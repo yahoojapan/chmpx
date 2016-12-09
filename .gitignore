@@ -1,0 +1,149 @@
+#
+# CHMPX
+#
+# Copyright 2014 Yahoo! JAPAN corporation.
+#
+# CHMPX is inprocess data exchange by MQ with consistent hashing.
+# CHMPX is made for the purpose of the construction of
+# original messaging system and the offer of the client
+# library.
+# CHMPX transfers messages between the client and the server/
+# slave. CHMPX based servers are dispersed by consistent
+# hashing and are automatically layouted. As a result, it
+# provides a high performance, a high scalability.
+#
+# For the full copyright and license information, please view
+# the LICENSE file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Tue July 1 2014
+# REVISION:
+#
+
+#
+# Compiled Object files
+#
+*.slo
+*.lo
+*.o
+*.Po
+*.Plo
+
+#
+# Precompiled Headers
+#
+*.gch
+*.pch
+
+#
+# Compiled Dynamic libraries
+#
+*.so
+*.so.*
+*.dylib
+*.dll
+
+#
+# Fortran module files
+#
+*.mod
+
+#
+# Compiled Static libraries
+#
+*.lai
+*.la
+*.a
+*.lib
+
+#
+# Executables
+#
+*.exe
+*.out
+*.app
+
+#
+# autotools
+#
+aclocal.m4
+autom4te.cache
+autoscan.log
+config.guess
+config.h
+config.h.in
+config.h.in~
+config.log
+config.status
+config.sub
+configure
+configure.scan
+depcomp
+install-sh
+libtool
+ltmain.sh
+m4
+m4/*
+missing
+stamp-h1
+
+#
+# automakes
+#
+Makefile.in
+*/Makefile.in
+*/*/Makefile.in
+
+
+#
+# archive files and backups
+#
+*.tgz
+*.tar.gz
+*.rpm
+*.swp
+
+#
+# object directories
+#
+.deps
+.libs
+*/.deps
+*/.deps/*
+*/.libs
+*/.libs/*
+
+#
+# other files
+#
+compile
+compile/*
+test-driver
+test-driver/*
+
+#
+# Other built objects
+#
+*.pc
+Makefile
+*/Makefile
+*/*/Makefile
+
+#
+# project custom
+#
+RELEASE_VERSION
+lib/chmpxversion.cc
+*.k2h
+src/chmpx
+src/chmmain
+tests/chmconftest
+tests/chmstreamtest
+tests/chmpxstatus
+tests/chmpxbench
+
+#
+# VIM modelines
+#
+# vim:set ts=4 fenc=utf-8:
+#

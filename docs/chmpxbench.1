@@ -1,0 +1,57 @@
+.TH CHMPXBENCH "1" "May 2015" "CHMPX" "Consistent Hashing Mq inProcess data eXchange"
+.SH NAME
+CHMPXBENCH \- Bench mark Tool for CHMPX by Yahoo! JAPAN
+.SH SYNOPSIS
+.B chmpxbench
+[ \-s | \-c ] [options]
+.SH DESCRIPTION
+.PP
+chmpxbench is bench mark test tool, this can test benchmark on CHMPX server/slave node. Then this tool send/receive data through CHMPX for bench mark on multi process/thread. You can see usage this tool by typing "-h".
+.SH OPTIONS
+.TP
+\fB\-h\fR
+display help
+.TP
+\fB\-s\fR
+join CHMPX server node(run chmpxbench on server node)
+.TP
+\fB\-c\fR
+join CHMPX slave node(run chmpxbench on slave node)
+.TP
+\fB\-f\fR [file path]
+specify configration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
+.TP
+\fB\-json\fR [file path]
+specify configration json string which is same file for CHMPX server/slave node.
+.TP
+\fB\-l\fR [loop count]
+specify loop count for each thread/process. default count is 1. 0 means no limit for loop.
+.TP
+\fB\-proccnt\fR [count]
+specify process count. default process count is 1.
+.TP
+\fB\-threadcnt\fR [count]
+specify thread count for each process. default thread count is 1.
+.TP
+\fB\-ta\fR
+specify Turn Around mode. the message is terned around on server to slave.
+.TP
+\fB\-b\fR
+specify Broadcast mode for only chmpxbench on slave node.
+.TP
+\fB\-dl\fR
+specify sending message data length by byte. default value and minimum value are 64 bytes.
+.TP
+\fB\-pr\fR
+print sending/recieving messages during bench mark.
+.TP
+\fB\-d\fR [ERR | WAN | INFO | DUMP]
+specify debugging level, chmpxbench displaies debugging message for itself.
+.SH SEE ALSO
+.TP
+chmpx(1)
+.SH BUGS
+.TP
+Please report owner and comitter.
+.SH AUTHOR
+chmpxbench has been written by Takeshi Nakatani <ggtakec@gmail.com>.

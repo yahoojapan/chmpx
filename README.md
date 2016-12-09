@@ -1,0 +1,43 @@
+CHMPX
+--------
+[![Build Status](https://travis-ci.org/yahoojapan/chmpx.svg?branch=master)](https://travis-ci.org/yahoojapan/chmpx)
+
+CHMPX - Consistent Hashing Mq inProcess data eXchange by Yahoo! JAPAN
+
+### Overview
+CHMPX is inprocess data exchange by MQ with consistent hashing system,
+and libraries for clients by Yahoo! JAPAN.
+CHMPX is made for the purpose of the construction of original
+messaging system and the offer of the client library. CHMPX
+transfers messages between the client and the server/slave. CHMPX
+based servers are dispersed by consistent hashing and are automatically
+layouted. As a result, it provides a high performance, a high
+scalability.
+
+### Feature
+  - Build up cluster with uniq name by some servers.
+  - Layouts servers in cluster by consistent hashing.
+  - Supports interprocess communication across the servers.
+  - Supports synchronous/asynchronous communication.
+  - Supports communicating messages in the target specified(HASH).
+  - Supports plugin Hashing function for target messaging.(k2hash)
+  - Supports communicating messages in the random.
+  - Supports SSL communication.
+  - The message communication possible bypass.
+  - No message lost during communication failure.
+  - Broadcast a message communication possible.
+  - Provision of high-level library for clients.
+  - Supports multi-thread/process for client programs.
+  - Supports synchronous communication
+  - Supports asynchronous communication
+  - Supports broadcast messages
+  - Supports data merging automatically
+  - Supports scaling automatically
+
+### Doccuments
+  - [WIKI](https://github.com/yahoojapan/chmpx/wiki)
+
+### License
+This software is released under the MIT License, see the LICENSE file.
+
+Copyright 2014 Yahoo! JAPAN corporation.

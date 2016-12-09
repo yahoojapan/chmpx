@@ -1,0 +1,274 @@
+.TH CHMPX "1" "December 2014" "CHMPX" "Consistent Hashing Mq inProcess data eXchange"
+.SH NAME
+CHMPX \- Consistent Hashing Mq inProcess data eXchange by Yahoo! JAPAN
+.SH SYNOPSIS
+.SS executable
+.TP
+\fBchmpx [options]
+.SS library
+.TP
+\fBlibchmpx.so
+.SH DESCRIPTION
+.TP 0
+CHMPX is Consistent Hashing Mq inProcess data eXchange system, and libraries for clients by Yahoo! JAPAN.
+CHMPX is made for the purpose of the construction of original messaging system and the offer of the client library. CHMPX transfers messages between the client and the server/slave. CHMPX based servers are dispersed by consistent hashing and are automatically layouted. As a result, it provides a high performance, a high scalability.
+.TP 2
+CHMPX is following specifications:
+.br
+\- Build up cluster with uniq name by some servers.
+.br
+\- Layouts servers in cluster by consistent hashing.
+.br
+\- Supports interprocess communication across the servers.
+.br
+\- Supports synchronous/asynchronous communication.
+.br
+\- Supports communicating messages in the target specified(HASH).
+.br
+\- Supports plugin Hashing function for target messaging.(k2hash)
+.br
+\- Supports communicating messages in the random.
+.br
+\- Supports SSL communication.
+.br
+\- The message communication possible bypass.
+.br
+\- No message lost during communication failure.
+.br
+\- Broadcast a message communication possible.
+.br
+\- Provision of high-level library for clients.
+.br
+\- Supports multi-thread/process for client programs.
+.br
+.SH OPTIONS
+.IP \fB\-h\fR 15
+display help
+.IP \fB\-v\fR 15
+display version.
+.IP \fB\-conf\ [file\ path]\fR 15
+specify configration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
+.IP \fB\-json\ [json\ string]\fR 15
+specify configration json string which is same file for CHMPX server/slave node.
+.IP \fB\-ctlport\ [control\ port\ number]\fR 15
+specify the self contrl port. if ctlport option is specified, chmpx searches same ctlport in configuration and ignores "CTLPORT" directive in "GLOBAL" section. and chmpx will start in the mode indicated by the server entry that has beed detected.
+.IP \fB\-d\fR\ [ERR\ |\ WAN\ |\ INFO\ |\ DUMP]\fR 15
+specify debugging level, chmpx displaies debugging message for itself.
+.IP \fB\-dl\ [file\ path]\fR 15
+specify sending message data length by byte. default value and minimum value are 64 bytes.
+.br
+.SH LIBRARY
+.TP 0
+CHMPX has library for programing client program.
+.TP 2
+CHMPX C Language interface function:
+.br
+void chmpx_bump_debug_level(...)
+.br
+void chmpx_set_debug_level_silent(...)
+.br
+void chmpx_set_debug_level_error(...)
+.br
+void chmpx_set_debug_level_warning(...)
+.br
+void chmpx_set_debug_level_message(...)
+.br
+void chmpx_set_debug_level_dump(...)
+.br
+bool chmpx_set_debug_file(...)
+.br
+bool chmpx_unset_debug_file(...)
+.br
+bool chmpx_load_debug_env(...)
+.TP 2
+.BR
+bool chmpx_load_hash_library(...)
+.br
+bool chmpx_unload_hash_library(...)
+.TP 2
+.BR
+chmpx_h chmpx_create(...)
+.br
+bool chmpx_destroy(...)
+.TP 2
+.BR
+bool chmpx_svr_send(...)
+.br
+bool chmpx_svr_send_kvp(...)
+.br
+bool chmpx_svr_send_kvp_ex(...)
+.br
+bool chmpx_svr_send_kv(...)
+.br
+bool chmpx_svr_send_kv_ex(...)
+.br
+bool chmpx_svr_broadcast(...)
+.br
+bool chmpx_svr_broadcast_ex(...)
+.br
+bool chmpx_svr_receive(...)
+.TP 2
+.BR
+msgid_t chmpx_open(...)
+.br
+bool chmpx_close(...)
+.br
+bool chmpx_msg_send(...)
+.br
+bool chmpx_msg_send_kvp(...)
+.br
+bool chmpx_msg_send_kv(...)
+.br
+bool chmpx_msg_broadcast(...)
+.br
+bool chmpx_msg_receive(...)
+.TP 2
+.BR
+bool chmpx_msg_reply(...)
+.br
+bool chmpx_msg_reply_kvp(...)
+.br
+bool chmpx_msg_reply_kv(...)
+.TP 2
+.BR
+bool is_chmpx_proc_exists(...)
+.TP 2
+.BR
+void chmpx_print_version(...)
+.TP 2
+.BR
+unsigned char* cvt_kvp_bin(...)
+.br
+bool cvt_bin_kvp(...)
+.br
+chmhash_t make_chmbin_hash(...)
+.br
+chmhash_t make_kvp_hash(...)
+.PP
+You can see these function prototypes in chmpx.h
+.TP
+CHMPX C++ Language interface is implemented almost in chmcntrl.h. You can use public ChmCntrl class methods like C Language interface.
+.br
+.SH CONFIGRATION
+.TP 0
+The chmpx program is main program for transferring message. You can run chmpx program with "\-h" option, then you can see options for chmpx. The chmpx program and clients program with library which is made by you are loading the configration file when these program start to run. The configration file is formatted "INI" file.
+.TP 2
+Following keys in configration file:
+.IP [GLOBAL] 20
+global common section.
+.IP [SVRNODE] 20
+server nodes section.
+.IP [SLVNODE] 20
+slave nodes section.
+.br
+.BR
+.br
+.IP FILEVERSION 20
+serial number for configration file version.
+.IP DATE 20
+date by RFC 2822
+.IP GROUP 20
+CHMPX group name as claster name.
+.IP MODE 20
+server or slave
+.IP DELIVERMODE 20
+random or hash, random means random transferred messages, hash is sending message to one of node.
+.IP MAXCHMPX 20
+maximum chmpx server in claster
+.IP REPLICA 20
+duplicate messages
+.IP MAXMQSERVER 20
+maximum MQ(POSIX Message Queue) on one server process.
+.IP MAXMQCLIENT 20
+maximum MQ(POSIX Message Queue) for all slave processes.
+.IP MQPERATTACH 20
+maximum attaching MQ count at time on server/slave process.
+.IP MAXQPERCLIENTMQ 20
+maximum queue in MQ by each MQ on client process.
+.IP MAXMQPERCLIENT 20
+maximum MQ count by each client process.
+.IP MAXHISTLOG 20
+maximum history log count.
+.IP PORT 20
+default chmpx port number.
+.IP CTLPORT 20
+default chmpx control port number.
+.IP SELFCTLPORT 20
+own chmpx control port number.
+.IP RWTIMEOUT 20
+timeout for reading/writing on socket by us.
+.IP RETRYCNT 20
+retry count for recovering connecting/sending/receiving on socket.
+.IP CONTIMEOUT 20
+timeout for connecting by us.
+.IP MQRWTIMEOUT 20
+timeout for reading/writing on MQ by us.
+.IP MQRETRYCNT 20
+retry count for recovering connecting/sending/receiving on MQ.
+.IP MQACK 20
+send/receive the ack at comminicating on MQ.
+.IP SOCKTHREADCNT 20
+thread count for receiving data on socket.
+.IP MQTHREADCNT 20
+thread count for receiving data on MQ.
+.IP MAXSOCKPOOL 20
+maximum socket pool count for each server node on server node.
+.IP SOCKPOOLTIMEOUT 20
+time limit for each socket pool.
+.IP DOMERGE 20
+auto merging mode, MUST be true.
+.IP AUTOMERGE 20
+merging data on server node automatically.
+.IP MERGETIMEOUT 20
+time limit for merging.
+.IP SSL 20
+default SSL mode.
+.IP SSL_VERIFY_PEER 20
+default verify peer mode on SSL.
+.IP CAPATH 20
+default CA certs file path or directory path.
+.IP SERVER_CERT 20
+default server cert file path.
+.IP SERVER_PRIKEY 20
+default server priovate key file path.
+.IP SLAVE_CERT 20
+default slave cert file path.
+.IP SLAVE_PRIKEY 20
+default slave priovate key file path.
+.IP K2HFULLMAP 20
+k2hash option which is used by chmpx.(see man k2hash)
+.IP K2HMASKBIT 20
+k2hash option which is used by chmpx.(see man k2hash)
+.IP K2HCMASKBIT 20
+k2hash option which is used by chmpx.(see man k2hash)
+.IP K2HMAXELE 20
+k2hash option which is used by chmpx.(see man k2hash)
+.br
+.BR
+.br
+.IP NAME 20
+server/slave name by FQDN. you can use regular expression(for slave name) or easiness regular expression(for server name)
+.TP
+You can see the sample of configration file in docs/exsample directory.
+.SH ENVIRONMENT
+.TP 2
+CHMPX use some environments automatically, plese take care these environments.
+.IP CHMDBGMODE 20
+specifies debugging level: INFO/WAN/ERR/SILENT
+.IP CHMDBGFILE 20
+output file path for message(default: stderr)
+.IP CHMCONFFILE 20
+specify configuratin file by environment, chmpx uses this value when configuration file or json string is not specified in command line.
+.IP CHMJSONCONF 20
+specify configuratin json string by environment, chmpx uses this value when configuration file or json string is not specified in command line.
+.SH NOTES
+.TP 0
+chmpxbench is tool for k2hash file/memory.
+.SH SEE ALSO
+.TP
+chmpxbench(1)
+.SH BUGS
+.TP
+Please report owner and comitter.
+.SH AUTHOR
+CHMPX has been written by Takeshi Nakatani <ggtakec@gmail.com>.
