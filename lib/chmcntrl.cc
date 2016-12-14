@@ -1219,7 +1219,7 @@ PCHMINFOEX ChmCntrl::DupAllChmInfo(void)
 {
 	if(!ImData.IsInitialized()){
 		ERR_CHMPRN("This object is not initialized yet.");
-		return false;
+		return NULL;
 	}
 	return ImData.DupAllChmInfo();
 }
@@ -1228,7 +1228,7 @@ PCHMPX ChmCntrl::DupSelfChmpxInfo(void)
 {
 	if(!ImData.IsInitialized()){
 		ERR_CHMPRN("This object is not initialized yet.");
-		return false;
+		return NULL;
 	}
 	return ImData.DupSelfChmpxInfo();
 }

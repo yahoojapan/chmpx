@@ -934,7 +934,7 @@ bool chmpx_lap<T>::Set(int sock, int ctlsock, int selfsock, int selfctlsock, int
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -996,7 +996,7 @@ bool chmpx_lap<T>::Set(chmhash_t base, chmhash_t pending, int type)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1043,7 +1043,7 @@ bool chmpx_lap<T>::Remove(int sock)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1087,7 +1087,7 @@ bool chmpx_lap<T>::SetStatus(chmpxsts_t status)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1108,7 +1108,7 @@ bool chmpx_lap<T>::Get(std::string& name, chmpxid_t& chmpxid, short& port, short
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1126,7 +1126,7 @@ bool chmpx_lap<T>::Get(socklist_t& socklist, int& ctlsock, int& selfsock, int& s
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1156,7 +1156,7 @@ int chmpx_lap<T>::GetSock(int type)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return CHM_INVALID_SOCK;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return CHM_INVALID_SOCK;
 	}
@@ -1190,7 +1190,7 @@ bool chmpx_lap<T>::FindSock(int sock)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}
@@ -1210,7 +1210,7 @@ bool chmpx_lap<T>::Get(chmhash_t& base, chmhash_t& pending) const
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(basic_type::pAbsPtr->name)){
+	if('\0' == basic_type::pAbsPtr->name[0]){
 		ERR_CHMPRN("PCHMPX does not initialized.");
 		return false;
 	}

@@ -2341,13 +2341,13 @@ bool ChmEventSock::IsSafeParamsForSSL(void)
 		ERR_CHMPRN("Failed to get SSL structure from self chmpx.");
 		return false;
 	}
-	if(!CHMEMPTYSTR(ssldata.server_cert)){
+	if('\0' != ssldata.server_cert[0]){
 		if(NULL == ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.server_cert, ssldata.server_prikey, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer)){
 			ERR_CHMPRN("Failed to make self SSL context for server socket.");
 			return false;
 		}
 	}
-	if(!CHMEMPTYSTR(ssldata.slave_cert)){
+	if('\0' != ssldata.slave_cert[0]){
 		if(NULL == ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), NULL, NULL, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer)){
 			ERR_CHMPRN("Failed to make self SSL context for slave socket.");
 			return false;
