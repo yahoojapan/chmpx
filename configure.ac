@@ -76,11 +76,11 @@ AC_CONFIG_FILES([Makefile
 
 # Check for k2hash + libfullock
 if test "x${CHECK_K2HASH}" != "xno"; then
-	PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.54], [have_k2hash=yes], [have_k2hash=no])
+	PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.56], [have_k2hash=yes], [have_k2hash=no])
 	if test "x${have_k2hash}" = "xno"; then
 		AC_MSG_ERROR([not found k2hash package.])
 	fi
-	PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.23], [have_fullock=yes], [have_fullock=no])
+	PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.24], [have_fullock=yes], [have_fullock=no])
 	if test "x${have_fullock}" = "xno"; then
 		AC_MSG_ERROR([not found fullock package.])
 	fi

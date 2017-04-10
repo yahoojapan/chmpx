@@ -1,3 +1,12 @@
+chmpx (1.0.52) unstable; urgency=low
+
+  * Updated fullock and k2hash submodule version
+  * Updated k2hash submodule v1.0.56
+  * Updated fullock submodule v1.0.24
+  * Added lib_version_for_link option to make_valiables.sh
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 28 Mar 2017 12:25:11 +0900
+
 chmpx (1.0.51) unstable; urgency=low
 
   * Updated dependency for fixing bugs in libfullock
