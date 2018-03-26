@@ -1,0 +1,66 @@
+.TH CHMPXLINETOOL "1" "December 2014" "CHMPX" "Consistent Hashing Mq inProcess data eXchange"
+.SH NAME
+CHMPXLINETOOL \- Interactive Command Line Tool for CHMPX by Yahoo! JAPAN
+.SH SYNOPSIS
+.B chmpxlinetool [options]
+.SH DESCRIPTION
+.PP
+chmpxlinetool is interactive tool, this can control CHMPX processes by control command, and print status, etc.. Then you can do servicein/serviceout/merge/etc to chmpx processes. chmpxlinetool has CUI interface, and command history, etc. You can see usage this tool by typing "-h".
+.SH OPTIONS
+.TP
+\fB\-h\fR
+display help
+.TP
+\fB\-conf\ [file\ path]\fR
+specify configration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
+.TP
+\fB\-json\ [json\ string]\fR
+specify configration json string which is same file for CHMPX server/slave node.
+.TP
+\fB\-host\ [hostname]\fR
+specify one of hostname for chmpx node, if not specified, using localhost.
+.TP
+\fB\-ctlport\ [control\ port\ number]\fR
+specify chmpx node control port. if host option is specified, this option must be specified.
+.TP
+\fB\-server\fR
+specify chmpx node server type for hostanme specified.
+.TP
+\fB\-slave\fR
+specify chmpx node slave type for hostanme specified.
+.TP
+\fB\-threadcnt\ [thread\ count]\fR
+specify thread count for sending/receiving control command to chmpx node.
+.TP
+\fB\-check\ [interval\ second]\fR
+specify running check all node status when chmpxlinetool starts to run. this checking is loop with interval second.
+.TP
+\fB\-status\ [interval\ second]\fR
+specify printing all node status when chmpxlinetool starts to run. this printing is loop with interval second.
+.TP
+\fB\-nocolor\fR
+specify this, print without no escape sequence(no color).
+.TP
+\fB\-lap\fR
+print lap time after line command.
+.TP
+\fB\-d\fR\ [SILENT\ |\ ERR\ |\ WAN\ |\ INFO\ |\ DUMP]\fR
+specify debugging level, chmpxlinetool displaies debugging message for itself.
+.TP
+\fB\-dchmpx\fR\
+specify debugging level for chmpx.
+.TP
+\fB\-his\fR\ [history\ count]\fR
+set history count of command.
+.TP
+\fB\-run\fR\ [command\ file\ path]\fR
+run commands in file when chmpxlinetool starts to run.
+.TP
+.SH SEE ALSO
+.TP
+chmpx(1)
+.SH BUGS
+.TP
+Please report owner and comitter.
+.SH AUTHOR
+chmpxlinetool has been written by Takeshi Nakatani <ggtakec@gmail.com>.

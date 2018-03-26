@@ -1762,17 +1762,17 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 
 	// check merge flags
 	if(chmcfginfo.is_random_mode){
-		if(chmcfginfo.is_auto_merge){
-			WAN_CHMPRN("Specified %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
-			chmcfginfo.is_auto_merge = false;
+		if(!chmcfginfo.is_auto_merge){
+			WAN_CHMPRN("Specified %s=%s and %s=OFF. These options can not be specified at the same time, so SET %s=ON.", INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_RANDOM_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
+			chmcfginfo.is_auto_merge = true;
 		}
 		if(chmcfginfo.is_do_merge){
-			WAN_CHMPRN("Specified %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_DOMERGE_STR, INICFG_DOMERGE_STR);
+			WAN_CHMPRN("Specified %s=%s and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_RANDOM_STR, INICFG_DOMERGE_STR, INICFG_DOMERGE_STR);
 			chmcfginfo.is_do_merge = false;
 		}
 	}else{
 		if(!chmcfginfo.is_do_merge && chmcfginfo.is_auto_merge){
-			WAN_CHMPRN("Specified %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DOMERGE_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
+			WAN_CHMPRN("Specified %s=OFF and %s=ON on %s=%s. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DOMERGE_STR, INICFG_AUTOMERGE_STR, INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_HASH_STR, INICFG_AUTOMERGE_STR);
 			chmcfginfo.is_auto_merge = false;
 		}
 	}
@@ -3051,17 +3051,17 @@ static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& 
 
 		// check merge flags
 		if(chmcfginfo.is_random_mode){
-			if(chmcfginfo.is_auto_merge){
-				WAN_CHMPRN("Found %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
-				chmcfginfo.is_auto_merge = false;
+			if(!chmcfginfo.is_auto_merge){
+				WAN_CHMPRN("Found %s=%s and %s=OFF. These options can not be specified at the same time, so SET %s=ON.", INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_RANDOM_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
+				chmcfginfo.is_auto_merge = true;
 			}
 			if(chmcfginfo.is_do_merge){
-				WAN_CHMPRN("Found %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_DOMERGE_STR, INICFG_DOMERGE_STR);
+				WAN_CHMPRN("Found %s=%s and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_RANDOM_STR, INICFG_DOMERGE_STR, INICFG_DOMERGE_STR);
 				chmcfginfo.is_do_merge = false;
 			}
 		}else{
 			if(!chmcfginfo.is_do_merge && chmcfginfo.is_auto_merge){
-				WAN_CHMPRN("Found %s=ON and %s=ON. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DOMERGE_STR, INICFG_AUTOMERGE_STR, INICFG_AUTOMERGE_STR);
+				WAN_CHMPRN("Found %s=OFF and %s=ON on %s=%s. These options can not be specified at the same time, so SET %s=OFF.", INICFG_DOMERGE_STR, INICFG_AUTOMERGE_STR, INICFG_DELIVERMODE_STR, INICFG_DELIVERMODE_HASH_STR, INICFG_AUTOMERGE_STR);
 				chmcfginfo.is_auto_merge = false;
 			}
 		}

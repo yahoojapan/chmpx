@@ -165,6 +165,7 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("random mode                                  = %s",				pInfo->pchminfo->is_random_deliver ? "yes" : "no");
 	PRN("communication history count                  = %ld",				pInfo->pchminfo->histlog_count);
 	PRN("auto merge                                   = %s",				pInfo->pchminfo->is_auto_merge ? "yes" : "no");
+	PRN("suspend auto merge                           = %s",				pInfo->pchminfo->is_auto_merge_suspend ? "yes" : "no");
 	PRN("merge processing(do merge)                   = %s",				pInfo->pchminfo->is_do_merge ? "yes" :"no");
 	PRN("timeout for merge                            = %zd (s)",			pInfo->pchminfo->timeout_merge);
 	PRN("thread count for socket                      = %d",				pInfo->pchminfo->evsock_thread_cnt);

@@ -38,6 +38,9 @@ scalability.
   - [WIKI](https://github.com/yahoojapan/chmpx/wiki)
 
 ### License
-This software is released under the MIT License, see the LICENSE file.
+This software is released under the MIT License, see the license file.
 
-Copyright 2014 Yahoo! JAPAN corporation.
+### AntPickax
+k2hash is one of [AntPickax](https://yahoojapan.github.io/AntPickax/) products.
+
+Copyright(C) 2014 Yahoo Japan corporation.

@@ -108,12 +108,13 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 		if(bcount <= bcnt){
 			return false;
 		}
-		if(	0 != strcmp(pbase[bcnt].name, pmerge[mcnt].name)	||
-			pbase[bcnt].base_hash	!= pmerge[mcnt].base_hash	||
-			pbase[bcnt].port		!= pmerge[mcnt].port		||
-			pbase[bcnt].ctlport		!= pmerge[mcnt].ctlport		||
-			!CMP_CHMPXSSL(pbase[bcnt].ssl, pmerge[mcnt].ssl)	||
-			(is_status && pbase[bcnt].status != pmerge[mcnt].status) )
+		if(	0 != strcmp(pbase[bcnt].name, pmerge[mcnt].name)						||
+			(is_status && pbase[bcnt].base_hash != pmerge[mcnt].base_hash)			||
+			(is_status && pbase[bcnt].pending_hash	!= pmerge[mcnt].pending_hash)	||
+			pbase[bcnt].port		!= pmerge[mcnt].port							||
+			pbase[bcnt].ctlport		!= pmerge[mcnt].ctlport							||
+			!CMP_CHMPXSSL(pbase[bcnt].ssl, pmerge[mcnt].ssl)						||
+			(is_status && pbase[bcnt].status != pmerge[mcnt].status)				)
 		{
 			return false;
 		}
@@ -1052,6 +1053,7 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count)
 
 	// check
 	if(!ChmIMData::CompareChmpxSvrs(pbasechmpxsvrs, basecount, pchmpxsvrs, count)){
+		MSG_CHMPRN("Not same servers status by each comparing.");
 		CHM_Free(pbasechmpxsvrs);
 		return false;
 	}
@@ -1138,7 +1140,7 @@ bool ChmIMData::IsRandomDeliver(void) const
 	return tmpchminfo.IsRandomDeliver();
 }
 
-bool ChmIMData::IsAutoMergeConf(void) const
+bool ChmIMData::IsAutoMerge(void) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1148,10 +1150,10 @@ bool ChmIMData::IsAutoMergeConf(void) const
 	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.IsAutoMergeConf();
+	return tmpchminfo.IsAutoMerge();
 }
 
-bool ChmIMData::IsDoMergeConf(void) const
+bool ChmIMData::IsDoMerge(void) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1161,7 +1163,46 @@ bool ChmIMData::IsDoMergeConf(void) const
 	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.IsDoMergeConf();
+	return tmpchminfo.IsDoMerge();
+}
+
+bool ChmIMData::SuspendAutoMerge(void)
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	// This value is set only at initializing, so not need locking
+	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.SuspendAutoMerge();
+}
+
+bool ChmIMData::ResetAutoMerge(void)
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	// This value is set only at initializing, so not need locking
+	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.ResetAutoMerge();
+}
+
+bool ChmIMData::GetAutoMergeMode(void) const
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	// This value is set only at initializing, so not need locking
+	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.GetAutoMergeMode();
 }
 
 int ChmIMData::GetSocketThreadCount(void) const
@@ -1595,7 +1636,7 @@ chmpxid_t ChmIMData::GetChmpxIdByStatus(chmpxsts_t status, bool part_match) cons
 	return tmpchminfo.GetChmpxIdByStatus(status, part_match);
 }
 
-chmpxid_t ChmIMData::GetRandomServerChmpxId(bool is_up_servers, bool without_suspend)
+chmpxid_t ChmIMData::GetRandomServerChmpxId(bool without_suspend)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1604,7 +1645,7 @@ chmpxid_t ChmIMData::GetRandomServerChmpxId(bool is_up_servers, bool without_sus
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.GetRandomServerChmpxId(is_up_servers, without_suspend);
+	return tmpchminfo.GetRandomServerChmpxId(without_suspend);
 }
 
 chmpxid_t ChmIMData::GetServerChmpxIdByHash(chmhash_t hash) const
@@ -1817,7 +1858,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 		if(IsRandomDeliver()){
 			// Random --> terminal chmpxid is one
 			chmpxid_t	tmpchmpxid;
-			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true, true))){	// only up server, not suspend server
+			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true))){			// only up server, not suspend server
 				ERR_CHMPRN("Could not get random server chmpxid.");
 				return -1L;
 			}
@@ -1825,66 +1866,84 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 		}else{
 			// from hash --> terminal chmpxid is some
 			chmpxidlist_t	tmpchmpxids;
-			if(!GetServerChmpxIdByHashs(hash, tmpchmpxids)){
+			if(!GetServerChmpxIdByHashs(hash, tmpchmpxids)){			// with pending(for DELETE), without down and suspend
 				ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ").", hash);
 				return -1L;
 			}
 
-			// set first chmpxid
-			chmpxid_t	tmpchmpxid = CHM_INVALID_CHMPXID;
-			do{
-				tmpchmpxid = tmpchmpxids.front();
+			// set first chmpxid(and without NOACT !(NOTHING)/ADD status)
+			bool	found = false;
+			for(chmpxidlist_t::const_iterator iter = tmpchmpxids.begin(); iter != tmpchmpxids.end(); ++iter){
+				chmpxid_t	tmpchmpxid = (*iter);
 				// except self chmpxid
 				if(IS_C2CTYPE_NOT_SELF(c2ctype)){
 					if(selfchmpxid == tmpchmpxid){
-						tmpchmpxid = CHM_INVALID_CHMPXID;
+						continue;
 					}
 				}
-			}while(tmpchmpxid == CHM_INVALID_CHMPXID && 0 < tmpchmpxids.size());
-
-			if(CHM_INVALID_CHMPXID == tmpchmpxid){
+				// without NOACT !(NOTHING)/ADD status
+				chmpxsts_t	status = GetServerStatus(tmpchmpxid);
+				if((IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)) || IS_CHMPXSTS_DELETE(status)){
+					// [NOACT][NOTHING] or [DELETE] status chmpx is OK.
+					chmpxids.push_back(tmpchmpxid);						// one chmpxid is set
+					found = true;
+					break;
+				}
+			}
+			if(!found){
 				ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
 				return -1L;
 			}
-
-			// one chmpxid is set
-			chmpxids.push_back(tmpchmpxid);
 		}
 
 	}else if(IS_C2CTYPE_BROADCAST(c2ctype)){
 		// any type --> terminal chmpxid is all
-		if(!GetServerChmpxIds(chmpxids)){
+		if(!GetServerChmpxIds(chmpxids)){								// with pending(for DELETE), without down and suspend
 			ERR_CHMPRN("Could not get all server chmpxids.");
 			return -1L;
 		}
-		// except self chmpxid
-		if(IS_C2CTYPE_NOT_SELF(c2ctype)){
-			for(chmpxidlist_t::iterator iter = chmpxids.begin(); iter != chmpxids.end(); ){
+		for(chmpxidlist_t::iterator iter = chmpxids.begin(); iter != chmpxids.end(); ){
+			// except self chmpxid
+			if(IS_C2CTYPE_NOT_SELF(c2ctype)){
 				if(selfchmpxid == *iter){
 					iter = chmpxids.erase(iter);
 					continue;
 				}
-				++iter;
 			}
+			// without NOACT !(NOTHING)/ADD status
+			chmpxsts_t	status = GetServerStatus(*iter);
+			if((IS_CHMPXSTS_NOACT(status) && !IS_CHMPXSTS_NOTHING(status)) || IS_CHMPXSTS_ADD(status)){
+				// [NOACT][PENDING / DOING / DONE] or [ADD] status chmpx is rejected.
+				iter = chmpxids.erase(iter);
+				continue;
+			}
+			++iter;
 		}
 
 	}else if(IS_C2CTYPE_RBROADCAST(c2ctype)){
 		// any type --> terminal chmpxid is all routing chmpxids for hash value
 
 		// get target chmpxids
-		if(!GetServerChmpxIdByHashs(hash, chmpxids, true, true, true)){					// with pending, without down and suspend
+		if(!GetServerChmpxIdByHashs(hash, chmpxids)){					// with pending(for DELETE), without down and suspend
 			ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because all target chmpxid is probabry down or suspend.", hash);
 			return -1L;
 		}
-		// except self chmpxid
-		if(IS_C2CTYPE_NOT_SELF(c2ctype)){
-			for(chmpxidlist_t::iterator iter = chmpxids.begin(); iter != chmpxids.end(); ){
+		for(chmpxidlist_t::iterator iter = chmpxids.begin(); iter != chmpxids.end(); ){
+			// except self chmpxid
+			if(IS_C2CTYPE_NOT_SELF(c2ctype)){
 				if(selfchmpxid == *iter){
 					iter = chmpxids.erase(iter);
 					continue;
 				}
-				++iter;
 			}
+			// without NOACT !(NOTHING)/ADD status
+			chmpxsts_t	status = GetServerStatus(*iter);
+			if((IS_CHMPXSTS_NOACT(status) && !IS_CHMPXSTS_NOTHING(status)) || IS_CHMPXSTS_ADD(status)){
+				// [NOACT][PENDING / DOING / DONE] or [ADD] status chmpx is rejected.
+				iter = chmpxids.erase(iter);
+				continue;
+			}
+			++iter;
 		}
 
 	}else{	// COM_C2C_NORMAL or COM_C2C_IGNORE
@@ -1895,39 +1954,49 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 		chmpxid_t	tmpchmpxid = CHM_INVALID_CHMPXID;
 		if(IsRandomDeliver()){
 			// Random --> terminal chmpxid is one
-			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true, true))){	// only up server, not suspend server
+			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true))){		// only up server, not suspend server
 				ERR_CHMPRN("Could not get random server chmpxid.");
 				return -1L;
 			}
 		}else{
 			// from hash --> terminal chmpxid is one
-			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetServerChmpxIdByHash(hash))){
-				// could not get main target hash chmpx(down or suspend),
+			if(CHM_INVALID_CHMPXID != (tmpchmpxid = GetServerChmpxIdByHash(hash))){
+				// without Not servicing/Suspend status
+				chmpxsts_t	status = GetServerStatus(tmpchmpxid);
+				if(!IS_CHMPXSTS_SERVICING(status) || IS_CHMPXSTS_SUSPEND(status)){
+					tmpchmpxid = CHM_INVALID_CHMPXID;
+				}
+			}
+			if(CHM_INVALID_CHMPXID == tmpchmpxid){
+				// could not get main target hash chmpx(not servicing or suspend),
 				// so try to get another chmpx when hash & replication mode.
 				//
 				if(0 < GetReplicaCount()){
+					// from hash --> terminal chmpxid is some
 					chmpxidlist_t	tmpchmpxids;
-					// find chmpxs assigned by target hash
-					if(!GetServerChmpxIdByHashs(hash, tmpchmpxids, false) || 0 == tmpchmpxids.size()){		// without assigned pending hash
-						if(!GetServerChmpxIdByHashs(hash, tmpchmpxids, true) || 0 == tmpchmpxids.size()){	// without assign pending hash
-							ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
-							return -1L;
-						}
+					if(!GetServerChmpxIdByHashs(hash, tmpchmpxids)){	// with pending(for DELETE), without down and suspend
+						ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
+						return -1L;
 					}
-					// set first chmpxid
-					do{
-						tmpchmpxid = tmpchmpxids.front();
+
+					// set first chmpxid(and without NOACT !(NOTHING)/ADD status)
+					for(chmpxidlist_t::const_iterator iter = tmpchmpxids.begin(); iter != tmpchmpxids.end(); ++iter){
 						// except self chmpxid
 						if(IS_C2CTYPE_NOT_SELF(c2ctype)){
-							if(selfchmpxid == tmpchmpxid){
-								tmpchmpxid = CHM_INVALID_CHMPXID;
+							if(selfchmpxid == *iter){
+								continue;
 							}
 						}
-					}while(tmpchmpxid == CHM_INVALID_CHMPXID && 0 < tmpchmpxids.size());
-
+						// without NOACT !(NOTHING)/ADD status
+						chmpxsts_t	status = GetServerStatus(*iter);
+						if((IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)) || IS_CHMPXSTS_DELETE(status)){
+							// [NOACT][NOTHING] or [DELETE] status chmpx is OK.
+							tmpchmpxid = (*iter);						// one chmpxid is set
+							break;
+						}
+					}
 				}else{
-					ERR_CHMPRN("Replica count is invalid, so could not get chmpxid by hash(0x%016" PRIx64 ").", hash);
-					return -1L;
+					WAN_CHMPRN("Replica count is 0, then could not search chmpxid by hash(0x%016" PRIx64 ") no more.", hash);
 				}
 			}
 		}
@@ -2109,6 +2178,18 @@ bool ChmIMData::SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status)
 	return tmpchminfo.SetServerStatus(chmpxid, status);
 }
 
+bool ChmIMData::UpdateLastStatusTime(chmpxid_t chmpxid)
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_WRITE);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.UpdateLastStatusTime(chmpxid);
+}
+
 bool ChmIMData::IsOperating(void)
 {
 	if(!IsAttachedShm()){
@@ -2121,7 +2202,7 @@ bool ChmIMData::IsOperating(void)
 	return tmpchminfo.IsOperating();
 }
 
-bool ChmIMData::UpdatePendingHash(bool is_allow_operating)
+bool ChmIMData::UpdateHash(int type, bool is_allow_operating)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -2130,7 +2211,7 @@ bool ChmIMData::UpdatePendingHash(bool is_allow_operating)
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_WRITE);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.UpdatePendingHash(is_allow_operating);
+	return tmpchminfo.UpdateHash(type, is_allow_operating, true);
 }
 
 bool ChmIMData::SetSelfSocks(int sock, int ctlsock)
@@ -2259,6 +2340,18 @@ bool ChmIMData::RemoveSlave(chmpxid_t chmpxid)
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
 	return tmpchminfo.RemoveSlave(chmpxid, eqfd);
+}
+
+bool ChmIMData::CheckSockInAllChmpx(int sock) const
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.CheckSockInAllChmpx(sock);
 }
 
 //---------------------------------------------------------

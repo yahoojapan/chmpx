@@ -22,7 +22,7 @@
 
 AUTOMAKE_OPTIONS = foreign no-dependencies
 
-man_MANS = chmpx.1 chmpxbench.1
+man_MANS = chmpx.1 chmpxbench.1 chmpxstatus.1 chmpxconftest.1 chmpxlinetool.1
 
 SUBDIRS = examples
 

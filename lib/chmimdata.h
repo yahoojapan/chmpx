@@ -156,8 +156,11 @@ class ChmIMData
 
 		bool GetGroup(std::string& group) const;
 		bool IsRandomDeliver(void) const;
-		bool IsAutoMergeConf(void) const;
-		bool IsDoMergeConf(void) const;
+		bool IsAutoMerge(void) const;
+		bool IsDoMerge(void) const;
+		bool SuspendAutoMerge(void);
+		bool ResetAutoMerge(void);
+		bool GetAutoMergeMode(void) const;
 		int GetSocketThreadCount(void) const;
 		int GetMQThreadCount(void) const;
 		int GetMaxSockPool(void) const;
@@ -198,7 +201,7 @@ class ChmIMData
 		chmpxid_t GetChmpxIdByFromSlaveSock(int sock) const { return GetChmpxIdBySock(sock, CLOSETG_SLAVES); }
 		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
-		chmpxid_t GetRandomServerChmpxId(bool is_up_servers = false, bool without_suspend = false);
+		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
 		bool GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending = true, bool without_down = true, bool without_suspend = true);
 		bool GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, bool with_pending = true, bool without_down = true, bool without_suspend = true);
@@ -240,8 +243,10 @@ class ChmIMData
 		bool SetServerBaseHash(chmpxid_t chmpxid, chmhash_t hash) { return SetServerHash(chmpxid, hash, 0L, HASHTG_BASE); }
 		bool SetServerPendingHash(chmpxid_t chmpxid, chmhash_t hash) { return SetServerHash(chmpxid, 0L, hash, HASHTG_PENDING); }
 		bool SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status);
+		bool UpdateSelfLastStatusTime(void) { return UpdateLastStatusTime(CHM_INVALID_CHMPXID); }
+		bool UpdateLastStatusTime(chmpxid_t chmpxid);
 		bool RemoveServerSock(chmpxid_t chmpxid, int sock);
-		bool UpdatePendingHash(bool is_allow_operating = true);
+		bool UpdateHash(int type, bool is_allow_operating = true);
 		bool SetSelfSocks(int sock, int ctlsock);
 		bool SetSelfHash(chmhash_t base, chmhash_t pending, int type);
 		bool SetSelfBaseHash(chmhash_t hash) { return SetSelfHash(hash, 0L, HASHTG_BASE); }
@@ -249,6 +254,7 @@ class ChmIMData
 		bool SetSelfStatus(chmpxsts_t status);
 		bool SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl, int sock, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock);
+		bool CheckSockInAllChmpx(int sock) const;
 
 		// Stats
 		bool AddStat(chmpxid_t chmpxid, bool is_sent, size_t bodylength, const struct timespec& elapsed_time);
