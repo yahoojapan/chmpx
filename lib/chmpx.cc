@@ -506,6 +506,17 @@ void chmpx_print_version(FILE* stream)
 	fprintf(stream, format, VERSION, chmpx_commit_hash);
 }
 
+const char* chmpx_get_version(void)
+{
+	static char stc_version[256];
+	static bool	stc_init = false;
+	if(!stc_init){
+		sprintf(stc_version, "Version %s (commit: %s)", VERSION, chmpx_commit_hash);
+		stc_init = true;
+	}
+	return stc_version;
+}
+
 //---------------------------------------------------------
 // Key Value Pair Utilities
 //---------------------------------------------------------

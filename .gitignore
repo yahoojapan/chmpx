@@ -137,10 +137,11 @@ lib/chmpxversion.cc
 *.k2h
 src/chmpx
 src/chmmain
-tests/chmconftest
-tests/chmstreamtest
+tests/chmpxconftest
+tests/chmpxstreamtest
 tests/chmpxstatus
 tests/chmpxbench
+tests/chmpxlinetool
 
 #
 # VIM modelines

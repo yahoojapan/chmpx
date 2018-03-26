@@ -275,7 +275,7 @@ int main(int argc, char** argv)
 	while(isloop){
 		struct epoll_event	events[32];
 		int					max_events	= 32;
-		int					timeout		= 1000;					// 1s (ex, shmproxy is 100ms)
+		int					timeout		= 1000;					// 1s (ex, another is 100ms)
 
 		int evcount = epoll_pwait(eventfd, events, max_events, timeout, &sigset);
 		if(-1 == evcount){

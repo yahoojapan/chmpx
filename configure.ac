@@ -64,7 +64,8 @@ AC_FUNC_MMAP
 AC_FUNC_REALLOC
 AC_FUNC_MKTIME
 AC_FUNC_FORK
-AC_CHECK_FUNCS([ftruncate gethostname memset regcomp setlocale strcasecmp strdup strrchr clock_gettime munmap select socket uname])
+AC_CHECK_FUNCS([ftruncate gethostname memset regcomp setlocale strcasecmp strncasecmp strdup strrchr clock_gettime munmap select socket uname gettimeofday])
+AC_CHECK_HEADERS([termios.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_FILES([Makefile
 		lib/Makefile
@@ -76,7 +77,7 @@ AC_CONFIG_FILES([Makefile
 
 # Check for k2hash + libfullock
 if test "x${CHECK_K2HASH}" != "xno"; then
-	PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.56], [have_k2hash=yes], [have_k2hash=no])
+	PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.57], [have_k2hash=yes], [have_k2hash=no])
 	if test "x${have_k2hash}" = "xno"; then
 		AC_MSG_ERROR([not found k2hash package.])
 	fi
