@@ -1,3 +1,40 @@
+chmpx (1.0.58) unstable; urgency=low
+
+  * Update dependency on k2hash v1.0.57
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 26 Mar 2018 11:47:56 +0900
+
+chmpx (1.0.57) unstable; urgency=low
+
+  * Improved the appearance of chmpxlinetool
+  * Added chmpxlinetool and changed some logic/codes, fixed bugs
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 23 Mar 2018 08:00:46 +0900
+
+chmpx (1.0.56) unstable; urgency=low
+
+  * Fixed bugs about connecting SSL and invalid result on ctlport
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 13 Mar 2018 11:13:16 +0900
+
+chmpx (1.0.55) unstable; urgency=low
+
+  * Fixed bugs about status and updating status flow etc
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 07 Mar 2018 10:17:05 +0900
+
+chmpx (1.0.54) unstable; urgency=low
+
+  * Enhanced status and status flow and Fixed bugs about status
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 27 Feb 2018 15:26:35 +0900
+
+chmpx (1.0.53) unstable; urgency=low
+
+  * Force to set SERVICE OUT/DOWN status when all server chmpx down
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 13 Feb 2018 15:41:08 +0900
+
 chmpx (1.0.52) unstable; urgency=low
 
   * Updated fullock and k2hash submodule version

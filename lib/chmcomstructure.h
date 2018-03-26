@@ -281,6 +281,10 @@ typedef uint64_t						pxcomres_t;			// result code for PXCOM_XXX
 #define	CHMPX_COM_REQ_UPDATEDATA		13					// [loop in RING] request update datas
 #define	CHMPX_COM_RES_UPDATEDATA		14					// Result(Response) request update datas
 #define	CHMPX_COM_RESULT_UPDATEDATA		15					// Result(Response) request update datas
+#define	CHMPX_COM_MERGE_SUSPEND			16					// [loop in RING] suspend auto merging(v1.0.54)
+#define	CHMPX_COM_MERGE_NOSUSPEND		17					// [loop in RING] reset(nosuspend) auto merging(v1.0.54)
+#define	CHMPX_COM_MERGE_SUSPEND_GET		18					// Request suspend merging suspend at initializing(v1.0.57)
+#define	CHMPX_COM_MERGE_SUSPEND_RES		19					// Response suspend merging status at initializing(v1.0.57)
 
 #define	STRPXCOMTYPE(type)			(	CHMPX_COM_UNKNOWN			== type ? "CHMPX_COM_UNKNOWN"			: \
 										CHMPX_COM_STATUS_REQ		== type ? "CHMPX_COM_STATUS_REQ"		: \
@@ -298,6 +302,10 @@ typedef uint64_t						pxcomres_t;			// result code for PXCOM_XXX
 										CHMPX_COM_REQ_UPDATEDATA	== type ? "CHMPX_COM_REQ_UPDATEDATA"	: \
 										CHMPX_COM_RES_UPDATEDATA	== type ? "CHMPX_COM_RES_UPDATEDATA"	: \
 										CHMPX_COM_RESULT_UPDATEDATA	== type ? "CHMPX_COM_RESULT_UPDATEDATA"	: \
+										CHMPX_COM_MERGE_SUSPEND		== type ? "CHMPX_COM_MERGE_SUSPEND"		: \
+										CHMPX_COM_MERGE_NOSUSPEND	== type ? "CHMPX_COM_MERGE_NOSUSPEND"	: \
+										CHMPX_COM_MERGE_SUSPEND_GET	== type ? "CHMPX_COM_MERGE_SUSPEND_GET"	: \
+										CHMPX_COM_MERGE_SUSPEND_RES	== type ? "CHMPX_COM_MERGE_SUSPEND_RES"	: \
 										"NOT_DEFINED_TYPE"	)
 
 #define	CHMPX_COM_RES_SUCCESS			0					// no error
@@ -413,6 +421,23 @@ typedef struct chmpx_com_result_updatedata{
 	reqidmapflag_t	result;										// result
 }CHMPX_ATTR_PACKED PXCOM_RESULT_UPDATEDATA, *PPXCOM_RESULT_UPDATEDATA;
 
+typedef struct chmpx_com_merge_suspend{							// same as STATUS_REQ
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_MERGE_SUSPEND, *PPXCOM_MERGE_SUSPEND;
+
+typedef struct chmpx_com_merge_nosuspend{						// same as STATUS_REQ
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_MERGE_NOSUSPEND, *PPXCOM_MERGE_NOSUSPEND;
+
+typedef struct chmpx_com_merge_suspend_get{						// same as STATUS_REQ
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_MERGE_SUSPEND_GET, *PPXCOM_MERGE_SUSPEND_GET;
+
+typedef struct chmpx_com_merge_suspend_res{
+	PXCOM_HEAD		head;
+	bool			is_suspend;
+}CHMPX_ATTR_PACKED PXCOM_MERGE_SUSPEND_RES, *PPXCOM_MERGE_SUSPEND_RES;
+
 typedef union chmpx_com_all{
 	PXCOM_HEAD				val_head;
 	PXCOM_STATUS_REQ		val_status_req;
@@ -430,6 +455,10 @@ typedef union chmpx_com_all{
 	PXCOM_REQ_UPDATEDATA	val_req_updatedata;
 	PXCOM_RES_UPDATEDATA	val_res_updatedata;
 	PXCOM_RESULT_UPDATEDATA	val_result_updatedata;
+	PXCOM_MERGE_SUSPEND		val_merge_suspend;
+	PXCOM_MERGE_NOSUSPEND	val_merge_nosuspend;
+	PXCOM_MERGE_SUSPEND_GET	val_merge_suspend_get;
+	PXCOM_MERGE_SUSPEND_RES	val_merge_suspend_res;
 }CHMPX_ATTR_PACKED PXCOM_ALL, *PPXCOM_ALL;
 
 //------------
@@ -671,6 +700,48 @@ typedef union chmpx_com_all{
 			(pdata)->result				= be64toh((pdata)->result);				\
 		}
 
+#define	HTON_PPXCOM_MERGE_SUSPEND(pdata)		\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_MERGE_SUSPEND(pdata)		\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	HTON_PPXCOM_MERGE_NOSUSPEND(pdata)		\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_MERGE_NOSUSPEND(pdata)		\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	HTON_PPXCOM_MERGE_SUSPEND_GET(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_MERGE_SUSPEND_GET(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+// is_suspend is bool(8bit) which is not needed to change byte order
+#define	HTON_PPXCOM_MERGE_SUSPEND_RES(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+// is_suspend is bool(8bit) which is not needed to change byte order
+#define	NTOH_PPXCOM_MERGE_SUSPEND_RES(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
 //---------------------------------------------------------
 // Communication Packets
 //---------------------------------------------------------
@@ -867,6 +938,10 @@ typedef struct com_packet{
 #define	CVT_COMPTR_REQ_UPDATEDATA(pComAll)		&((pComAll)->val_req_updatedata)
 #define	CVT_COMPTR_RES_UPDATEDATA(pComAll)		&((pComAll)->val_res_updatedata)
 #define	CVT_COMPTR_RESULT_UPDATEDATA(pComAll)	&((pComAll)->val_result_updatedata)
+#define	CVT_COMPTR_MERGE_SUSPEND(pComAll)		&((pComAll)->val_merge_suspend)
+#define	CVT_COMPTR_MERGE_NOSUSPEND(pComAll)		&((pComAll)->val_merge_nosuspend)
+#define	CVT_COMPTR_MERGE_SUSPEND_GET(pComAll)	&((pComAll)->val_merge_suspend_get)
+#define	CVT_COMPTR_MERGE_SUSPEND_RES(pComAll)	&((pComAll)->val_merge_suspend_res)
 
 #define	SIZEOF_CHMPX_COM(type)					(	CHMPX_COM_STATUS_REQ		 == type ? sizeof(PXCOM_STATUS_REQ)			: \
 													CHMPX_COM_STATUS_RES		 == type ? sizeof(PXCOM_STATUS_RES)			: \
@@ -883,6 +958,10 @@ typedef struct com_packet{
 													CHMPX_COM_REQ_UPDATEDATA	 == type ? sizeof(PXCOM_REQ_UPDATEDATA)		: \
 													CHMPX_COM_RES_UPDATEDATA	 == type ? sizeof(PXCOM_RES_UPDATEDATA)		: \
 													CHMPX_COM_RESULT_UPDATEDATA	 == type ? sizeof(PXCOM_RESULT_UPDATEDATA)	: \
+													CHMPX_COM_MERGE_SUSPEND		 == type ? sizeof(PXCOM_MERGE_SUSPEND)		: \
+													CHMPX_COM_MERGE_NOSUSPEND	 == type ? sizeof(PXCOM_MERGE_NOSUSPEND)	: \
+													CHMPX_COM_MERGE_SUSPEND_GET	 == type ? sizeof(PXCOM_MERGE_SUSPEND_GET)	: \
+													CHMPX_COM_MERGE_SUSPEND_RES	 == type ? sizeof(PXCOM_MERGE_SUSPEND_RES)	: \
 													0L)
 
 #define	CVT_COM_ALL_PTR_PXCOMPKT(pComPkt)		(	CHM_OFFSET((pComPkt), sizeof(COMPKT), PPXCOM_ALL)	)

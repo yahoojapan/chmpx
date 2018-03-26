@@ -221,6 +221,7 @@ extern bool is_chmpx_proc_exists(chmpx_h handle);
 // Version
 //---------------------------------------------------------
 extern void chmpx_print_version(FILE* stream);
+extern const char* chmpx_get_version(void);
 
 //---------------------------------------------------------
 // Utility Functions(Key Value Pair)
