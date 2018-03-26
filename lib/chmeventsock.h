@@ -124,8 +124,7 @@ class ChmEventSock : public ChmEventBase
 		sendlockmap_t				sendlockmap;							// lock socket map for sending
 		SSL_CTX*					svr_sslctx;								// SSL Context for server
 		SSL_CTX*					slv_sslctx;								// SSL Context for slave
-		bool						is_do_merge;							// do merging or not when need to merge
-		bool						is_auto_merge;							// automatically start merge at service-in/out
+		bool						startup_servicein;						// SERVICE IN pending at start when automerge mode is true
 		volatile bool				is_run_merge;							// whichever run or abort in merging
 		ChmThread					procthreads;							// processing threads
 		ChmThread					mergethread;							// merge thread
@@ -209,6 +208,11 @@ class ChmEventSock : public ChmEventBase
 		bool LockedSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool is_blocking = false);
 		bool LockedSend(int sock, SSL* ssl, const unsigned char* pbydata, size_t length, bool is_blocking = false);
 
+		// Utility
+		chmpxid_t GetAssociateChmpxid(int fd);
+		std::string GetAssociateAcceptHostName(int fd);
+		bool RawClearSelfWorkerStatus(int fd);
+
 		// Receive
 		bool RawReceive(int fd, bool& is_closed);
 
@@ -226,9 +230,13 @@ class ChmEventSock : public ChmEventBase
 		bool Processing(int sock, const char* pCommand);
 
 		// for merge
-		bool IsSuspendServerInRing(void) const;
+		bool IsAutoMerge(void);
+		bool IsDoMerge(void);
+		bool ContinuousAutoMerge(void);
+		bool CheckAllStatusForMergeStart(void) const;
+		bool CheckAllStatusForMergeComplete(void) const;
 		bool ChangeStatusBeforeMergeStart(void);
-		bool ChangeDownSvrStatusBeforeMerge(CHMDOWNSVRMERGE mode);
+		bool ChangeDownSvrStatusByMerge(CHMDOWNSVRMERGE mode);
 		bool MergeStart(void);
 		bool MergeAbort(void);
 		bool MergeDone(void);
@@ -236,7 +244,10 @@ class ChmEventSock : public ChmEventBase
 		bool RequestMergeStart(std::string* pstring = NULL);
 		bool RequestMergeAbort(std::string* pstring = NULL);
 		bool RequestMergeComplete(std::string* pstring = NULL);
+		bool RequestMergeSuspend(std::string* pstring = NULL);
+		bool RequestMergeNoSuspend(std::string* pstring = NULL);
 		bool RequestServiceIn(std::string* pstring = NULL);
+		bool RequestServiceOut(chmpxid_t chmpxid = CHM_INVALID_CHMPXID, std::string* pstring = NULL);
 
 		// notification
 		bool RawNotifyHup(int fd);
@@ -252,15 +263,18 @@ class ChmEventSock : public ChmEventBase
 		bool CtlComMergeStart(std::string& strResponse);
 		bool CtlComMergeAbort(std::string& strResponse);
 		bool CtlComMergeComplete(std::string& strResponse);
+		bool CtlComMergeSuspend(std::string& strResponse);
+		bool CtlComMergeNoSuspend(std::string& strResponse);
 		bool CtlComServiceIn(std::string& strResponse);
 		bool CtlComServiceOut(const char* hostname, short ctlport, const char* pOrgCommand, std::string& strResponse);
 		bool CtlComSelfStatus(std::string& strResponse);
 		bool CtlComAllServerStatus(std::string& strResponse);
+		bool CtlComUpdateStatus(std::string& strResponse);
 		bool CtlComAllTraceSet(std::string& strResponse, bool enable);
 		bool CtlComAllTraceView(std::string& strResponse, logtype_t dirmask, logtype_t devmask, long count);
 
 		// px2px commands
-		bool PxComSendStatusReq(int sock, chmpxid_t chmpxid);
+		bool PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_sock_close);
 		bool PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, bool is_init_process = false);
 		bool PxComSendConinitReq(int sock, chmpxid_t chmpxid);
@@ -281,7 +295,14 @@ class ChmEventSock : public ChmEventBase
 		bool PxComSendMergeAbort(chmpxid_t chmpxid);
 		bool PxComReceiveMergeAbort(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComSendMergeComplete(chmpxid_t chmpxid);
-		bool PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, bool& is_completed);
+		bool PxComSendMergeSuspend(chmpxid_t chmpxid);
+		bool PxComReceiveMergeSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComSendMergeNoSuspend(chmpxid_t chmpxid);
+		bool PxComReceiveMergeNoSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid);
+		bool PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComReceiveMergeSuspendRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
 		bool PxComSendServerDown(chmpxid_t chmpxid, chmpxid_t downchmpxid);
 		bool PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 

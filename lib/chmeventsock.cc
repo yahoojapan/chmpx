@@ -20,6 +20,7 @@
  * REVISION:
  *
  */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string>
@@ -62,14 +63,18 @@ using namespace	std;
 #define	CTL_COMMAND_MAX_LENGTH				8192
 #define	CTL_RECEIVE_MAX_LENGTH				(CTL_COMMAND_MAX_LENGTH * 2)
 
+#define	CTL_COMMAND_VERSION					"VERSION"
 #define	CTL_COMMAND_DUMP_IMDATA				"DUMP"
 #define	CTL_COMMAND_START_MERGE				"MERGE"
 #define	CTL_COMMAND_STOP_MERGE				"ABORTMERGE"
 #define	CTL_COMMAND_COMPLETE_MERGE			"COMPMERGE"
+#define	CTL_COMMAND_SUSPEND_MERGE			"SUSPENDMERGE"
+#define	CTL_COMMAND_NOSUP_MERGE				"NOSUSPENDMERGE"
 #define	CTL_COMMAND_SERVICE_IN				"SERVICEIN"
 #define	CTL_COMMAND_SERVICE_OUT				"SERVICEOUT"
 #define	CTL_COMMAND_SELF_STATUS				"SELFSTATUS"
 #define	CTL_COMMAND_ALLSVR_STATUS			"ALLSTATUS"
+#define	CTL_COMMAND_UPDATE_STATUS			"UPDATESTATUS"
 #define	CTL_COMMAND_TRACE_SET				"TRACE"
 #define	CTL_COMMAND_TRACE_VIEW				"TRACEVIEW"
 
@@ -89,10 +94,11 @@ using namespace	std;
 
 #define	CTL_RES_SUCCESS						"SUCCEED\n"
 #define	CTL_RES_SUCCESS_NOSERVER			"SUCCEED: There no server on RING.\n"
-#define	CTL_RES_SUCCESS_STATUS_NOTICE		"SUCCEES: Send status notice to no server on RING.\n"
+#define	CTL_RES_SUCCESS_STATUS_NOTICE		"SUCCEED: Send status notice to no server on RING.\n"
 #define	CTL_RES_ERROR						"ERROR: Something error is occured.\n"
 #define	CTL_RES_ERROR_PARAMETER				"ERROR: Parameters are wrong.\n"
 #define	CTL_RES_ERROR_COMMUNICATION			"ERROR: Something error is occured in sending/receiveing data on RING.\n"
+#define	CTL_RES_ERROR_COMMAND_ON_SERVER		"ERROR: The command can not be executed on the slave node.\n"
 #define	CTL_RES_ERROR_SERVICE_OUT_PARAM		"ERROR: SERVICEOUT command must have parameter as server/ctlport.(ex: \"SERVICEOUT servername.fqdn:ctlport\")\n"
 #define	CTL_RES_ERROR_MERGE_START			"ERROR: Failed to start merging.\n"
 #define	CTL_RES_ERROR_MERGE_ABORT			"ERROR: Failed to stop merging.\n"
@@ -103,8 +109,9 @@ using namespace	std;
 #define	CTL_RES_ERROR_NOT_SRVIN				"ERROR: Server is not \"service in\" on RING.\n"
 #define	CTL_RES_ERROR_OPERATING				"ERROR: Could not change status, because server is operating now.\n"
 #define	CTL_RES_ERROR_STATUS_NOT_ALLOWED	"ERROR: Could not change status, because status is not allowed.\n"
-#define	CTL_RES_ERROR_STATUS_HAS_SUSPEND	"ERROR: Could not change status, because status has SUSPEND.\n"
-#define	CTL_RES_ERROR_SOME_SERVER_SUSPEND	"ERROR: Could not change status, because some servers status is SUSPEND.\n"
+#define	CTL_RES_ERROR_SOME_SERVER_STATUS	"ERROR: Could not change status, because some servers could not be changed its status now.\n"
+#define	CTL_RES_ERROR_COULD_NOT_SUSPEND		"ERROR: Could not suspend merge automatically.\n"
+#define	CTL_RES_ERROR_COULD_NOT_NOSUSPEND	"ERROR: Could not nosuspend merge automatically.\n"
 #define	CTL_RES_ERROR_COULD_NOT_SERVICE_OUT	"ERROR: Server could not set SERVICE OUT on RING.\n"
 #define	CTL_RES_ERROR_NOT_CHANGE_STATUS		"ERROR: Server can not be changed status.\n"
 #define	CTL_RES_ERROR_CHANGE_STATUS			"ERROR: Failed to change server status.\n"
@@ -112,6 +119,8 @@ using namespace	std;
 #define	CTL_RES_ERROR_STATUS_NOTICE			"ERROR: Failed to send status notice to other servers.\n"
 #define	CTL_RES_ERROR_GET_CHMPXSVR			"ERROR: Failed to get all information.\n"
 #define	CTL_RES_ERROR_GET_STAT				"ERROR: Failed to get all stat.\n"
+#define	CTL_RES_ERROR_UPDATE_STATUS_SENDERR	"ERROR: Could not send self status to other servers in RING.\n"
+#define	CTL_RES_ERROR_UPDATE_STATUS_INTERR	"ERROR: Internal error is occured for UPDATESTATUS.\n"
 #define	CTL_RES_ERROR_TRACE_SET_PARAM		"ERROR: TRACE command must have parameter as enable/disable.(ex: \"TRACE enable\")\n"
 #define	CTL_RES_ERROR_TRACE_SET_ALREADY		"ERROR: TRACE is already enabled/disabled.\n"
 #define	CTL_RES_ERROR_TRACE_SET_FAILED		"ERROR: Failed to set TRACE enable/disable.\n"
@@ -261,7 +270,8 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 
 			case	SSL_ERROR_SSL:
 				if(CHKRESULTSSL_TYPE_SD == type){
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					is_retry= false;
 					result	= false;
 				}else{
 					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so something error occured(errno=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
@@ -280,7 +290,7 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 						is_close= true;
 					}
 				}else{
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait write.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					//MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait write.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
 				}
 				result = false;
 				break;
@@ -294,7 +304,7 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 						is_close= true;
 					}
 				}else{
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait read.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					//MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait read.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
 				}
 				result = false;
 				break;
@@ -309,7 +319,8 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 						MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so this case is received illigal EOF after calling connect/accept, but no error(no=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
 						result	= true;
 					}else if(CHKRESULTSSL_TYPE_SD == type){
-						WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+						WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+						is_retry= false;
 						result	= false;
 					}else{
 						ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s).", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
@@ -322,7 +333,9 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 
 			case	SSL_ERROR_ZERO_RETURN:
 				if(CHKRESULTSSL_TYPE_SD == type){
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so the peer is closed then not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					is_retry= false;
+					is_close= true;
 					result	= false;
 				}else{
 					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so the peer is closed.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
@@ -334,7 +347,8 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 
 			default:
 				if(CHKRESULTSSL_TYPE_SD == type){
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
+					is_retry= false;
 					result	= false;
 				}else{
 					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s).", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
@@ -345,6 +359,7 @@ bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int ty
 		}
 	}else{
 		// Result is Success!
+		//MSG_CHMPRN("SSL action result(%ld): succeed.", action_result);
 	}
 	return result;
 }
@@ -355,7 +370,7 @@ SSL_CTX* ChmEventSock::MakeSSLContext(const char* CApath, const char* CAfile, co
 		ERR_CHMPRN("Parameters are wrong.");
 		return NULL;
 	}
-	if((CHMEMPTYSTR(server_cert) || CHMEMPTYSTR(server_prikey)) && (CHMEMPTYSTR(slave_cert) || CHMEMPTYSTR(slave_prikey))){
+	if((CHMEMPTYSTR(server_cert) || CHMEMPTYSTR(server_prikey)) && (is_verify_peer && (CHMEMPTYSTR(slave_cert) || CHMEMPTYSTR(slave_prikey)))){
 		ERR_CHMPRN("Parameters are wrong.");
 		return NULL;
 	}
@@ -918,15 +933,15 @@ bool ChmEventSock::RawSend(int sock, SSL* ssl, const unsigned char* pbydata, siz
 					// wait(non blocking)
 					MSG_CHMPRN("sock(%d) does not ready for sending, errno=%d(EAGAIN or EWOULDBLOCK).", sock, errno);
 
-				}else if(EACCES == errno || EBADF == errno || ECONNRESET == errno || ENOTCONN == errno || EDESTADDRREQ == errno || EISCONN == errno || ENOTSOCK == errno){
+				}else if(EACCES == errno || EBADF == errno || ECONNRESET == errno || ENOTCONN == errno || EDESTADDRREQ == errno || EISCONN == errno || ENOTSOCK == errno || EPIPE == errno){
 					// something error to closing
-					ERR_CHMPRN("sock(%d) does not ready for sending, errno=%d(EACCES or EBADF or ECONNRESET or ENOTCONN or EDESTADDRREQ or EISCONN or ENOTSOCK).", sock, errno);
+					WAN_CHMPRN("sock(%d) does not ready for sending, errno=%d(EACCES or EBADF or ECONNRESET or ENOTCONN or EDESTADDRREQ or EISCONN or ENOTSOCK or EPIPE).", sock, errno);
 					is_closed = true;
 					return false;
 
 				}else{
 					// failed
-					ERR_CHMPRN("Failed to send PCOMPKT(length:%zu), errno=%d.", length, errno);
+					WAN_CHMPRN("Failed to send PCOMPKT(length:%zu), errno=%d.", length, errno);
 					return false;
 				}
 				// continue...
@@ -994,13 +1009,14 @@ bool ChmEventSock::RawReceiveByte(int sock, SSL* ssl, bool& is_closed, unsigned 
 
 				}else if(EBADF == errno || ECONNREFUSED == errno || ENOTCONN == errno || ENOTSOCK == errno){
 					// error for closing
-					ERR_CHMPRN("There are no received data on sock(%d), errno=%d(EBADF or ECONNREFUSED or ENOTCONN or ENOTSOCK).", sock, errno);
+					WAN_CHMPRN("There are no received data on sock(%d), errno=%d(EBADF or ECONNREFUSED or ENOTCONN or ENOTSOCK).", sock, errno);
 					is_closed = true;
 					return false;
 
 				}else{
 					// failed
-					ERR_CHMPRN("Failed to receive from sock(%d), errno=%d.", sock, errno);
+					WAN_CHMPRN("Failed to receive from sock(%d), errno=%d, then closing this socket.", sock, errno);
+					is_closed = true;
 					return false;
 				}
 				// continue...
@@ -1058,13 +1074,14 @@ bool ChmEventSock::RawReceiveAny(int sock, bool& is_closed, unsigned char* pbuff
 
 			}else if(EBADF == errno || ECONNREFUSED == errno || ENOTCONN == errno || ENOTSOCK == errno){
 				// error for closing
-				ERR_CHMPRN("There are no received data on sock(%d), errno=%d(EBADF or ECONNREFUSED or ENOTCONN or ENOTSOCK).", sock, errno);
+				WAN_CHMPRN("There are no received data on sock(%d), errno=%d(EBADF or ECONNREFUSED or ENOTCONN or ENOTSOCK).", sock, errno);
 				is_closed = true;
 				return false;
 
 			}else{
 				// failed
-				ERR_CHMPRN("Failed to receive from sock(%d), errno=%d.", sock, errno);
+				WAN_CHMPRN("Failed to receive from sock(%d), errno=%d, then closing this socket.", sock, errno);
+				is_closed = true;
 				return false;
 			}
 
@@ -1331,6 +1348,22 @@ bool ChmEventSock::hton(PCOMPKT pComPkt, size_t& length)
 			PPXCOM_RESULT_UPDATEDATA	pComContents = CVT_COMPTR_RESULT_UPDATEDATA(pComPacket);
 			HTON_PPXCOM_RESULT_UPDATEDATA(pComContents);
 
+		}else if(CHMPX_COM_MERGE_SUSPEND == comtype){
+			PPXCOM_MERGE_SUSPEND	pComContents = CVT_COMPTR_MERGE_SUSPEND(pComPacket);
+			HTON_PPXCOM_MERGE_SUSPEND(pComContents);
+
+		}else if(CHMPX_COM_MERGE_NOSUSPEND == comtype){
+			PPXCOM_MERGE_NOSUSPEND	pComContents = CVT_COMPTR_MERGE_NOSUSPEND(pComPacket);
+			HTON_PPXCOM_MERGE_NOSUSPEND(pComContents);
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_GET == comtype){
+			PPXCOM_MERGE_SUSPEND_GET	pComContents = CVT_COMPTR_MERGE_SUSPEND_GET(pComPacket);
+			HTON_PPXCOM_MERGE_SUSPEND_GET(pComContents);
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_RES == comtype){
+			PPXCOM_MERGE_SUSPEND_RES	pComContents = CVT_COMPTR_MERGE_SUSPEND_RES(pComPacket);
+			HTON_PPXCOM_MERGE_SUSPEND_RES(pComContents);
+
 		}else{
 			WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(comtype), comtype);
 		}
@@ -1443,6 +1476,22 @@ bool ChmEventSock::ntoh(PCOMPKT pComPkt, bool is_except_compkt)
 			PPXCOM_RESULT_UPDATEDATA	pComContents = CVT_COMPTR_RESULT_UPDATEDATA(pComPacket);
 			NTOH_PPXCOM_RESULT_UPDATEDATA(pComContents);
 
+		}else if(CHMPX_COM_MERGE_SUSPEND == type){
+			PPXCOM_MERGE_SUSPEND	pComContents = CVT_COMPTR_MERGE_SUSPEND(pComPacket);
+			NTOH_PPXCOM_MERGE_SUSPEND(pComContents);
+
+		}else if(CHMPX_COM_MERGE_NOSUSPEND == type){
+			PPXCOM_MERGE_NOSUSPEND	pComContents = CVT_COMPTR_MERGE_NOSUSPEND(pComPacket);
+			NTOH_PPXCOM_MERGE_NOSUSPEND(pComContents);
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_GET == type){
+			PPXCOM_MERGE_SUSPEND_GET	pComContents = CVT_COMPTR_MERGE_SUSPEND_GET(pComPacket);
+			NTOH_PPXCOM_MERGE_SUSPEND_GET(pComContents);
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_RES == type){
+			PPXCOM_MERGE_SUSPEND_RES	pComContents = CVT_COMPTR_MERGE_SUSPEND_RES(pComPacket);
+			NTOH_PPXCOM_MERGE_SUSPEND_RES(pComContents);
+
 		}else{
 			WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(type), type);
 		}
@@ -1510,6 +1559,18 @@ PCOMPKT ChmEventSock::AllocatePxComPacket(pxcomtype_t type, ssize_t ext_length)
 	}else if(CHMPX_COM_RESULT_UPDATEDATA == type){
 		length += sizeof(PXCOM_RESULT_UPDATEDATA);
 
+	}else if(CHMPX_COM_MERGE_SUSPEND == type){
+		length += sizeof(PXCOM_MERGE_SUSPEND);
+
+	}else if(CHMPX_COM_MERGE_NOSUSPEND == type){
+		length += sizeof(PXCOM_MERGE_NOSUSPEND);
+
+	}else if(CHMPX_COM_MERGE_SUSPEND_GET == type){
+		length += sizeof(PXCOM_MERGE_SUSPEND_GET);
+
+	}else if(CHMPX_COM_MERGE_SUSPEND_RES == type){
+		length += sizeof(PXCOM_MERGE_SUSPEND_RES);
+
 	}else{
 		WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(type), type);
 	}
@@ -1558,6 +1619,10 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 		ERR_CHMPRN("Paraemtera are wrong.");
 		return true;		// sleep thread
 	}
+	chmpxid_t			tgchmpxid	= pSockObj->GetAssociateChmpxid(sock);
+	string				tgachname	= pSockObj->GetAssociateAcceptHostName(sock);
+	bool				changed_sock= false;
+
 	// [NOTE]
 	// We use edge triggerd epoll, in this type the event is accumulated and not sent when the data to
 	// the socket is left. Thus we must read more until EAGAIN. Otherwise we lost data.
@@ -1574,11 +1639,22 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 				ERR_CHMPRN("Failed to receive and to process for sock(%d) by event socket object.", sock);
 			}else{
 				MSG_CHMPRN("sock(%d) is closed while processing thread.", sock);
+
+				chmpxid_t	nowchmpxid = pSockObj ? pSockObj->GetAssociateChmpxid(sock) : CHM_INVALID_CHMPXID;
+				string		nowachname = pSockObj ? pSockObj->GetAssociateAcceptHostName(sock) : string("");
+				if(tgchmpxid != nowchmpxid || tgachname != nowachname){
+					MSG_CHMPRN("Associate chmpxid of target sock(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", sock, tgchmpxid, tgachname.c_str(), nowchmpxid, nowachname.c_str());
+					changed_sock = true;
+				}
 			}
 			break;
 		}
 	}
-	if((0 != werr && ETIMEDOUT != werr) || is_closed){
+	// [NOTE]
+	// If chmpxid for socket is changed, we should not call RawNotifyHup().
+	// Because it is already called for Hup from another threads.
+	//
+	if(!changed_sock && ((0 != werr && ETIMEDOUT != werr) || is_closed)){
 		if(!pSockObj->RawNotifyHup(sock)){
 			ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
 		}
@@ -1623,8 +1699,8 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	}
 	ChmEventSock*	pThis = reinterpret_cast<ChmEventSock*>(common_param);
 
-	if(!pThis->is_do_merge){
-		WAN_CHMPRN("Why does this method call when is_do_merge flag is false.");
+	if(!pThis->IsDoMerge()){
+		WAN_CHMPRN("Why does this method call when do merge flag is false.");
 		pThis->is_run_merge = false;
 		return false;
 	}
@@ -1783,25 +1859,26 @@ bool ChmEventSock::ServerSockMapCallback(sock_ids_map_t::iterator& iter, void* p
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
 	}
-	int	sock = iter->first;
-	if(CHM_INVALID_SOCK != sock){
-		// close
-		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// not check result
-	}
-
-	ChmIMData*	pImData = pSockObj->pChmCntrl->GetImDataObj();
-	if(pImData){
-		chmpxid_t	chmpxid = pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
+	// get socket and im object
+	int				sock	= iter->first;
+	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	if(pImData && CHM_INVALID_SOCK != sock){
+		chmpxid_t	chmpxid	= pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
 		if(CHM_INVALID_CHMPXID != chmpxid){
 			if(chmpxid != iter->second){
-				ERR_CHMPRN("Not same slave chmpxid(0x%016" PRIx64 " : 0x%016" PRIx64 "), by socket in imdata and by parameter", chmpxid, iter->second);
-			}
-			// set invalid sock in server list
-			if(CHM_INVALID_SOCK != sock && !pImData->RemoveServerSock(chmpxid, sock)){
-				ERR_CHMPRN("Could not set sock(INVALID) to chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);
+				ERR_CHMPRN("Not same server chmpxid(0x%016" PRIx64 " : 0x%016" PRIx64 "), by socket in imdata and by parameter", chmpxid, iter->second);
+			}else{
+				MSG_CHMPRN("server chmpxid(0x%016" PRIx64 ") has socket(%d), then remove it associated from chmpxid.", chmpxid, sock);
+				if(!pImData->RemoveServerSock(chmpxid, sock)){
+					ERR_CHMPRN("Could not remove server sock(%d) from chmpxid(0x%016" PRIx64 "), but continue...", sock, chmpxid);
+				}
 			}
 		}
+	}
+	// close
+	if(CHM_INVALID_SOCK != sock){
+		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
 	}
 	return true;
 }
@@ -1813,24 +1890,26 @@ bool ChmEventSock::SlaveSockMapCallback(sock_ids_map_t::iterator& iter, void* ps
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
 	}
-
-	int	sock = iter->first;
-	if(CHM_INVALID_SOCK != sock){
-		// close
-		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// not check result
-	}
-
-	ChmIMData*	pImData	= pSockObj->pChmCntrl->GetImDataObj();
-	if(pImData){
+	// get socket and im object
+	int				sock	= iter->first;
+	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	if(pImData && CHM_INVALID_SOCK != sock){
 		chmpxid_t	chmpxid = pImData->GetChmpxIdBySock(sock, CLOSETG_SLAVES);
-		if(CHM_INVALID_CHMPXID != chmpxid && chmpxid == iter->second){
-			if(CHM_INVALID_SOCK != sock && !pImData->RemoveSlaveSock(chmpxid, sock)){
-				ERR_CHMPRN("Failed to remove slave(0x%016" PRIx64 ") information, but continue...", iter->second);
+		if(CHM_INVALID_CHMPXID != chmpxid){
+			if(chmpxid != iter->second){
+				ERR_CHMPRN("Not same slave chmpxid(0x%016" PRIx64 " : 0x%016" PRIx64 "), by socket in imdata and by parameter", chmpxid, iter->second);
+			}else{
+				MSG_CHMPRN("slave chmpxid(0x%016" PRIx64 ") has socket(%d), then remove it associated from chmpxid.", chmpxid, sock);
+				if(!pImData->RemoveSlaveSock(chmpxid, sock)){
+					ERR_CHMPRN("Could not remove slave sock(%d) from chmpxid(0x%016" PRIx64 "), but continue...", sock, chmpxid);
+				}
 			}
-		}else{
-			ERR_CHMPRN("Not same slave chmpxid(0x%016" PRIx64 " : 0x%016" PRIx64 "), by socket in imdata and by parameter", chmpxid, iter->second);
 		}
+	}
+	// close
+	if(CHM_INVALID_SOCK != sock){
+		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
 	}
 	return true;
 }
@@ -1842,10 +1921,25 @@ bool ChmEventSock::AcceptMapCallback(sock_pending_map_t::iterator& iter, void* p
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
 	}
+	// get socket and im object
+	int				sock	= iter->first;
+	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	if(pImData && CHM_INVALID_SOCK != sock){
+		// check server/slave socket
+		chmpxid_t	chmpxid	= pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
+		if(CHM_INVALID_CHMPXID == chmpxid){
+			chmpxid			= pImData->GetChmpxIdBySock(sock, CLOSETG_SLAVES);
+		}
+		if(CHM_INVALID_CHMPXID != chmpxid){
+			ERR_CHMPRN("server or slave chmpxid(0x%016" PRIx64 ") has socket(%d), then we could not remove this.", chmpxid, sock);
+			return true;
+		}
+	}
 	// close
-	pSockObj->UnlockSendSock(iter->first);					// UNLOCK SOCK(For safety)
-	pSockObj->CloseSocketWithEpoll(iter->first);			// not check result
-
+	if(CHM_INVALID_SOCK != sock){
+		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+	}
 	return true;
 }
 
@@ -1856,10 +1950,25 @@ bool ChmEventSock::ControlSockMapCallback(sock_ids_map_t::iterator& iter, void* 
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
 	}
+	// get socket and im object
+	int				sock	= iter->first;
+	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	if(pImData && CHM_INVALID_SOCK != sock){
+		// check server/slave socket
+		chmpxid_t	chmpxid	= pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
+		if(CHM_INVALID_CHMPXID == chmpxid){
+			chmpxid			= pImData->GetChmpxIdBySock(sock, CLOSETG_SLAVES);
+		}
+		if(CHM_INVALID_CHMPXID != chmpxid){
+			ERR_CHMPRN("server or slave chmpxid(0x%016" PRIx64 ") has socket(%d), then we could not remove this.", chmpxid, sock);
+			return true;
+		}
+	}
 	// close
-	pSockObj->UnlockSendSock(iter->first);					// UNLOCK SOCK(For safety)
-	pSockObj->CloseSocketWithEpoll(iter->first);			// not check result
-
+	if(CHM_INVALID_SOCK != sock){
+		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+	}
 	return true;
 }
 
@@ -1873,8 +1982,9 @@ bool ChmEventSock::SslSockMapCallback(sock_ssl_map_t::iterator& iter, void* psoc
 	int		sock = iter->first;
 	SSL*	pssl = iter->second;
 
-	pSockObj->UnlockSendSock(sock);							// UNLOCK SOCK
-
+	if(CHM_INVALID_SOCK != sock){
+		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK
+	}
 	if(pssl){
 		ChmEventSock::ShutdownSSL(sock, pssl, pSockObj->con_retry_count, pSockObj->con_wait_time);
 		SSL_free(pssl);
@@ -1906,7 +2016,7 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl) :
 	ctlsockmap(CHM_INVALID_CHMPXID, ChmEventSock::ControlSockMapCallback, this),
 	sslmap(NULL, ChmEventSock::SslSockMapCallback, this),
 	sendlockmap(NULL, ChmEventSock::SendLockMapCallback, this),
-	svr_sslctx(NULL), slv_sslctx(NULL), is_do_merge(false), is_auto_merge(false), is_run_merge(false),
+	svr_sslctx(NULL), slv_sslctx(NULL), startup_servicein(true), is_run_merge(false),
 	procthreads(CHMEVSOCK_SOCK_THREAD_NAME), mergethread(CHMEVSOCK_MERGE_THREAD_NAME),
 	sockfd_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), last_check_time(time(NULL)), dyna_sockfd_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED),
 	mergeidmap_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), is_server_mode(false), max_sock_pool(ChmEventSock::DEFAULT_MAX_SOCK_POOL),
@@ -1992,24 +2102,12 @@ bool ChmEventSock::UpdateInternalData(void)
 		return false;
 	}
 
-	//
-	// If random mode, set not do merging and automatically merge start.
-	// If hash(not random) mode, set do merge and manually merge start.
-	//
-	// [NOTE] BE CAREFUL
-	// In configuration the auto merge flag at random mode MUST be false,
-	// but this class needs the flag is true at random mode.
-	// So convert flag here!
-	//
-	bool	tmp_is_auto_merge	= pImData->IsRandomDeliver() ? true : pImData->IsAutoMergeConf();
-	bool	tmp_is_do_merge		= pImData->IsRandomDeliver() ? false : pImData->IsDoMergeConf();
-
 	// merge thread
-	if(!tmp_is_do_merge && is_run_merge){
+	if(!IsDoMerge() && is_run_merge){
 		// now work to merge, but we do do not stop it.
 		WAN_CHMPRN("Re-initialize by configration. new do_merge mode is false, but mergeing now. be careful about merging.");
 	}
-	if(tmp_is_do_merge && !mergethread.HasThread()){
+	if(IsDoMerge() && !mergethread.HasThread()){
 		// do_merge false to true, we need to run merge thread.
 		//
 		//	- parameter is this object
@@ -2027,8 +2125,19 @@ bool ChmEventSock::UpdateInternalData(void)
 		// [NOTE]
 		// if new do_merge flag is false and already run thread, but we do not stop it.
 	}
-	is_auto_merge	 	= tmp_is_auto_merge;
-	is_do_merge		 	= tmp_is_do_merge;
+
+	// check first service in operation flag
+	//
+	// [NOTE]
+	// The startup_servicein flag is always set true in constructor.
+	// This flag is true, change status to SERVICE IN / ADD / PENDING and do SERVICE IN logic
+	// when server node is first up.
+	// If the server is not automerge mode or it is slave mode, this flag is set
+	// false here. And this flag is set false after first SERVICE IN operation.
+	//
+	if((!pImData->IsServerMode() || !IsAutoMerge()) && startup_servicein){
+		startup_servicein = false;
+	}
 
 	// processing thread
 	int	conf_thread_cnt	= pImData->GetSocketThreadCount();		// we do not need to cache this value.
@@ -2126,6 +2235,10 @@ bool ChmEventSock::SetEventQueue(void)
 	}
 
 	// all status update.
+	//
+	// Following function gets all server(on ring) status from existed another chmpx server.
+	// If got status includes self status, it is merges for self.
+	//
 	if(!InitialAllServerStatus()){
 		ERR_CHMPRN("Could not update all server status.");
 		return false;
@@ -2199,34 +2312,65 @@ bool ChmEventSock::SetEventQueue(void)
 		return false;
 	}
 
-	// check self status
-	chmpxsts_t	status = pImData->GetSelfStatus();
+	//
+	// re-check self status
+	//
+	// Here, no client joins this new chmpx, then force set SUSPEND status
+	//
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;								// for messaging
 	if(is_server_mode){
-		if(CHMPXSTS_SRVOUT_DOWN_NORMAL == status){
-			// normally default come here.
-			MSG_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) is wrong, so force to set CHMPXSTS_SRVOUT_UP_NORMAL.", status, STR_CHMPXSTS_FULL(status).c_str());
+		if(IS_CHMPXSTS_SRVIN(status)){								// [SERVICE IN]
+			if(IS_CHMPXSTS_UP(status)){								// [SERVICE IN] [UP]
+				if(IS_CHMPXSTS_NOACT(status)){						// [SERVICE IN] [UP] [NOACT]
+					if(IS_CHMPXSTS_NOTHING(status)){				// [SERVICE IN] [UP] [NOACT] [NOTHING]
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}else if(IS_CHMPXSTS_PENDING(status)){			// [SERVICE IN] [UP] [NOACT] [PENDING]
+						status = CHMPXSTS_SRVIN_UP_NORMAL;
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}else{											// [SERVICE IN] [UP] [NOACT] [DOING/DONE]
+						// This case is impossible. but force to set(NOACT NOTHING SUSPEND)
+						status = CHMPXSTS_SRVIN_UP_NORMAL;
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}
+				}else if(IS_CHMPXSTS_ADD(status)){					// [SERVICE IN] [UP] [ADD]
+					// This case is impossible. but force to set(ADD PENDING SUSPEND)
+					status = CHMPXSTS_SRVIN_UP_ADDPENDING;
+					CHANGE_CHMPXSTS_TO_SUSPEND(status);
+
+				}else if(IS_CHMPXSTS_DELETE(status)){				// [SERVICE IN] [UP] [DELETE]
+					if(IS_CHMPXSTS_PENDING(status)){				// [SERVICE IN] [UP] [DELETE] [PENDING]
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}else if(IS_CHMPXSTS_DOING(status)){			// [SERVICE IN] [UP] [DELETE] [DOING]
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}else if(IS_CHMPXSTS_DONE(status)){				// [SERVICE IN] [UP] [DELETE] [DONE]
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}
+				}
+			}else{													// [SERVICE IN] [DOWN]
+				if(IS_CHMPXSTS_NOACT(status)){						// [SERVICE IN] [DOWN] [NOACT]
+					status = CHMPXSTS_SRVIN_UP_NORMAL;
+					CHANGE_CHMPXSTS_TO_SUSPEND(status);
+				}else{												// [SERVICE IN] [DOWN] [DELETE]
+					if(IS_CHMPXSTS_PENDING(status)){				// [SERVICE IN] [DOWN] [DELETE] [PENDING]
+						status = CHMPXSTS_SRVIN_UP_DELPENDING;
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}else{											// [SERVICE IN] [DOWN] [DELETE] [DONE]
+						status = CHMPXSTS_SRVIN_UP_DELETED;
+						CHANGE_CHMPXSTS_TO_SUSPEND(status);
+					}
+				}
+			}
+		}else if(IS_CHMPXSTS_SRVOUT(status)){						// [SERVICE OUT]
 			status = CHMPXSTS_SRVOUT_UP_NORMAL;
-
-		}else if(CHMPXSTS_SRVIN_DOWN_NORMAL == status){
-			WAN_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) is wrong, so force to set CHMPXSTS_SRVIN_UP_MERGING.", status, STR_CHMPXSTS_FULL(status).c_str());
-			status = CHMPXSTS_SRVIN_UP_MERGING;
-
-		}else if(CHMPXSTS_SRVIN_DOWN_DELPENDING == status){
-			WAN_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) is wrong, so force to set CHMPXSTS_SRVIN_UP_MERGING.", status, STR_CHMPXSTS_FULL(status).c_str());
-			status = CHMPXSTS_SRVIN_UP_MERGING;		// should be CHMPXSTS_SRVIN_UP_NORMAL ?
-
-		}else if(CHMPXSTS_SRVIN_DOWN_DELETED == status){
-			WAN_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) is wrong, so force to set CHMPXSTS_SRVOUT_UP_NORMAL.", status, STR_CHMPXSTS_FULL(status).c_str());
-			status = CHMPXSTS_SRVIN_UP_DELETED;
-
-		}else{
-			// nothing to change status
+			CHANGE_CHMPXSTS_TO_SUSPEND(status);
+		}else{														// [SLAVE]
+			status = CHMPXSTS_SLAVE_UP_NORMAL;
 		}
-
 	}else{
-		WAN_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) is slave, so force to set CHMPXSTS_SRVOUT_UP_NORMAL.", status, STR_CHMPXSTS_FULL(status).c_str());
-		status = CHMPXSTS_SLAVE_UP_NORMAL;
+		status = CHMPXSTS_SLAVE_UP_NORMAL;							// [SLAVE]
 	}
+	MSG_CHMPRN("initial chmpx status(0x%016" PRIx64 ":%s) from initial status(0x%016" PRIx64 ":%s) which get from another server in ring.", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
 	// re-set self status(set suspend in this method)
 	if(!pImData->SetSelfStatus(status)){
@@ -2437,8 +2581,10 @@ bool ChmEventSock::LockedSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool is_block
 	if(!ChmEventSock::RawSend(sock, ssl, pComPkt, is_closed, is_blocking, sock_retry_count, sock_wait_time)){
 		ERR_CHMPRN("Failed to send COMPKT to sock(%d).", sock);
 		UnlockSendSock(sock);	// UNLOCK SOCKET
-		if(!is_closed){
-			CloseSSL(sock);		// close socket
+		if(is_closed){
+			if(!RawNotifyHup(sock)){
+				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
+			}
 		}
 		return false;
 	}
@@ -2458,8 +2604,10 @@ bool ChmEventSock::LockedSend(int sock, SSL* ssl, const unsigned char* pbydata, 
 	if(!ChmEventSock::RawSend(sock, ssl, pbydata, length, is_closed, is_blocking, sock_retry_count, sock_wait_time)){
 		ERR_CHMPRN("Failed to send binary data to sock(%d).", sock);
 		UnlockSendSock(sock);	// UNLOCK SOCKET
-		if(!is_closed){
-			CloseSSL(sock);		// close socket
+		if(is_closed){
+			if(!RawNotifyHup(sock)){
+				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
+			}
 		}
 		return false;
 	}
@@ -2503,8 +2651,10 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 					for(socklist_t::reverse_iterator riter = socklist.rbegin(); riter != socklist.rend(); ){
 						if(TryLockSendSock(*riter)){									// try to lock socket
 							// Succeed to lock socket, so close this.
-							seversockmap.erase(*riter);									// close socket
 							sendlockmap.erase(*riter);									// remove socket from send lock map(with unlock it)
+							if(seversockmap.find(*riter)){
+								seversockmap.erase(*riter);								// close socket
+							}
 
 							// remove socket from socklist
 							if((++riter) != socklist.rend()){
@@ -2571,9 +2721,10 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 							const PCHMSSSTAT	pssstat = sendlockmap.get(*iter);
 							if(pssstat && (pssstat->last_time + sock_pool_timeout) < nowtime){
 								// timeouted socket.
-								seversockmap.erase(*iter);								// close socket
 								sendlockmap.erase(*iter);								// remove socket from send lock map(with unlock it)
-
+								if(seversockmap.find(*iter)){
+									seversockmap.erase(*iter);							// close socket
+								}
 								// [NOTE]
 								// we do not remove socket(iter) from socklist, because this loop will be broken soon.
 								//
@@ -2707,9 +2858,10 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pPacked, is_closed, false, sock_retry_count, sock_wait_time)){
 		ERR_CHMPRN("Failed to send COMPKT to sock(%d).", sock);
 		UnlockSendSock(sock);			// UNLOCK SOCKET
-
-		if(!is_closed){
-			CloseSSL(sock);				// close socket
+		if(is_closed){
+			if(!RawNotifyHup(sock)){
+				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
+			}
 		}
 		if(is_pack){
 			CHM_Free(pPacked);
@@ -2766,9 +2918,20 @@ bool ChmEventSock::Receive(int fd)
 		// So we checked socket for rest data here.
 		//
 		bool		is_closed;
-		int			rtcode;
-		suseconds_t	waittime = sock_wait_time;
+		int			rtcode		= 0;
+		chmpxid_t	tgchmpxid	= GetAssociateChmpxid(fd);
+		chmpxid_t	chmpxid		= tgchmpxid;
+		string		tgachname	= GetAssociateAcceptHostName(fd);
+		string		achname		= tgachname;
+		suseconds_t	waittime	= sock_wait_time;
 		do{
+			chmpxid = GetAssociateChmpxid(fd);
+			achname	= GetAssociateAcceptHostName(fd);
+			if(tgchmpxid != chmpxid || tgachname != achname){
+				MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", fd, tgchmpxid, tgachname.c_str(), chmpxid, achname.c_str());
+				result = true;
+				break;
+			}
 			is_closed = false;
 			if(false == (result = RawReceive(fd, is_closed))){
 				if(!is_closed){
@@ -2782,13 +2945,49 @@ bool ChmEventSock::Receive(int fd)
 		}while(0 == (rtcode = ChmEventSock::WaitForReady(fd, WAIT_READ_FD, 0, false, waittime)));		// check rest data & return assap
 
 		if(0 != rtcode && ETIMEDOUT != rtcode){
-			if(RawNotifyHup(fd)){
-				ERR_CHMPRN("Failed to closing socket(%d), but continue...", fd);
+			chmpxid = GetAssociateChmpxid(fd);
+			achname	= GetAssociateAcceptHostName(fd);
+			if(tgchmpxid != chmpxid || tgachname != achname){
+				MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", fd, tgchmpxid, tgachname.c_str(), chmpxid, achname.c_str());
+			}else{
+				if(RawNotifyHup(fd)){
+					ERR_CHMPRN("Failed to closing socket(%d), but continue...", fd);
+				}
 			}
 			result = true;
 		}
 	}
 	return result;
+}
+
+chmpxid_t ChmEventSock::GetAssociateChmpxid(int fd)
+{
+	chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
+
+	if(CHM_INVALID_HANDLE == fd){
+		ERR_CHMPRN("Parameter is wrong.");
+		return chmpxid;
+	}
+	if(seversockmap.find(fd)){
+		chmpxid = seversockmap[fd];
+	}else if(slavesockmap.find(fd)){
+		chmpxid = slavesockmap[fd];
+	}
+	return chmpxid;
+}
+
+string ChmEventSock::GetAssociateAcceptHostName(int fd)
+{
+	string	achname("");
+
+	if(CHM_INVALID_HANDLE == fd){
+		ERR_CHMPRN("Parameter is wrong.");
+		return achname;
+	}
+	if(acceptingmap.find(fd)){
+		achname = acceptingmap[fd];
+	}
+	return achname;
 }
 
 //
@@ -2835,6 +3034,7 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 
 	}else if(seversockmap.find(fd)){
 		// server chmpx
+		chmpxid_t	tgchmpxid	= seversockmap[fd];
 
 		// for stat
 		struct timespec	start_time;
@@ -2847,10 +3047,15 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 				ERR_CHMPRN("Failed to receive ComPkt from sock(%d), sock is not closed.", fd);
 			}else{
 				MSG_CHMPRN("Failed to receive ComPkt from sock(%d), sock is closed.", fd);
-				// close socket
-				chmpxid_t	chmpxid	= seversockmap[fd];
-				if(!RawNotifyHup(fd)){
-					ERR_CHMPRN("Failed to closing \"to server socket\" for chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);
+
+				chmpxid_t	chmpxid = GetAssociateChmpxid(fd);
+				if(tgchmpxid != chmpxid){
+					MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") to now chmpxid(0x%016" PRIx64 ").", fd, tgchmpxid, chmpxid);
+				}else{
+					// close socket
+					if(!RawNotifyHup(fd)){
+						ERR_CHMPRN("Failed to closing \"to server socket\" for chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);
+					}
 				}
 			}
 			return false;
@@ -2871,6 +3076,7 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 
 	}else if(slavesockmap.find(fd)){
 		// slave chmpx
+		chmpxid_t	tgchmpxid	= slavesockmap[fd];
 
 		// for stat
 		struct timespec	start_time;
@@ -2883,10 +3089,15 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 				ERR_CHMPRN("Failed to receive ComPkt from sock(%d), sock is not closed.", fd);
 			}else{
 				MSG_CHMPRN("Failed to receive ComPkt from sock(%d), sock is closed.", fd);
-				// close socket
-				chmpxid_t	chmpxid	= slavesockmap[fd];
-				if(!RawNotifyHup(fd)){
-					ERR_CHMPRN("Failed to closing \"from slave socket\" for chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);
+
+				chmpxid_t	chmpxid = GetAssociateChmpxid(fd);
+				if(tgchmpxid != chmpxid){
+					MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") to now chmpxid(0x%016" PRIx64 ").", fd, tgchmpxid, chmpxid);
+				}else{
+					// close socket
+					if(!RawNotifyHup(fd)){
+						ERR_CHMPRN("Failed to closing \"from slave socket\" for chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);
+					}
 				}
 			}
 			return false;
@@ -2915,10 +3126,17 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 			if(!is_closed){
 				ERR_CHMPRN("Failed to receive ComPkt from accepting sock(%d), sock is not closed.", fd);
 			}else{
-				// remove mapping
 				MSG_CHMPRN("Failed to receive ComPkt from accepting sock(%d), sock is closed.", fd);
-				if(!RawNotifyHup(fd)){
-					ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", achname.c_str());
+
+				string		nowachname	= GetAssociateAcceptHostName(fd);
+				chmpxid_t	chmpxid		= GetAssociateChmpxid(fd);
+				if(achname != nowachname || CHM_INVALID_CHMPXID != chmpxid){
+					MSG_CHMPRN("Associate accepting hostname of target fd(%d) was changed from old host(%s) to now host(%s).", fd, achname.c_str(), nowachname.c_str());
+				}else{
+					// remove mapping
+					if(!RawNotifyHup(fd)){
+						ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", achname.c_str());
+					}
 				}
 			}
 			return false;
@@ -3006,7 +3224,7 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 		// control port
 		char		szReceive[CTL_COMMAND_MAX_LENGTH];
 		size_t		RecLength	= CTL_COMMAND_MAX_LENGTH - 1;
-		chmpxid_t	chmpxid		= ctlsockmap[fd];
+		chmpxid_t	chmpxid		= ctlsockmap[fd];		// [NOTICE] sock for control is always CHM_INVALID_CHMPXID
 
 		// receive command
 		memset(szReceive, 0, CTL_COMMAND_MAX_LENGTH);
@@ -3107,42 +3325,60 @@ bool ChmEventSock::RawNotifyHup(int fd)
 		ERR_CHMPRN("Parameters are wrong.");
 		return false;
 	}
-	while(!fullock::flck_trylock_noshared_mutex(&sockfd_lockval));	// LOCK
 	if(IsEmpty()){
 		ERR_CHMPRN("Object is not initialized.");
 		// try to close for safety
-		CloseSocketWithEpoll(fd);		// not check result
-		fullock::flck_unlock_noshared_mutex(&sockfd_lockval);		// UNLOCK
+		while(!fullock::flck_trylock_noshared_mutex(&sockfd_lockval));	// LOCK
+		CloseSocketWithEpoll(fd);										// not check result
+		fullock::flck_unlock_noshared_mutex(&sockfd_lockval);			// UNLOCK
 		return false;
 	}
+
+	while(!fullock::flck_trylock_noshared_mutex(&sockfd_lockval));		// LOCK
+	bool	result	= true;
 
 	// [NOTE]
 	// following method call is with locking sockfd_lockval.
 	// so should not connect to new servers while locking.
 	//
-	bool		result	= true;
-	bool		is_close= false;
+	bool		closed	= false;
 	chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
-	if(!ServerSockNotifyHup(fd, is_close, chmpxid)){
+	if(!ServerSockNotifyHup(fd, closed, chmpxid)){
 		ERR_CHMPRN("Something error occured in closing server socket(%d) by HUP.", fd);
 		result = false;
 	}
-	if(!is_close && !SlaveSockNotifyHup(fd, is_close)){
+	if(!closed && !SlaveSockNotifyHup(fd, closed)){
 		ERR_CHMPRN("Something error occured in closing slave socket(%d) by HUP.", fd);
 		result = false;
 	}
-	if(!is_close && !AcceptingSockNotifyHup(fd, is_close)){
+	if(!closed && !AcceptingSockNotifyHup(fd, closed)){
 		ERR_CHMPRN("Something error occured in closing accepting socket(%d) by HUP.", fd);
 		result = false;
 	}
-	if(!is_close && !ControlSockNotifyHup(fd, is_close)){
+	if(!closed && !ControlSockNotifyHup(fd, closed)){
 		ERR_CHMPRN("Something error occured in closing control socket(%d) by HUP.", fd);
 		result = false;
 	}
-	if(!is_close){
-		// try to close for safety
-		CloseSocketWithEpoll(fd);		// not check result
+
+	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);				// UNLOCK
+
+	// do rechain RING when closed fd is for servers.
+	if(closed && CHM_INVALID_CHMPXID != chmpxid){
+		if(!ServerDownNotifyHup(chmpxid)){
+			ERR_CHMPRN("Something error occured in setting chmpxid(0x%016" PRIx64 ") - fd(%d) to down status.", chmpxid, fd);
+			result = false;
+		}
 	}
+	return result;
+}
+
+bool ChmEventSock::RawClearSelfWorkerStatus(int fd)
+{
+	if(CHM_INVALID_HANDLE == fd){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	bool	result	= true;
 
 	// Clear worker thread queue
 	//
@@ -3155,22 +3391,18 @@ bool ChmEventSock::RawNotifyHup(int fd)
 			// fd is worker thread's socket, so clear worker loop count(queued work count).
 			if(!procthreads.ClearSelfWorkerStatus()){
 				ERR_CHMPRN("Something error occured in clearing worker thread loop count for sock(%d), but continue...", fd);
+				result = false;
 			}
 		}
 	}
-	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);		// UNLOCK
-
-	// do rechain RING when closed fd is for servers.
-	if(CHM_INVALID_CHMPXID != chmpxid){
-		if(!ServerDownNotifyHup(chmpxid)){
-			ERR_CHMPRN("Something error occured in setting chmpxid(0x%016" PRIx64 ") - fd(%d) to down status.", chmpxid, fd);
-			result = false;
-		}
-	}
-
 	return result;
 }
 
+// [NOTE]
+// This method is almost the same as RequestMergeAbort().
+// The difference with RequestMergeAbort() is that the checking of
+// operating(merging) flag and call of notification to other servers are different.
+//
 bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 {
 	if(CHM_INVALID_CHMPXID == chmpxid){
@@ -3179,13 +3411,28 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 	}
 	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
 
+	// check server socket count
+	socklist_t	socklist;
+	int			ctlsock = CHM_INVALID_SOCK;
+	if(pImData->GetServerSocks(chmpxid, socklist, ctlsock) && 0 < socklist.size()){
+		MSG_CHMPRN("Caught Server Down notify(HUP) for chmpxid(0x%016" PRIx64 "), but this server still has some socket from this.", chmpxid);
+		return true;
+	}
+
 	// backup operation mode.
 	bool	is_operating = pImData->IsOperating();
 
-	// set status
-	chmpxsts_t	status = pImData->GetServerStatus(chmpxid);
+	// check status and set new status
+	chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
+	chmpxsts_t	old_status	= status;
 
 	CHANGE_CHMPXSTS_TO_DOWN(status);
+	if(status == old_status){
+		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by server down notify hup, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+		return true;
+	}
+	MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") is changed status(0x%016" PRIx64 ":%s) from old status(0x%016" PRIx64 ":%s) by server down notify hup.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
 	if(!pImData->SetServerStatus(chmpxid, status)){
 		ERR_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) to chmpxid(0x%016" PRIx64 "), but continue...", status, STR_CHMPXSTS_FULL(status).c_str(), chmpxid);
 	}
@@ -3223,15 +3470,23 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 				return false;
 			}
 		}
+		// Check automerge
+		if(IsAutoMerge()){
+			// Request Service out
+			if(!RequestServiceOut(chmpxid)){
+				ERR_CHMPRN("Could not operate to SERVICEOUT by automerge for chmpxid(0x%016" PRIx64 ").", chmpxid);
+				return false;
+			}
+		}
 	}else{
 		if(is_operating){
 			if(!PxComSendMergeAbort(nextchmpxid)){
 				ERR_CHMPRN("Got server down notice during merging, but failed to abort merge. but continue...");
 			}
 		}
-		// send SERVER_DOWN
+		// send SERVER DOWN status
 		if(!PxComSendServerDown(nextchmpxid, chmpxid)){
-			ERR_CHMPRN("Failed to send down chmpx server information to chmpxid(0x%016" PRIx64 ").", nextchmpxid);
+			ERR_CHMPRN("Failed to send down chmpx server information to chmpxid(0x%016" PRIx64 "), but continue...", nextchmpxid);
 			return false;
 		}
 	}
@@ -3244,26 +3499,25 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 //
 bool ChmEventSock::ServerSockNotifyHup(int fd, bool& is_close, chmpxid_t& chmpxid)
 {
-	is_close= false;
-	chmpxid	= CHM_INVALID_CHMPXID;
+	// get sock to chmpxid
+	ChmIMData*	pImData;
+	if(!pChmCntrl || NULL == (pImData = pChmCntrl->GetImDataObj()) || CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdBySock(fd, CLOSETG_SERVERS))){
+		MSG_CHMPRN("checked sock(%d) and it is not server sock(not found server sock list).", fd);
+		chmpxid	= CHM_INVALID_CHMPXID;
+	}
 
 	// [NOTE]
 	// we not check fd and object empty because NotifyHup() already checks it.
 	//
 	if(!seversockmap.find(fd)){
-		return true;
+		MSG_CHMPRN("checked sock(%d) and there is not in server sock map.", fd);
+		is_close = false;
+	}else{
+		// close socket at first.(check both server and slave)
+		RawClearSelfWorkerStatus(fd);
+		seversockmap.erase(fd);					// call default cb function
+		is_close = true;
 	}
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-
-	// get sock to chmpxid
-	if(CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdBySock(fd, CLOSETG_SERVERS))){
-		ERR_CHMPRN("Could not find sock(%d) in servers list, but continue...", fd);
-	}
-
-	// close socket at first.(check both server and slave)
-	seversockmap.erase(fd);			// call default cb function
-	is_close = true;
-
 	return true;
 }
 
@@ -3273,18 +3527,18 @@ bool ChmEventSock::ServerSockNotifyHup(int fd, bool& is_close, chmpxid_t& chmpxi
 //
 bool ChmEventSock::SlaveSockNotifyHup(int fd, bool& is_close)
 {
-	is_close = false;
-
 	// [NOTE]
 	// we not check fd and object empty because NotifyHup() already checks it.
 	//
 	if(!slavesockmap.find(fd)){
-		return true;
+		MSG_CHMPRN("checked sock(%d) and there is not in slave sock map.", fd);
+		is_close = false;
+	}else{
+		// close socket
+		RawClearSelfWorkerStatus(fd);
+		slavesockmap.erase(fd);					// call default cb function
+		is_close = true;
 	}
-	// close socket
-	slavesockmap.erase(fd);
-	is_close = true;
-
 	return true;
 }
 
@@ -3294,18 +3548,18 @@ bool ChmEventSock::SlaveSockNotifyHup(int fd, bool& is_close)
 //
 bool ChmEventSock::AcceptingSockNotifyHup(int fd, bool& is_close)
 {
-	is_close = false;
-
 	// [NOTE]
 	// we not check fd and object empty because NotifyHup() already checks it.
 	//
 	if(!acceptingmap.find(fd)){
-		return true;
+		MSG_CHMPRN("checked sock(%d) and there is not in accept sock map.", fd);
+		is_close = false;
+	}else{
+		// close socket
+		RawClearSelfWorkerStatus(fd);
+		acceptingmap.erase(fd);					// call default cb function
+		is_close = true;
 	}
-	// close socket
-	acceptingmap.erase(fd);
-	is_close = true;
-
 	return true;
 }
 
@@ -3315,18 +3569,18 @@ bool ChmEventSock::AcceptingSockNotifyHup(int fd, bool& is_close)
 //
 bool ChmEventSock::ControlSockNotifyHup(int fd, bool& is_close)
 {
-	is_close = false;
-
 	// [NOTE]
 	// we not check fd and object empty because NotifyHup() already checks it.
 	//
 	if(!ctlsockmap.find(fd)){
-		return true;
+		MSG_CHMPRN("checked sock(%d) and there is not in control sock map.", fd);
+		is_close = false;
+	}else{
+		// close socket
+		RawClearSelfWorkerStatus(fd);
+		ctlsockmap.erase(fd);					// call default cb function
+		is_close = true;
 	}
-	// close socket
-	ctlsockmap.erase(fd);
-	is_close = true;
-
 	return true;
 }
 
@@ -3348,13 +3602,11 @@ bool ChmEventSock::CloseSelfSocks(void)
 		return false;
 	}
 	if(CHM_INVALID_SOCK != sock){
-		epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL);
+		CloseSocketWithEpoll(sock);
 	}
 	if(CHM_INVALID_SOCK != ctlsock){
-		epoll_ctl(eqfd, EPOLL_CTL_DEL, ctlsock, NULL);
+		CloseSocketWithEpoll(ctlsock);
 	}
-	CloseSSL(sock);
-	CloseSSL(ctlsock);
 
 	// update sock in chmshm
 	bool	result = true;
@@ -3364,9 +3616,11 @@ bool ChmEventSock::CloseSelfSocks(void)
 	}
 
 	// update status in chmshm
-	chmpxsts_t	status = pImData->GetSelfStatus();
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
 
 	CHANGE_CHMPXSTS_TO_DOWN(status);
+	MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 	if(!pImData->SetSelfStatus(status)){
 		ERR_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) for self.", status, STR_CHMPXSTS_FULL(status).c_str());
 		result = false;
@@ -3381,7 +3635,7 @@ bool ChmEventSock::CloseFromSlavesSocks(void)
 		return true;
 	}
 	// close sockets connecting from clients
-	slavesockmap.clear();
+	slavesockmap.clear();			// call default cb function
 
 	return true;
 }
@@ -3391,16 +3645,10 @@ bool ChmEventSock::CloseToServersSocks(void)
 	if(IsEmpty()){
 		return true;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	//ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// close all server ssl
-	seversockmap.clear();	// call default cb function
-
-	// close sockets connecting to other servers.
-	if(!pImData->CloseSocks(CLOSETG_SERVERS)){
-		ERR_CHMPRN("Failed to close connection to other servers.");
-		return false;
-	}
+	seversockmap.clear();		// call default cb function
 	return true;
 }
 
@@ -3409,7 +3657,8 @@ bool ChmEventSock::CloseCtlportClientSocks(void)
 	if(IsEmpty()){
 		return true;
 	}
-	ctlsockmap.clear();
+	// close all ctlsock
+	ctlsockmap.clear();			// call default cb function
 	return true;
 }
 
@@ -3419,7 +3668,7 @@ bool ChmEventSock::CloseFromSlavesAcceptingSocks(void)
 		return true;
 	}
 	// close accepting sockets connecting from clients
-	acceptingmap.clear();
+	acceptingmap.clear();			// call default cb function
 	return true;
 }
 
@@ -3428,8 +3677,12 @@ bool ChmEventSock::CloseSSL(int sock, bool with_sock)
 	if(IsEmpty()){
 		return true;
 	}
-	sslmap.erase(sock);
-
+	if(!sslmap.find(sock)){
+		MSG_CHMPRN("checked sock(%d) and there is not in ssl sock map.", sock);
+	}else{
+		MSG_CHMPRN("checked sock(%d) and it is found in ssl sock map.", sock);
+		sslmap.erase(sock);
+	}
 	if(with_sock){
 		CHM_CLOSESOCK(sock);
 	}
@@ -3460,7 +3713,7 @@ bool ChmEventSock::CloseSocketWithEpoll(int sock)
 		//
 		MSG_CHMPRN("Failed to delete socket(%d) from epoll event, probably already remove it.", sock);
 	}
-	CloseSSL(sock);
+	CloseSSL(sock);					// close socket automatically in this method.
 
 	return true;
 }
@@ -3614,7 +3867,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 
 	// Lock
 	if(is_lock){
-		LockSendSock(sock);			// LOCK SOCKET
+		LockSendSock(sock);									// LOCK SOCKET
 	}
 
 	// Set IM data
@@ -3626,16 +3879,24 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		struct epoll_event	eqevent;
 		memset(&eqevent, 0, sizeof(struct epoll_event));
 		eqevent.data.fd	= sock;
-		eqevent.events	= EPOLLIN | EPOLLET | EPOLLRDHUP;			// EPOLLRDHUP is set, connecting to server socket is needed to know server side down.
+		eqevent.events	= EPOLLIN | EPOLLET | EPOLLRDHUP;	// EPOLLRDHUP is set, connecting to server socket is needed to know server side down.
 		if(-1 == epoll_ctl(eqfd, EPOLL_CTL_ADD, sock, &eqevent)){
 			ERR_CHMPRN("Failed to add sock(port %d: sock %d) into epoll event(%d), errno=%d", port, sock, eqfd, errno);
-			seversockmap.erase(sock);
+			if(is_lock){
+				UnlockSendSock(sock);						// UNLOCK SOCKET
+			}
+			seversockmap.erase(sock, NULL, NULL);			// do not call callback
+			CloseSSL(sock);
 			return false;
 		}
 		// set sock in server list and update status
 		if(!pImData->SetServerSocks(chmpxid, sock, CHM_INVALID_SOCK, SOCKTG_SOCK)){
 			MSG_CHMPRN("Could not set sock(%d) to chmpxid(0x%016" PRIx64 ").", sock, chmpxid);
-			seversockmap.erase(sock);
+			if(is_lock){
+				UnlockSendSock(sock);						// UNLOCK SOCKET
+			}
+			seversockmap.erase(sock, NULL, NULL);			// do not call callback
+			CloseSSL(sock);
 			return false;
 		}
 	}
@@ -3645,6 +3906,9 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 //
 // This method try to connect all server, and updates chmshm status for each server
 // when connecting servers.
+//
+// [NOTE]
+// This method is called for not server mode(slave) now.
 //
 bool ChmEventSock::ConnectServers(void)
 {
@@ -3672,7 +3936,8 @@ bool ChmEventSock::ConnectServers(void)
 		}
 
 		// status check
-		chmpxsts_t	status = pImData->GetServerStatus(chmpxid);
+		chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
+		chmpxsts_t	old_status	= status;
 		if(!IS_CHMPXSTS_SERVER(status) || !IS_CHMPXSTS_UP(status)){
 			MSG_CHMPRN("chmpid(0x%016" PRIx64 ") which is pos(%" PRIu64 ") is status(0x%016" PRIx64 ":%s), not enough status to connecting.", chmpxid, pos, status, STR_CHMPXSTS_FULL(status).c_str());
 			continue;
@@ -3688,6 +3953,7 @@ bool ChmEventSock::ConnectServers(void)
 			// Other server status is updated, because DOWN status can not be sent by that server.
 			//
 			CHANGE_CHMPXSTS_TO_DOWN(status);
+			MSG_CHMPRN("chmpid(0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 			if(!pImData->SetServerStatus(chmpxid, status)){
 				MSG_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) by down to chmpid(%" PRIu64 ") which is pos(%" PRIu64 ").", status, STR_CHMPXSTS_FULL(status).c_str(), chmpxid, pos);
 				continue;
@@ -3749,6 +4015,11 @@ bool ChmEventSock::ConnectRing(void)
 			// could not connect
 			ERR_CHMPRN("Could not connect to %s:%d, set status to DOWN.", name.c_str(), port);
 		}else{
+			// Update self last status updating time
+			if(!pImData->UpdateSelfLastStatusTime()){
+				ERR_CHMPRN("Could not update own updating status time, but continue...");
+			}
+
 			// send CHMPX_COM_JOIN_RING
 			CHMPXSVR	selfchmpxsvr;
 			if(!pImData->GetSelfChmpxSvr(&selfchmpxsvr)){
@@ -3935,7 +4206,7 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 	chmpxid_t	chmpxid;
 
 	if(CHM_INVALID_CHMPXID != (chmpxid = pImData->GetNextRingChmpxId())){
-		MSG_CHMPRN("Not need to connect rechain RING.");
+		//MSG_CHMPRN("Not need to connect rechain RING.");
 		return chmpxid;
 	}
 
@@ -4167,6 +4438,8 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 		ERR_CHMPRN("Failed to accept from ctlsock(%d), error=%d", ctlsock, errno);
 		return false;
 	}
+	MSG_CHMPRN("Accept new control socket(%d)", newctlsock);
+
 	// add internal mapping
 	ctlsockmap.set(newctlsock, CHM_INVALID_CHMPXID);	// control sock does not have chmpxid
 
@@ -4266,7 +4539,7 @@ bool ChmEventSock::InitialAllServerStatus(void)
 	// [NOTE]
 	// This method is for initializing chmpx, so do not need to lock socket.
 	//
-	if(!PxComSendStatusReq(sock, chmpxid)){
+	if(!PxComSendStatusReq(sock, chmpxid, false)){	// do not close socket if error.
 		ERR_CHMPRN("Failed to send PXCOM_STATUS_REQ.");
 		CloseSSL(sock);
 		return false;
@@ -4310,9 +4583,52 @@ bool ChmEventSock::InitialAllServerStatus(void)
 		CHM_Free(pResComPkt);
 		return false;
 	}
-	CloseSSL(sock);
 	CHM_Free(pComPkt);
 	CHM_Free(pResComPkt);
+
+	//
+	// [NOTICE] - added after 1.0.57
+	//
+	// Get suspend merging status here.
+	// If all servers in the ring has suspending merging status, this node must is set
+	// same status at initializing.
+	// If the ring(target node) is under 1.0.57, they can not response unknown
+	// communication command as MERGE_SUSPEND_GET.
+	// Thus it will be timeouted here, we must check timeout.
+	// If error occurred here, bu we will continue.
+	//
+	if(!PxComSendMergeSuspendGet(sock, chmpxid)){
+		ERR_CHMPRN("Failed to send PXCOM_MERGE_SUSPEND_GET, but continue...");
+	}else{
+		//
+		// Receive resnponse(MERGE_SUSPEND_RES)
+		// 
+		// [NOTICE]
+		// retry count is sock_retry_count
+		// 
+		is_closed	= false;	// tmp
+		pComPkt		= NULL;
+		if(!ChmEventSock::RawReceive(sock, GetSSL(sock), is_closed, &pComPkt, 0L, false, sock_retry_count, sock_wait_time) || !pComPkt){
+			ERR_CHMPRN("Failed to receive ComPkt from sock(%d), sock is %s.", sock, is_closed ? "closed" : "not closed");
+		}else{
+			// Check response type
+			if(COM_PX2PX != pComPkt->head.type){
+				ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not COM_PX2PX type from sock(%d).", STRCOMTYPE(pComPkt->head.type), pComPkt->head.type, sock);
+			}else{
+				pChmpxCom = CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
+				if(CHMPX_COM_MERGE_SUSPEND_RES != pChmpxCom->val_head.type){
+					ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_MERGE_SUSPEND_RES type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
+				}else{
+					// Check response & set suspend merging mode
+					if(!PxComReceiveMergeSuspendRes(&(pComPkt->head), pChmpxCom)){
+						ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+					}
+				}
+			}
+		}
+		CHM_Free(pComPkt);
+	}
+	CloseSSL(sock);
 
 	return true;
 }
@@ -4365,6 +4681,10 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			// If this pkt receiver is this server, check status and merging.
 			//
 			if(is_server_mode && pComPkt->head.term_ids.chmpxid == pImData->GetSelfChmpxId()){
+				// Update self last status updating time 
+				if(!pImData->UpdateSelfLastStatusTime()){
+					ERR_CHMPRN("Could not update own updating status time, but continue...");
+				}
 				chmpxsts_t	status = pImData->GetSelfStatus();
 
 				// If change self status after processing, so need to update status to all servers.
@@ -4389,23 +4709,15 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				// When this server is up and after joining ring and the status is changed pending, do merge.
 				//
 				// [NOTICE]
-				// MergeChmpxSvrs() in PxComReceiveStatusRes() can change self status from CHMPXSTS_SRVIN_DOWN_NORMAL or
-				// CHMPXSTS_SRVIN_DOWN_DELPENDING to CHMPXSTS_SRVIN_UP_MERGING, if it is neeed.
-				// If status is changed, we need to start merging.
+				// MergeChmpxSvrs() in PxComReceiveStatusRes() can change self status.
+				// Check changed self status and do start merging.
 				// 
-				if(is_auto_merge){
+				if(IsAutoMerge()){
 					if(!IS_CHMPXSTS_NOTHING(status)){
 						// start merge automatically
-						if(CHM_INVALID_CHMPXID == to_chmpxid){
-							if(!MergeStart()){
-								ERR_CHMPRN("Failed to merge or complete merge for \"server up and automatically merging\".");
-								return false;
-							}
-						}else{
-							if(!RequestMergeStart()){
-								ERR_CHMPRN("Failed to merge or complete merge for \"server up and automatically merging\".");
-								return false;
-							}
+						if(!RequestMergeStart()){
+							ERR_CHMPRN("Failed to merge or complete merge for \"server up and automatically merging\".");
+							return false;
 						}
 					}
 				}
@@ -4617,9 +4929,16 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				}
 			}
 
+			// Check auto merging when it is needed.
+			if(!ContinuousAutoMerge()){
+				ERR_CHMPRN("Failed to start merging.");
+				return true;
+			}
+
 		}else if(CHMPX_COM_MERGE_COMPLETE == pChmpxCom->val_head.type){
-			PCOMPKT	pResComPkt = NULL;
-			if(!PxComReceiveMergeComplete(&(pComPkt->head), pChmpxCom, &pResComPkt)){
+			PCOMPKT	pResComPkt	= NULL;
+			bool	is_completed= false;
+			if(!PxComReceiveMergeComplete(&(pComPkt->head), pChmpxCom, &pResComPkt, is_completed)){
 				// Failed
 				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 				return false;
@@ -4633,6 +4952,10 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				}
 				CHM_Free(pResComPkt);
 			}
+			if(!is_completed){
+				// Not finish merging by all servers in RING, then nothing to do.
+				return true;
+			}
 
 			// complete merging
 			//
@@ -4643,48 +4966,118 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			//
 			if(!MergeComplete()){
 				WAN_CHMPRN("Failed to complete merge on this server because of maybe merging now, so wait complete merge after finishing merge");
-				return true;
-			}
 
-			// [NOTICE]
-			// If there are CHMPXSTS_SRVIN_DOWN_DELETED status server, that server can not send
-			// "change status" by itself, so that if this server is start server of sending "merge complete",
-			// this server send "status change" instead of down server.
-			//
-			if(pComPkt->head.dept_ids.chmpxid == pImData->GetSelfChmpxId()){
-				chmpxid_t	nextchmpxid = pImData->GetNextRingChmpxId();
-				chmpxid_t	downchmpxid;
-
+			}else{
 				// [NOTICE]
-				// Any DOWN status server does not have SUSPEND status.
+				// If there are CHMPXSTS_SRVIN_DOWN_DELETED/DELPENDING status server, that server can not send
+				// "change status" by itself, so that if this server is start server of sending "merge complete",
+				// this server send "status change" instead of down server.
 				//
-				while(CHM_INVALID_CHMPXID != (downchmpxid = pImData->GetChmpxIdByStatus(CHMPXSTS_SRVIN_DOWN_DELETED))){
-					// hash & status update
-					if(!pImData->SetServerBaseHash(downchmpxid, CHM_INVALID_HASHVAL)){
-						ERR_CHMPRN("Failed to update base hash(CHM_INVALID_HASHVAL) for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
-						continue;
-					}
-					if(!pImData->SetServerStatus(downchmpxid, CHMPXSTS_SRVOUT_DOWN_NORMAL)){
-						ERR_CHMPRN("Failed to update status(CHMPXSTS_SRVOUT_DOWN_NORMAL) for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
-						continue;
-					}
-					// send status change
-					CHMPXSVR	chmpxsvr;
-					if(!pImData->GetChmpxSvr(downchmpxid, &chmpxsvr)){
-						ERR_CHMPRN("Could not get chmpx information for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
-						continue;
-					}
-					if(CHM_INVALID_CHMPXID == nextchmpxid){
-						if(!PxComSendSlavesStatusChange(&chmpxsvr)){
-							ERR_CHMPRN("Failed to send self status change to slaves, but continue...");
+				if(pComPkt->head.dept_ids.chmpxid == pImData->GetSelfChmpxId()){
+					chmpxid_t	nextchmpxid = pImData->GetNextRingChmpxId();
+					chmpxid_t	downchmpxid;
+
+					// [NOTICE]
+					// Any DOWN status server does not have SUSPEND status.
+					//
+					while(CHM_INVALID_CHMPXID != (downchmpxid = pImData->GetChmpxIdByStatus(CHMPXSTS_SRVIN_DOWN_DELETED)) || CHM_INVALID_CHMPXID != (downchmpxid = pImData->GetChmpxIdByStatus(CHMPXSTS_SRVIN_DOWN_DELPENDING))){
+						// hash & status update
+						if(!pImData->SetServerBaseHash(downchmpxid, CHM_INVALID_HASHVAL)){
+							ERR_CHMPRN("Failed to update base hash(CHM_INVALID_HASHVAL) for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
+							continue;
 						}
-					}else{
-						if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
-							ERR_CHMPRN("Failed to send self status change, but continue...");
+						if(!pImData->SetServerStatus(downchmpxid, CHMPXSTS_SRVOUT_DOWN_NORMAL)){
+							ERR_CHMPRN("Failed to update status(CHMPXSTS_SRVOUT_DOWN_NORMAL) for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
+							continue;
+						}
+						// send status change
+						CHMPXSVR	chmpxsvr;
+						if(!pImData->GetChmpxSvr(downchmpxid, &chmpxsvr)){
+							ERR_CHMPRN("Could not get chmpx information for down server(0x%016" PRIx64 "), but continue...", downchmpxid);
+							continue;
+						}
+						if(CHM_INVALID_CHMPXID == nextchmpxid){
+							if(!PxComSendSlavesStatusChange(&chmpxsvr)){
+								ERR_CHMPRN("Failed to send self status change to slaves, but continue...");
+							}
+						}else{
+							if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
+								ERR_CHMPRN("Failed to send self status change, but continue...");
+							}
 						}
 					}
 				}
 			}
+			// Check auto merging when it is needed.
+			if(!ContinuousAutoMerge()){
+				ERR_CHMPRN("Failed to start merging.");
+				return true;
+			}
+
+		}else if(CHMPX_COM_MERGE_SUSPEND == pChmpxCom->val_head.type){
+			PCOMPKT	pResComPkt	= NULL;
+			if(!PxComReceiveMergeSuspend(&(pComPkt->head), pChmpxCom, &pResComPkt)){
+				// Failed
+				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+				return false;
+			}
+			if(pResComPkt){
+				// Success, at first send(transfer) compkt to next server
+				if(!Send(pResComPkt, NULL, 0L)){
+					ERR_CHMPRN("Sending ComPkt type(%" PRIu64 ":%s) against ComPkt type(%" PRIu64 ":%s), Something error occured.", pResComPkt->head.type, STRCOMTYPE(pResComPkt->head.type), pComPkt->head.type, STRCOMTYPE(pComPkt->head.type));
+					CHM_Free(pResComPkt);
+					return false;
+				}
+				CHM_Free(pResComPkt);
+			}else{
+				// Success
+				MSG_CHMPRN("Succeed CHMPXCOM type(%" PRIu64 ":%s).", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+			}
+
+		}else if(CHMPX_COM_MERGE_NOSUSPEND == pChmpxCom->val_head.type){
+			PCOMPKT	pResComPkt	= NULL;
+			if(!PxComReceiveMergeNoSuspend(&(pComPkt->head), pChmpxCom, &pResComPkt)){
+				// Failed
+				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+				return false;
+			}
+			if(pResComPkt){
+				// Success, at first send(transfer) compkt to next server
+				if(!Send(pResComPkt, NULL, 0L)){
+					ERR_CHMPRN("Sending ComPkt type(%" PRIu64 ":%s) against ComPkt type(%" PRIu64 ":%s), Something error occured.", pResComPkt->head.type, STRCOMTYPE(pResComPkt->head.type), pComPkt->head.type, STRCOMTYPE(pComPkt->head.type));
+					CHM_Free(pResComPkt);
+					return false;
+				}
+				CHM_Free(pResComPkt);
+			}else{
+				// Success
+				MSG_CHMPRN("Succeed CHMPXCOM type(%" PRIu64 ":%s).", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+			}
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_GET == pChmpxCom->val_head.type){
+			PCOMPKT	pResComPkt	= NULL;
+			if(!PxComReceiveMergeSuspendGet(&(pComPkt->head), pChmpxCom, &pResComPkt)){
+				// Failed
+				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+				return false;
+			}
+			if(pResComPkt){
+				// Success, renponsing compkt(suspend res) to sending server
+				if(!Send(pResComPkt, NULL, 0L)){
+					ERR_CHMPRN("Sending ComPkt type(%" PRIu64 ":%s) against ComPkt type(%" PRIu64 ":%s), Something error occured.", pResComPkt->head.type, STRCOMTYPE(pResComPkt->head.type), pComPkt->head.type, STRCOMTYPE(pComPkt->head.type));
+					CHM_Free(pResComPkt);
+					return false;
+				}
+				CHM_Free(pResComPkt);
+			}else{
+				// Success
+				MSG_CHMPRN("Succeed CHMPXCOM type(%" PRIu64 ":%s).", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+			}
+
+		}else if(CHMPX_COM_MERGE_SUSPEND_RES == pChmpxCom->val_head.type){
+			// Not allow this packat receiving here.
+			WAN_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). But this packet can not be recieved in initalizing method, because this is only used for initializing.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+			return false;
 
 		}else if(CHMPX_COM_SERVER_DOWN == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
@@ -4927,7 +5320,11 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 
 	string	strResponse;
 
-	if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_DUMP_IMDATA)){
+	if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_VERSION)){
+		// Version
+		strResponse = chmpx_get_version() + string("\n");
+
+	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_DUMP_IMDATA)){
 		// Dump
 		stringstream	sstream;
 		pImData->Dump(sstream);
@@ -4949,9 +5346,9 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_STOP_MERGE)){
 		// Abort Merge
 		if(!CtlComMergeAbort(strResponse)){
-			ERR_CHMPRN("CTL_COMMAND_COMPLETE_MERGE is failed, so stop merging.");
+			ERR_CHMPRN("CTL_COMMAND_STOP_MERGE is failed, so continue merging.");
 		}else{
-			MSG_CHMPRN("CTL_COMMAND_COMPLETE_MERGE is succeed, so do next step after reciveing result.");
+			MSG_CHMPRN("CTL_COMMAND_STOP_MERGE is succeed, so stop merging.");
 		}
 
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_COMPLETE_MERGE)){
@@ -4960,6 +5357,22 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			ERR_CHMPRN("CTL_COMMAND_COMPLETE_MERGE is failed, so stop merging.");
 		}else{
 			MSG_CHMPRN("CTL_COMMAND_COMPLETE_MERGE is succeed, so do next step after receiving result.");
+		}
+
+	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SUSPEND_MERGE)){
+		// Suspend Merge
+		if(!CtlComMergeSuspend(strResponse)){
+			ERR_CHMPRN("CTL_COMMAND_SUSPEND_MERGE is failed, so automatically merging is default configration.");
+		}else{
+			MSG_CHMPRN("CTL_COMMAND_SUSPEND_MERGE is succeed, so automatically merging is suspended.");
+		}
+
+	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_NOSUP_MERGE)){
+		// Reset Merge mode
+		if(!CtlComMergeNoSuspend(strResponse)){
+			ERR_CHMPRN("CTL_COMMAND_NOSUP_MERGE is failed, so automatically merging is unknown(you can see it by dump command).");
+		}else{
+			MSG_CHMPRN("CTL_COMMAND_NOSUP_MERGE is succeed, so automatically merging is set default(configration).");
 		}
 
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SERVICE_IN)){
@@ -5012,6 +5425,15 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			ERR_CHMPRN("CTL_COMMAND_SELF_STATUS is failed.");
 		}else{
 			MSG_CHMPRN("CTL_COMMAND_SELF_STATUS is succeed.");
+		}
+
+	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_UPDATE_STATUS)){
+		// Print all server status
+		//
+		if(!CtlComUpdateStatus(strResponse)){
+			ERR_CHMPRN("CTL_COMMAND_UPDATE_STATUS is failed.");
+		}else{
+			MSG_CHMPRN("CTL_COMMAND_UPDATE_STATUS is succeed.");
 		}
 
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_TRACE_SET)){
@@ -5138,28 +5560,32 @@ bool ChmEventSock::ChangeStatusBeforeMergeStart(void)
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// Check status
-	chmpxsts_t	status = pImData->GetSelfStatus();
+	// check operating(merging)
+	if(pImData->IsOperating()){
+		ERR_CHMPRN("Now operating(merging) now, then could not start merging.");
+		return false;
+	}
+
+	// Check self status
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
+
+	if(IS_CHMPXSTS_OPERATING(status)){
+		MSG_CHMPRN("Already DOING / DONE status(0x%016" PRIx64 ":%s), so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+		return false;
+	}
 	if(!IS_CHMPXSTS_SRVIN(status)){
-		// [NOTE]
-		// For auto merging
-		// local status value is changed SERVICEIN/UP/ADD/PENDING/NOSUSPEND here, when server is SERVICEOUT/UP/NOACT(ADD)/NOTHING(ANY)/NOSUSPEND.
-		//
-		if(is_auto_merge && IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_UP(status) && !IS_CHMPXSTS_DELETE(status) && IS_CHMPXSTS_NOSUP(status)){
-			SET_CHMPXSTS_SRVIN(status);
-			SET_CHMPXSTS_ADD(status);
-			SET_CHMPXSTS_PENDING(status);
-		}else{
-			MSG_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not CHMPXSTS_VAL_SRVIN, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+		// [SERVICE OUT] or [SLAVE] --> nothing to do
+		MSG_CHMPRN("status(0x%016" PRIx64 ":%s) is SLAVE or SERVICE OUT, so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+		return false;
+	}
+	if(IS_CHMPXSTS_UP(status)){
+		if(!IS_CHMPXSTS_PENDING(status)){
+			MSG_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not PENDING, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
 			return false;
 		}
-	}
-	if(!IS_CHMPXSTS_PENDING(status)){
-		if(IS_CHMPXSTS_DOING(status) || IS_CHMPXSTS_DONE(status)){
-			return true;
-		}
-		if(!IS_CHMPXSTS_NOACT(status)){
-			MSG_CHMPRN("Already not pending/doing/done status(0x%016" PRIx64 ":%s), so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+		if(IS_CHMPXSTS_SUSPEND(status)){
+			WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
 			return false;
 		}
 
@@ -5172,44 +5598,31 @@ bool ChmEventSock::ChangeStatusBeforeMergeStart(void)
 			ERR_CHMPRN("Could not get base/pending hash value and those max value.");
 			return false;
 		}
-		if(base_hash == pending_hash && max_base_hash == max_pending_hash){
-			MSG_CHMPRN("this server has status(0x%016" PRIx64 ":%s) and base/pending hash(0x%016" PRIx64 ") is same, so nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str(), base_hash);
+		if(!IS_CHMPXSTS_NOACT(status) && (base_hash == pending_hash && max_base_hash == max_pending_hash)){
+			MSG_CHMPRN("this server has status(0x%016" PRIx64 ":%s) and base/pending hash(0x%016" PRIx64 ") is same on not NOACT status, so nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str(), base_hash);
 			return false;
 		}
-		SET_CHMPXSTS_PENDING(status);
-	}
-	if(IS_CHMPXSTS_ADD(status) && IS_CHMPXSTS_SUSPEND(status)){
-		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND(on ADD), so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
-	}
 
-	// new status
-	if(IS_CHMPXSTS_NOACT(status)){
-		if(!IS_CHMPXSTS_SUSPEND(status)){
-			status = CHMPXSTS_SRVIN_UP_MERGING;
-		}else{
-			status = CHMPXSTS_SRVIN_UP_MERGED;
-		}
-	}else if(IS_CHMPXSTS_ADD(status)){
-		if(!IS_CHMPXSTS_SUSPEND(status)){
-			status = CHMPXSTS_SRVIN_UP_ADDING;
-		}else{
-			status = CHMPXSTS_SRVIN_UP_ADDED;
-		}
-	}else if(IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_DELETE(status)){
-		if(!IS_CHMPXSTS_SUSPEND(status)){
-			status = CHMPXSTS_SRVIN_UP_DELETING;
-		}else{
-			status = CHMPXSTS_SRVIN_UP_DELETED;
-		}
-	}else if(IS_CHMPXSTS_DOWN(status) && IS_CHMPXSTS_DELETE(status)){
-		status = CHMPXSTS_SRVIN_DOWN_DELETED;
-	}else{	// why?
-		ERR_CHMPRN("Un-safe status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
-	}
+		// new status(to DOING)
+		SET_CHMPXSTS_DOING(status);
 
-	// set new status(set suspend in this method)
+	}else if(IS_CHMPXSTS_DOWN(status)){
+		// This case is impossible, but check it.
+		if(IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)){
+			// [SERVICE IN] [DOWN] [NOACT] [NOTHING] --> nothing to do
+			MSG_CHMPRN("status(0x%016" PRIx64 ":%s) does not need to merge, so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+			return false;
+		}else if(IS_CHMPXSTS_DELETE(status) && IS_CHMPXSTS_PENDING(status)){
+			// [SERVICE IN] [DOWN] [DELETE] [PENDING] --> [SERVICE IN] [DOWN] [DELETE] [DONE]
+			SET_CHMPXSTS_DONE(status);
+		}else{
+			MSG_CHMPRN("Unkown status(0x%016" PRIx64 ":%s), so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+			return false;
+		}
+	}
+	MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
+	// set new status
 	if(!pImData->SetSelfStatus(status)){
 		ERR_CHMPRN("Failed to change self status to 0x%016" PRIx64 ":%s", status, STR_CHMPXSTS_FULL(status).c_str());
 		return false;
@@ -5244,7 +5657,7 @@ bool ChmEventSock::ChangeStatusBeforeMergeStart(void)
 // If there are down servers, this server changes down server's status and
 // send it on behalf of down server before starting merging.
 //
-bool ChmEventSock::ChangeDownSvrStatusBeforeMerge(CHMDOWNSVRMERGE type)
+bool ChmEventSock::ChangeDownSvrStatusByMerge(CHMDOWNSVRMERGE type)
 {
 	if(CHM_DOWNSVR_MERGE_START != type && CHM_DOWNSVR_MERGE_COMPLETE != type && CHM_DOWNSVR_MERGE_ABORT != type){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -5268,23 +5681,29 @@ bool ChmEventSock::ChangeDownSvrStatusBeforeMerge(CHMDOWNSVRMERGE type)
 
 	// loop: check down servers and update it's status.
 	for(long cnt = 0; cnt < count; ++cnt){
-		// check status:	merge start		-> SERVICEIN / DOWN / DELETE / NOTHING or PENDING
-		// 					merge complete	-> SERVICEIN / DOWN / DELETE / ANYTHING
-		//					merge abort		-> SERVICEIN / DOWN / DELETE / DOING or DONE
-		if(	(CHM_DOWNSVR_MERGE_START == type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && (!IS_CHMPXSTS_DOING(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status))) ||
-			(CHM_DOWNSVR_MERGE_COMPLETE == type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status)) ||
-			(CHM_DOWNSVR_MERGE_ABORT == type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && (IS_CHMPXSTS_DOING(pchmpxsvrs[cnt].status) || IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status))) )
+		// check status:	merge start		-> SERVICEIN / DOWN / DELETE / PENDING
+		// 					merge complete	-> SERVICEIN / DOWN / DELETE
+		//					merge abort		-> SERVICEIN / DOWN / DELETE / PENDING or DONE
+		if(	(CHM_DOWNSVR_MERGE_START	== type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)) ||
+			(CHM_DOWNSVR_MERGE_COMPLETE	== type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status))	||
+			(CHM_DOWNSVR_MERGE_ABORT	== type && IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status))	)
 		{
 			// set new status:	merge start		-> SERVICEIN / DOWN / DELETE / DONE
-			//					merge complete	-> SERVICEOUT / DOWN / NOACT / NOTHING
-			//					merge abort		-> SERVICEIN / DOWN / DELETE / PENDING
-			chmpxsts_t	newstatus = CHM_DOWNSVR_MERGE_START == type ? CHMPXSTS_SRVIN_DOWN_DELETED : CHM_DOWNSVR_MERGE_COMPLETE == type ? CHMPXSTS_SRVOUT_DOWN_NORMAL : CHMPXSTS_SRVIN_DOWN_DELPENDING;
+			//					merge complete	-> SERVICEOUT/ DOWN / NOACT  / NOTHING
+			//					merge abort		-> SERVICEIN / DOWN / NOACT  / NOTHING
+			chmpxsts_t	newstatus = CHM_DOWNSVR_MERGE_START == type ? CHMPXSTS_SRVIN_DOWN_DELETED : CHMPXSTS_SRVOUT_DOWN_NORMAL;
 
 			// set new status and hash
 			if(!pImData->SetServerStatus(pchmpxsvrs[cnt].chmpxid, newstatus) || (CHM_DOWNSVR_MERGE_COMPLETE == type && !pImData->SetServerBaseHash(pchmpxsvrs[cnt].chmpxid, CHM_INVALID_HASHVAL))){
 				ERR_CHMPRN("Could not change server(0x%016" PRIx64 ") status to 0x%016" PRIx64 ":%s.", pchmpxsvrs[cnt].chmpxid, newstatus, STR_CHMPXSTS_FULL(newstatus).c_str());
 
 			}else{
+				// Update pending hash.
+				if(!pImData->UpdateHash(HASHTG_PENDING)){
+					ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
+					return false;
+				}
+
 				// reget status
 				CHMPXSVR	chmpxsvr;
 				if(!pImData->GetChmpxSvr(pchmpxsvrs[cnt].chmpxid, &chmpxsvr)){
@@ -5325,7 +5744,8 @@ bool ChmEventSock::MergeDone(void)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Check status
-	chmpxsts_t	status = pImData->GetSelfStatus();
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
 	if(!IS_CHMPXSTS_SRVIN(status)){
 		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not CHMPXSTS_VAL_SRVIN, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
 		return false;
@@ -5337,24 +5757,14 @@ bool ChmEventSock::MergeDone(void)
 		}
 		return false;
 	}
-	if((IS_CHMPXSTS_NOACT(status) || IS_CHMPXSTS_ADD(status)) && IS_CHMPXSTS_SUSPEND(status)){
-		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND(not on DELETE), so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+	if(IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_SUSPEND(status)){
+		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
 		return false;
 	}
 
 	// new status
-	if(IS_CHMPXSTS_NOACT(status)){
-		status = CHMPXSTS_SRVIN_UP_MERGED;
-	}else if(IS_CHMPXSTS_ADD(status)){
-		status = CHMPXSTS_SRVIN_UP_ADDED;
-	}else if(IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_DELETE(status)){
-		status = CHMPXSTS_SRVIN_UP_DELETED;
-	}else if(IS_CHMPXSTS_DOWN(status) && IS_CHMPXSTS_DELETE(status)){
-		status = CHMPXSTS_SRVIN_DOWN_DELETED;		// No case come here.
-	}else{	// why?
-		ERR_CHMPRN("Un-safe status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
-	}
+	SET_CHMPXSTS_DONE(status);
+	MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
 	// set new status(set suspend in this method)
 	if(!pImData->SetSelfStatus(status)){
@@ -5376,11 +5786,6 @@ bool ChmEventSock::MergeDone(void)
 				WAN_CHMPRN("Failed to send self status change to slaves, but continue...");
 			}
 		}else{
-			// Update pending hash.
-			if(!pImData->UpdatePendingHash()){
-				ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
-				return false;
-			}
 			// push status changed
 			if(!PxComSendStatusChange(to_chmpxid, &selfchmpxsvr)){
 				WAN_CHMPRN("Failed to send self status change, but continue...");
@@ -5389,7 +5794,7 @@ bool ChmEventSock::MergeDone(void)
 	}
 
 	// if the mode for merge is automatical, do complete here.
-	if(is_auto_merge){
+	if(IsAutoMerge()){
 		if(!RequestMergeComplete()){
 			ERR_CHMPRN("Could not change status merge \"COMPLETE\", probabry another server does not change status yet, DO COMPMERGE BY MANUAL!");
 		}
@@ -5397,13 +5802,92 @@ bool ChmEventSock::MergeDone(void)
 	return true;
 }
 
-bool ChmEventSock::IsSuspendServerInRing(void) const
+bool ChmEventSock::IsAutoMerge(void)
+{
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	return pImData->IsAutoMerge();
+}
+
+bool ChmEventSock::IsDoMerge(void)
+{
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	return pImData->IsDoMerge();
+}
+
+bool ChmEventSock::ContinuousAutoMerge(void)
+{
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	if(!is_server_mode){
+		MSG_CHMPRN("Continuous Merging automatically must be on server node.");
+		return false;
+	}
+	if(!IsAutoMerge() && !startup_servicein){
+		// Nothing to do.
+		MSG_CHMPRN("Not merging automatically mode and have no pending SERVICE IN request.");
+		return true;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	if(pImData->IsOperating()){
+		MSG_CHMPRN("Servers are now operating, then could not start to merge.");
+		return true;
+	}
+
+	// get now status
+	chmpxsts_t	status = pImData->GetSelfStatus();
+
+	// check pending service in operation 
+	if(startup_servicein){
+		// SERVICE IN operation is pending.
+		if(IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)){
+			if(IS_CHMPXSTS_SUSPEND(status)){
+				ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, then could not start to merge now.", status, STR_CHMPXSTS_FULL(status).c_str());
+				return true;
+			}
+
+			// do service in
+			if(!RequestServiceIn()){
+				WAN_CHMPRN("Failed to request \"servce in\" status before auto merging, maybe operating now.");
+				return true;
+			}
+
+			// set pending flag off
+			startup_servicein = false;
+
+			// re-get status
+			status = pImData->GetSelfStatus();
+		}else{
+			// Not [SERVICE OUT] [UP] [NOACT] [NOTHING] status
+			WAN_CHMPRN("Server is status(0x%016" PRIx64 ":%s), it must be SERVICE OUT / UP / NOACT / NOTHING. but continue...", status, STR_CHMPXSTS_FULL(status).c_str());
+			// for recover panding flag
+			startup_servicein = false;
+		}
+	}
+
+	// start merging
+	if(!RequestMergeStart()){
+		ERR_CHMPRN("Failed to merge or complete merge for \"service in\".");
+		return false;
+	}
+	return true;
+}
+
+bool ChmEventSock::CheckAllStatusForMergeStart(void) const
 {
 	if(IsEmpty()){
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// check operating(merging)
+	if(pImData->IsOperating()){
+		ERR_CHMPRN("Now operating(merging) now, then could not start merging.");
+		return false;
+	}
 
 	// get all server status
 	PCHMPXSVR	pchmpxsvrs	= NULL;
@@ -5417,26 +5901,89 @@ bool ChmEventSock::IsSuspendServerInRing(void) const
 	bool	result = true;
 	for(long cnt = 0; cnt < count; ++cnt){
 		if(IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status)){
-			if(IS_CHMPXSTS_NOACT(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_NOSUP(pchmpxsvrs[cnt].status)){
-				result = false;
-			}else if(IS_CHMPXSTS_ADD(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_NOSUP(pchmpxsvrs[cnt].status)){
-				result = false;
+			if(IS_CHMPXSTS_UP(pchmpxsvrs[cnt].status)){
+				if(IS_CHMPXSTS_NOACT(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_SUSPEND(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / UP / NOACT / NOTHING / SUSPEND server, then could not start merging.");
+					result = false;
+					break;
+				}
+				if(IS_CHMPXSTS_ADD(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_SUSPEND(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / UP / ADD / PENDING / SUSPEND server, then could not start merging.");
+					result = false;
+					break;
+				}
+				if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && IS_CHMPXSTS_SUSPEND(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / UP / DELETE / PENDING / SUSPEND server, then could not start merging.");
+					result = false;
+					break;
+				}
+			}else if(IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status)){
+				if(IS_CHMPXSTS_NOACT(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / DOWN / NOACT / NOTHING server, then could not start merging.");
+					result = false;
+					break;
+				}
 			}
-			// If DELETE action, do not care for suspend status.
+		}else{
+			// Not care for SERVICE OUT servers
 		}
-		// If SERVICEOUT, do not care for suspend status.
 	}
 	CHM_Free(pchmpxsvrs);
 
-	if(!result){
-		MSG_CHMPRN("Found SERVICEIN & SUSPEND server(not have clinet, but join RING), so could not start to merge.");
+	return result;
+}
+
+bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
+{
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
 	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// check operating(merging)
+	if(pImData->IsOperating()){
+		ERR_CHMPRN("Now operating(merging) now, then could not complete merging.");
+		return false;
+	}
+
+	// get all server status
+	PCHMPXSVR	pchmpxsvrs	= NULL;
+	long		count		= 0L;
+	if(!pImData->GetChmpxSvrs(&pchmpxsvrs, count)){
+		ERR_CHMPRN("Could not get all server status, so stop update status.");
+		return false;
+	}
+
+	// loop: check wrong status
+	bool	result = true;
+	for(long cnt = 0; cnt < count; ++cnt){
+		if(IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status)){
+			if(IS_CHMPXSTS_UP(pchmpxsvrs[cnt].status)){
+				if(!IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / UP / NOACT or ADD or DELETE / !DONE server, then could not complete merging.");
+					result = false;
+					break;
+				}
+			}else if(IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status)){
+				if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / DOWN / DELETE / !DONE server, then could not complete merging.");
+					result = false;
+					break;
+				}
+			}
+		}else{
+			// Not care for SERVICE OUT servers
+		}
+	}
+	CHM_Free(pchmpxsvrs);
+
 	return result;
 }
 
 //
-// This method sends "STATUS_COMFIRM", and After receiving "STATUS_COMFIRM", 
-// sends "MERGE_START" automatically.
+// This method sends only "STATUS_COMFIRM".
+// After that, this process receives "STATUS_COMFIRM" result, and sends "MERGE_START" automatically.
 //
 bool ChmEventSock::RequestMergeStart(string* pstring)
 {
@@ -5449,11 +5996,10 @@ bool ChmEventSock::RequestMergeStart(string* pstring)
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// check SUSPEND status
-	if(IsSuspendServerInRing()){
-		ERR_CHMPRN("Some server in RING have SUSPEND status, so could not change status.");
+	// check all server status
+	if(!CheckAllStatusForMergeStart()){
 		if(pstring){
-			*pstring = CTL_RES_ERROR_SOME_SERVER_SUSPEND;
+			*pstring = CTL_RES_ERROR_SOME_SERVER_STATUS;
 		}
 		return false;
 	}
@@ -5482,6 +6028,11 @@ bool ChmEventSock::RequestMergeStart(string* pstring)
 		}
 	}
 
+	// Update self last status updating time 
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
+	}
+
 	// get all server status
 	PCHMPXSVR	pchmpxsvrs	= NULL;
 	long		count		= 0L;
@@ -5490,6 +6041,7 @@ bool ChmEventSock::RequestMergeStart(string* pstring)
 		if(pstring){
 			*pstring = CTL_RES_INT_ERROR_NOTGETCHMPX;
 		}
+		CHM_Free(pchmpxsvrs);
 		return false;
 	}
 
@@ -5499,8 +6051,11 @@ bool ChmEventSock::RequestMergeStart(string* pstring)
 		if(pstring){
 			*pstring = CTL_RES_ERROR_COMMUNICATION;
 		}
+		CHM_Free(pchmpxsvrs);
 		return false;
 	}
+	CHM_Free(pchmpxsvrs);
+
 	if(pstring){
 		*pstring = CTL_RES_SUCCESS;
 	}
@@ -5516,16 +6071,16 @@ bool ChmEventSock::MergeStart(void)
 
 	// change status "DOING" before merging.
 	if(!ChangeStatusBeforeMergeStart()){
-		MSG_CHMPRN("Failed to change status \"DOING\", probabry nothing to do.");
+		MSG_CHMPRN("Not change status to \"DOING\", because probably nothing to do now.");
 		return true;
 	}
 	// change down server status before merging.
-	if(!ChangeDownSvrStatusBeforeMerge(CHM_DOWNSVR_MERGE_START)){
+	if(!ChangeDownSvrStatusByMerge(CHM_DOWNSVR_MERGE_START)){
 		ERR_CHMPRN("Failed to change down server status, but continue...");
 	}
 
 	// start merging.
-	if(is_do_merge){
+	if(IsDoMerge()){
 		if(is_run_merge){
 			ERR_CHMPRN("Already to run merge.");
 			return false;
@@ -5607,18 +6162,8 @@ bool ChmEventSock::MergeAbort(void)
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// status check
-	chmpxsts_t	status = pImData->GetSelfStatus();
-	if(!IS_CHMPXSTS_SRVIN(status) || (!IS_CHMPXSTS_DOING(status) && !IS_CHMPXSTS_DONE(status))){
-		// [NOTICE]
-		// CHMPXSTS_SRVIN_UP_MERGING & CHMPXSTS_SRVIN_UP_MERGED could not abort.
-		// Only doing merge complete or merging on no-suspend
-		//
-		MSG_CHMPRN("Now status is status(0x%016" PRIx64 ":%s) which is not \"DOING\" nor \"DONE\", so nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return true;
-	}
-
-	if(is_do_merge){
+	// stop data merging
+	if(IsDoMerge()){
 		if(!mergethread.HasThread()){
 			ERR_CHMPRN("The thread for merging is not running, why? but continue...");
 		}else{
@@ -5632,15 +6177,60 @@ bool ChmEventSock::MergeAbort(void)
 		ERR_CHMPRN("Failed to send abort update data, but continue...");
 	}
 
-	// set original status
-	CHANGE_CHMPXSTS_TO_MERGESTOP(status);
+	// status check and set new status
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
+	if(IS_CHMPXSTS_SRVIN(status)){
+		if(IS_CHMPXSTS_UP(status)){
+			if(IS_CHMPXSTS_NOACT(status)){
+				if(IS_CHMPXSTS_DOING(status) || IS_CHMPXSTS_DONE(status)){
+					if(IS_CHMPXSTS_NOSUP(status)){
+						// [SERVICE IN] [UP] [NOACT] [DOING or DONE] [NOSUSPEND] --> [SERVICE IN] [UP] [NOACT] [PENDING] [NOSUSPEND]
+						SET_CHMPXSTS_PENDING(status);
+					}else{
+						// [SERVICE IN] [UP] [NOACT] [DOING or DONE] [SUSPEND]	 --> [SERVICE IN] [UP] [NOACT] [NOTHING] [SUSPEND]
+						// this status is impossible
+						SET_CHMPXSTS_NOTHING(status);
+					}
+				}
+				// Nothing to do at [SERVICE IN] [UP] [NOACT] [NOTHING or PENDING]
+
+			}else if(IS_CHMPXSTS_ADD(status)){
+				if(IS_CHMPXSTS_DOING(status) || IS_CHMPXSTS_DONE(status)){
+					// [SERVICE IN] [UP] [ADD] [DOING or DONE]	--> [SERVICE IN] [UP] [ADD] [PENDING]
+					SET_CHMPXSTS_PENDING(status);
+				}
+				// Nothing to do at [SERVICE IN] [UP] [ADD] [PENDING]
+
+			}else if(IS_CHMPXSTS_DELETE(status)){
+				if(IS_CHMPXSTS_NOSUP(status)){
+					// [SERVICE IN] [UP] [DELETE] [NOSUSPEND] --> [SERVICE IN] [UP] [NOACT] [PENDING] [NOSUSPEND]
+					SET_CHMPXSTS_NOACT(status);
+					SET_CHMPXSTS_PENDING(status);
+				}else{
+					// [SERVICE IN] [UP] [DELETE] [SUSPEND]	 --> [SERVICE IN] [UP] [NOACT] [NOTHING] [SUSPEND]
+					SET_CHMPXSTS_NOACT(status);
+					SET_CHMPXSTS_NOTHING(status);
+				}
+			}
+		}else if(IS_CHMPXSTS_DOWN(status)){
+			if(IS_CHMPXSTS_DELETE(status)){
+				// [SERVICE IN] [DOWN] [DELETE]	--> [SERVICE IN] [DOWN] [NOACT] [PENDING]
+				SET_CHMPXSTS_NOACT(status);
+				SET_CHMPXSTS_NOTHING(status);
+			}
+			SET_CHMPXSTS_NOSUP(status);
+		}
+	}
+	MSG_CHMPRN("Changed status(0x%016" PRIx64 ":%s) from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
 	if(!pImData->SetSelfStatus(status)){
 		ERR_CHMPRN("Failed to update(rewind) status(0x%061lx:%s).", status, STR_CHMPXSTS_FULL(status).c_str());
 		return false;
 	}
 
 	// Update pending hash.
-	if(!pImData->UpdatePendingHash()){
+	if(!pImData->UpdateHash(HASHTG_PENDING)){
 		ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
 		return false;
 	}
@@ -5667,7 +6257,7 @@ bool ChmEventSock::MergeAbort(void)
 	}
 
 	// change down server status.
-	if(!ChangeDownSvrStatusBeforeMerge(CHM_DOWNSVR_MERGE_ABORT)){
+	if(!ChangeDownSvrStatusByMerge(CHM_DOWNSVR_MERGE_ABORT)){
 		ERR_CHMPRN("Failed to change down server status, but continue...");
 	}
 	return true;
@@ -5682,13 +6272,13 @@ bool ChmEventSock::RequestMergeComplete(string* pstring)
 		}
 		return false;
 	}
-//	ChmIMData*	pImData = pChmCntrl->GetImDataObj();	not used
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// check SUSPEND status
-	if(IsSuspendServerInRing()){
-		MSG_CHMPRN("Some server in RING have SUSPEND status, so could not change status.");
+	// check status
+	if(CheckAllStatusForMergeComplete()){
+		MSG_CHMPRN("Some server in RING have been merging yet, so could not change status.");
 		if(pstring){
-			*pstring = CTL_RES_ERROR_SOME_SERVER_SUSPEND;
+			*pstring = CTL_RES_ERROR_SOME_SERVER_STATUS;
 		}
 		return false;
 	}
@@ -5716,9 +6306,127 @@ bool ChmEventSock::RequestMergeComplete(string* pstring)
 		return true;
 	}
 
+	// Update self last status updating time for updating self status
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
+	}
+	CHMPXSVR	chmpxsvr;
+	if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
+		ERR_CHMPRN("Could not get self chmpx information.");
+		return false;
+	}
+	if(!PxComSendStatusChange(chmpxid, &chmpxsvr)){
+		ERR_CHMPRN("Failed to send self status change.");
+		return false;
+	}
+
 	// send complete_merge
 	if(!PxComSendMergeComplete(chmpxid)){
 		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_COMPLETE.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COMMUNICATION;
+		}
+		return false;
+	}
+	if(pstring){
+		*pstring = CTL_RES_SUCCESS;
+	}
+	return true;
+}
+
+bool ChmEventSock::RequestMergeSuspend(string* pstring)
+{
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		if(pstring){
+			*pstring = CTL_RES_INT_ERROR;
+		}
+		return false;
+	}
+	if(!is_server_mode){
+		ERR_CHMPRN("SUSPENDMERGE command need to run on server node.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		}
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Do suspend
+	if(!pImData->SuspendAutoMerge()){
+		MSG_CHMPRN("Could not suspend auto merge to self.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COULD_NOT_SUSPEND;
+		}
+		return false;
+	}else if(startup_servicein){
+		startup_servicein = false;
+	}
+
+	// get terminated chmpxid
+	chmpxid_t	chmpxid = GetNextRingChmpxId();
+	if(CHM_INVALID_CHMPXID == chmpxid){
+		// no server found, finish doing so pending hash updated self.
+		if(pstring){
+			*pstring = CTL_RES_SUCCESS;
+		}
+		return true;
+	}
+
+	// send suspend merge
+	if(!PxComSendMergeSuspend(chmpxid)){
+		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_SUSPEND.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COMMUNICATION;
+		}
+		return false;
+	}
+	if(pstring){
+		*pstring = CTL_RES_SUCCESS;
+	}
+	return true;
+}
+
+bool ChmEventSock::RequestMergeNoSuspend(string* pstring)
+{
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		if(pstring){
+			*pstring = CTL_RES_INT_ERROR;
+		}
+		return false;
+	}
+	if(!is_server_mode){
+		ERR_CHMPRN("NOSUSPENDMERGE command need to run on server node.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		}
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Reset suspend
+	if(!pImData->ResetAutoMerge()){
+		MSG_CHMPRN("Could not nosuspend auto merge to self.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COULD_NOT_NOSUSPEND;
+		}
+		return false;
+	}
+
+	// get terminated chmpxid
+	chmpxid_t	chmpxid = GetNextRingChmpxId();
+	if(CHM_INVALID_CHMPXID == chmpxid){
+		// no server found, finish doing so pending hash updated self.
+		if(pstring){
+			*pstring = CTL_RES_SUCCESS;
+		}
+		return true;
+	}
+
+	// send suspend merge
+	if(!PxComSendMergeNoSuspend(chmpxid)){
+		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_NOSUSPEND.");
 		if(pstring){
 			*pstring = CTL_RES_ERROR_COMMUNICATION;
 		}
@@ -5739,6 +6447,13 @@ bool ChmEventSock::RequestServiceIn(string* pstring)
 		}
 		return false;
 	}
+	if(!is_server_mode){
+		ERR_CHMPRN("SERVICEIN command need to run on server node.");
+		if(pstring){
+			*pstring = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		}
+		return false;
+	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	if(pImData->IsOperating()){
@@ -5749,31 +6464,19 @@ bool ChmEventSock::RequestServiceIn(string* pstring)
 		return false;
 	}
 
-	// check self status
-	chmpxsts_t	status = pImData->GetSelfStatus();
-	if(!(IS_CHMPXSTS_SRVIN(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_DELETE(status)) && !(IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_NOACT(status))){
+	// check status and set new status
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
+
+	CHANGE_CHMPXSTS_TO_SRVIN(status);
+	if(status == old_status){
 		ERR_CHMPRN("Server is status(0x%016" PRIx64 ":%s), so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
 		if(pstring){
 			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
 		}
 		return false;
 	}
-	if(IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_SUSPEND(status)){
-		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-		if(pstring){
-			*pstring = CTL_RES_ERROR_STATUS_HAS_SUSPEND;
-		}
-		return false;
-	}
-
-	// new status
-	if(IS_CHMPXSTS_SRVIN(status) && IS_CHMPXSTS_SUSPEND(status)){		// SERVICEIN & UP & DELETE & SUSPEND
-		status = CHMPXSTS_SRVIN_UP_ADDPENDING;
-	}else if(IS_CHMPXSTS_SRVIN(status) && IS_CHMPXSTS_NOSUP(status)){	// SERVICEIN & UP & DELETE & NOT SUSPEND
-		status = CHMPXSTS_SRVIN_UP_NORMAL;
-	}else if(IS_CHMPXSTS_SRVOUT(status)){								// SERVICEOUT & UP & NOACT & NOT SUSPEND
-		status = CHMPXSTS_SRVIN_UP_ADDPENDING;
-	}
+	MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
 	// set status(set suspend in this method)
 	if(!pImData->SetSelfStatus(status)){
@@ -5785,7 +6488,7 @@ bool ChmEventSock::RequestServiceIn(string* pstring)
 	}
 
 	// Update pending hash.
-	if(!pImData->UpdatePendingHash()){
+	if(!pImData->UpdateHash(HASHTG_PENDING)){
 		ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
 		if(pstring){
 			*pstring = CTL_RES_ERROR_CHANGE_STATUS;
@@ -5827,6 +6530,156 @@ bool ChmEventSock::RequestServiceIn(string* pstring)
 	return true;
 }
 
+bool ChmEventSock::RequestServiceOut(chmpxid_t chmpxid, string* pstring)
+{
+	string	strDummy = "";
+	if(!pstring){
+		pstring = &strDummy;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		*pstring = CTL_RES_INT_ERROR;
+		return false;
+	}
+	if(!is_server_mode){
+		ERR_CHMPRN("SERVICEOUT command need to run on server node.");
+		*pstring = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		return false;
+	}
+	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t	selfchmpxid	= pImData->GetSelfChmpxId();
+	if(CHM_INVALID_CHMPXID == chmpxid){
+		chmpxid = selfchmpxid;
+	}
+
+	// check operating
+	if(pImData->IsOperating()){
+		ERR_CHMPRN("Servers are now operating.");
+		*pstring = CTL_RES_ERROR_OPERATING;
+		return false;
+	}
+
+	if(selfchmpxid == chmpxid){
+		// check status and set new status
+		chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
+		chmpxsts_t	old_status	= status;
+
+		CHANGE_CHMPXSTS_TO_SRVOUT(status);
+		if(status == old_status){
+			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by sevice out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
+			return false;
+		}
+		MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
+		// set new status(set suspend in this method)
+		if(!pImData->SetSelfStatus(status)){
+			ERR_CHMPRN("Failed to change server status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
+			*pstring = CTL_RES_ERROR_CHANGE_STATUS;
+			return false;
+		}
+
+		// Update pending hash.
+		if(!pImData->UpdateHash(HASHTG_PENDING)){
+			ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
+			*pstring = CTL_RES_ERROR_CHANGE_STATUS;
+			return false;
+		}
+
+		// send status update
+		CHMPXSVR	chmpxsvr;
+		if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
+			ERR_CHMPRN("Could not get self chmpx information.");
+			*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+			return false;
+		}
+
+		chmpxid_t	nextchmpxid = GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			WAN_CHMPRN("Could not get next chmpxid, probably there is no server without self chmpx on RING.");
+			if(!PxComSendSlavesStatusChange(&chmpxsvr)){
+				ERR_CHMPRN("Failed to send self status change to slaves.");
+				*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+				return false;
+			}
+			*pstring = CTL_RES_SUCCESS_STATUS_NOTICE;
+		}
+		if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
+			ERR_CHMPRN("Failed to send self status change.");
+			*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+			return false;
+		}
+
+	}else{
+		// set status on this server and send status update.
+		//
+		// check status and set new status
+		chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
+		chmpxsts_t	old_status	= status;
+
+		CHANGE_CHMPXSTS_TO_SRVOUT(status);
+		if(status == old_status){
+			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by sevice out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
+			return false;
+		}
+		MSG_CHMPRN("server(chmpxid:0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s) try to change from old status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
+		// set new status
+		if(!pImData->SetServerStatus(chmpxid, status)){
+			ERR_CHMPRN("Failed to change server(chmpxid:0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			*pstring = CTL_RES_ERROR_CHANGE_STATUS;
+			return false;
+		}
+
+		// Update pending hash.
+		if(!pImData->UpdateHash(HASHTG_PENDING)){
+			ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
+			*pstring = CTL_RES_ERROR_CHANGE_STATUS;
+			return false;
+		}
+
+		// send status update
+		CHMPXSVR	chmpxsvr;
+		if(!pImData->GetChmpxSvr(chmpxid, &chmpxsvr)){
+			ERR_CHMPRN("Could not get server(0x%016" PRIx64 ") information.", chmpxid);
+			*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+			return false;
+		}
+
+		chmpxid_t	nextchmpxid = GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			WAN_CHMPRN("Could not get next chmpxid, probably there is no server without self chmpx on RING.");
+
+			if(!PxComSendSlavesStatusChange(&chmpxsvr)){
+				ERR_CHMPRN("Failed to send server(0x%016" PRIx64 ") status change to slaves.", chmpxid);
+				*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+				return false;
+			}
+			*pstring = CTL_RES_SUCCESS_STATUS_NOTICE;
+		}else{
+			if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
+				ERR_CHMPRN("Failed to send server(0x%016" PRIx64 ") status change.", chmpxid);
+				*pstring = CTL_RES_ERROR_STATUS_NOTICE;
+				return false;
+			}
+		}
+	}
+
+	// If do not merge(almost random deliver mode), do merging, completing it.
+	if(IsAutoMerge()){
+		// start merge complete automatically
+		if(!RequestMergeComplete(pstring)){
+			ERR_CHMPRN("Failed to complete merge for \"service out\".");
+			*pstring += "\n";
+			*pstring += CTL_RES_ERROR_MERGE_AUTO;
+			return false;
+		}
+	}
+	*pstring = CTL_RES_SUCCESS;
+	return true;
+}
+
 bool ChmEventSock::MergeComplete(void)
 {
 	if(IsEmpty()){
@@ -5836,28 +6689,8 @@ bool ChmEventSock::MergeComplete(void)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// change down server status before merging.
-	if(!ChangeDownSvrStatusBeforeMerge(CHM_DOWNSVR_MERGE_COMPLETE)){
+	if(!ChangeDownSvrStatusByMerge(CHM_DOWNSVR_MERGE_COMPLETE)){
 		ERR_CHMPRN("Failed to change down server status, but continue...");
-	}
-
-	// status check
-	chmpxsts_t	status = pImData->GetSelfStatus();
-	if(!IS_CHMPXSTS_SRVIN(status)){
-		MSG_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not CHMPXSTS_VAL_SRVIN, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return true;
-	}
-	if(!IS_CHMPXSTS_DONE(status)){
-		if(IS_CHMPXSTS_NOTHING(status)){
-			MSG_CHMPRN("status(0x%016" PRIx64 ":%s) is not \"DONE\", but not need to change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
-			return true;
-		}
-		WAN_CHMPRN("status(0x%016" PRIx64 ":%s) is not \"DONE\", so probably now doing thus could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
-	}
-	if(IS_CHMPXSTS_ADD(status) && IS_CHMPXSTS_SUSPEND(status)){
-		// allow NOACT & SUSPEND
-		ERR_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND(on ADD), so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
 	}
 
 	// get pending hash
@@ -5867,23 +6700,61 @@ bool ChmEventSock::MergeComplete(void)
 		return false;
 	}
 
-	// new status
-	if(IS_CHMPXSTS_NOACT(status)){
-		status	= CHMPXSTS_SRVIN_UP_NORMAL;
-	}else if(IS_CHMPXSTS_ADD(status)){
-		status	= CHMPXSTS_SRVIN_UP_NORMAL;
-	}else if(IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_DELETE(status)){
-		SET_CHMPXSTS_UP(status);
-		SET_CHMPXSTS_SRVOUT(status);
-		SET_CHMPXSTS_NOACT(status);
-		SET_CHMPXSTS_NOTHING(status);
-	}else if(IS_CHMPXSTS_DOWN(status) && IS_CHMPXSTS_DELETE(status)){
-		status	= CHMPXSTS_SRVOUT_DOWN_NORMAL;
-		hash	= CHM_INVALID_HASHVAL;
-	}else{	// why?
-		ERR_CHMPRN("Un-safe status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
-		return false;
+	// status check & set new status
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
+	if(IS_CHMPXSTS_SRVIN(status)){
+		if(IS_CHMPXSTS_UP(status)){
+			if(IS_CHMPXSTS_NOACT(status)){
+				if(IS_CHMPXSTS_SUSPEND(status)){
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}else if(IS_CHMPXSTS_PENDING(status) || IS_CHMPXSTS_DOING(status)){
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not DONE/NOTHING, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}
+				status	= CHMPXSTS_SRVIN_UP_NORMAL;
+
+			}else if(IS_CHMPXSTS_ADD(status)){
+				if(IS_CHMPXSTS_SUSPEND(status)){
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}else if(IS_CHMPXSTS_PENDING(status) || IS_CHMPXSTS_DOING(status)){
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not DONE, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}
+				status	= CHMPXSTS_SRVIN_UP_NORMAL;
+
+			}else if(IS_CHMPXSTS_DELETE(status)){
+				if(!IS_CHMPXSTS_DONE(status) && IS_CHMPXSTS_SUSPEND(status)){		// DONE and SUSPEND is allowed
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}else if(IS_CHMPXSTS_PENDING(status) || IS_CHMPXSTS_DOING(status)){
+					WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is DONE yet, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+					return false;
+				}
+				if(IS_CHMPXSTS_SUSPEND(status)){
+					status	= CHMPXSTS_SRVOUT_UP_NORMAL;
+					CHANGE_CHMPXSTS_TO_SUSPEND(status);
+				}else{
+					status	= CHMPXSTS_SRVOUT_UP_NORMAL;
+				}
+			}
+		}else if(IS_CHMPXSTS_DOWN(status)){
+			if(IS_CHMPXSTS_DELETE(status) && !IS_CHMPXSTS_DONE(status)){
+				WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is not DONE, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+				return false;
+			}
+			if(IS_CHMPXSTS_DELETE(status) && IS_CHMPXSTS_DONE(status)){
+				status	= CHMPXSTS_SRVOUT_DOWN_NORMAL;
+			}else{
+				// Not care for SERVICE IN / DOWN / NOACT servers
+			}
+		}
+	}else{
+		// Not care for SERVICE OUT servers
 	}
+	MSG_CHMPRN("Server status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
 	// hash update
 	if(!pImData->SetSelfBaseHash(hash)){
@@ -5895,6 +6766,11 @@ bool ChmEventSock::MergeComplete(void)
 	if(!pImData->SetSelfStatus(status)){
 		ERR_CHMPRN("Failed to change self status to 0x%016" PRIx64 ":%s", status, STR_CHMPXSTS_FULL(status).c_str());
 		return false;
+	}
+
+	// Update self last status updating time for retrying
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
 	}
 
 	// send status change
@@ -5981,26 +6857,57 @@ bool ChmEventSock::DoSuspend(void)
 		return false;
 	}
 
-	// check status
-	chmpxsts_t	status = pImData->GetSelfStatus();
-	if(IS_CHMPXSTS_SUSPEND(status)){
-		MSG_CHMPRN("Server is already SUSPEND status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
-		return true;
-	}
-	if(IS_CHMPXSTS_DOWN(status) || IS_CHMPXSTS_SLAVE(status)){
-		MSG_CHMPRN("Server is status(0x%016" PRIx64 ":%s), so could not need to add status SUSPEND.", status, STR_CHMPXSTS_FULL(status).c_str());
-		return true;
-	}
+	// backup operation mode.
+	bool	is_operating = pImData->IsOperating();
 
-	// add suspend status
-	CHANGE_CHMPXSTS_TO_SUSPEND(status);
+	// status check and set new status
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
+	if(IS_CHMPXSTS_SRVIN(status)){
+		if(IS_CHMPXSTS_UP(status)){
+			if(IS_CHMPXSTS_NOACT(status)){
+				// [SERVICE IN] [UP] [NOACT] [*] [NOSUSPEND / SUSPEND]		--> [SERVICE IN] [UP] [NOACT] [NOTHING] [SUSPEND]
+				SET_CHMPXSTS_NOTHING(status);
+				CHANGE_CHMPXSTS_TO_SUSPEND(status);
+
+			}else if(IS_CHMPXSTS_ADD(status)){
+				// [SERVICE IN] [UP] [ADD] [*] [NOSUSPEND / SUSPEND]		--> [SERVICE IN] [UP] [ADD] [PENDING] [SUSPEND]
+				SET_CHMPXSTS_PENDING(status);
+				CHANGE_CHMPXSTS_TO_SUSPEND(status);
+
+			}else if(IS_CHMPXSTS_DELETE(status)){
+				// [SERVICE IN] [UP] [DELETE] [*] [NOSUSPEND / SUSPEND]		--> [SERVICE IN] [UP] [DELETE] [PENDING] [SUSPEND]
+				SET_CHMPXSTS_PENDING(status);
+				CHANGE_CHMPXSTS_TO_SUSPEND(status);
+			}
+		}else if(IS_CHMPXSTS_DOWN(status)){
+			// [SERVICE IN] [DOWN] [*] [*] [NOSUSPEND]
+			// Should be NOSUSPEND status for DOWN servers, then do not nothing.
+			CHANGE_CHMPXSTS_TO_NOSUP(status);
+		}
+	}else if(IS_CHMPXSTS_SRVOUT(status)){
+		if(IS_CHMPXSTS_UP(status)){
+			// [SERVICE OUT] [UP] [NOACT] [NOTHING] [NOSUSPEND / SUSPEND]	--> [SERVICE OUT] [UP] [NOACT] [NOTHING] [SUSPEND]
+			CHANGE_CHMPXSTS_TO_SUSPEND(status);
+		}else if(IS_CHMPXSTS_DOWN(status)){
+			// [SERVICE OUT] [DOWN] [NOACT] [NOTHING] [NOSUSPEND]
+			// Should be NOSUSPEND status for DOWN servers, then do not nothing.
+			CHANGE_CHMPXSTS_TO_NOSUP(status);
+		}
+	}
+	if(status == old_status){
+		MSG_CHMPRN("Server is already set status(0x%016" PRIx64 ":%s) by DoSuspend.", status, STR_CHMPXSTS_FULL(status).c_str());
+		return true;
+	}
+	MSG_CHMPRN("Changed status(0x%016" PRIx64 ":%s) from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
 	if(!pImData->SetSelfStatus(status)){
 		ERR_CHMPRN("Failed to change server status(0x%016" PRIx64 ").", status);
 		return false;
 	}
 
 	// Update pending hash.
-	if(!pImData->UpdatePendingHash()){
+	if(!pImData->UpdateHash(HASHTG_PENDING)){
 		ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
 		return false;
 	}
@@ -6026,9 +6933,11 @@ bool ChmEventSock::DoSuspend(void)
 	}
 
 	// If merging, stop it.
-	if(!RequestMergeAbort()){
-		ERR_CHMPRN("Failed stopping merging.");
-		return false;
+	if(is_operating){
+		if(!RequestMergeAbort()){
+			ERR_CHMPRN("Failed stopping merging.");
+			return false;
+		}
 	}
 	return true;
 }
@@ -6084,6 +6993,16 @@ bool ChmEventSock::CtlComMergeComplete(string& strResponse)
 	return RequestMergeComplete(&strResponse);
 }
 
+bool ChmEventSock::CtlComMergeSuspend(string& strResponse)
+{
+	return RequestMergeSuspend(&strResponse);
+}
+
+bool ChmEventSock::CtlComMergeNoSuspend(string& strResponse)
+{
+	return RequestMergeNoSuspend(&strResponse);
+}
+
 bool ChmEventSock::CtlComServiceIn(string& strResponse)
 {
 	if(!RequestServiceIn(&strResponse)){
@@ -6091,24 +7010,12 @@ bool ChmEventSock::CtlComServiceIn(string& strResponse)
 	}
 
 	// If do not merge(almost random deliver mode), do merging, completing it.
-	if(is_auto_merge){
-		chmpxid_t	nextchmpxid = GetNextRingChmpxId();
-
-		// start merge automatically
-		if(CHM_INVALID_CHMPXID == nextchmpxid){
-			if(!MergeStart()){
-				ERR_CHMPRN("Failed to merge or complete merge for \"service in\".");
-				strResponse += "\n";
-				strResponse += CTL_RES_ERROR_MERGE_AUTO;
-				return false;
-			}
-		}else{
-			if(!RequestMergeStart(&strResponse)){
-				ERR_CHMPRN("Failed to merge or complete merge for \"service in\".");
-				strResponse += "\n";
-				strResponse += CTL_RES_ERROR_MERGE_AUTO;
-				return false;
-			}
+	if(IsAutoMerge()){
+		if(!RequestMergeStart(&strResponse)){
+			ERR_CHMPRN("Failed to start merging or complete merging for \"service in\".");
+			strResponse += "\n";
+			strResponse += CTL_RES_ERROR_MERGE_AUTO;
+			return false;
 		}
 	}
 	if(0 == strResponse.length()){
@@ -6129,8 +7036,8 @@ bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const c
 		strResponse = CTL_RES_INT_ERROR;
 		return false;
 	}
+
 	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
-	chmpxid_t	selfchmpxid	= pImData->GetSelfChmpxId();
 	chmpxid_t	chmpxid;
 	if(CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdByToServerName(hostname, ctlport))){
 		ERR_CHMPRN("Could not find a server as %s:%d.", hostname, ctlport);
@@ -6138,85 +7045,18 @@ bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const c
 		return false;
 	}
 
-	if(selfchmpxid == chmpxid){
-		// set self status
-		chmpxsts_t	status = pImData->GetSelfStatus();
-		if(IS_CHMPXSTS_SLAVE(status) || IS_CHMPXSTS_SRVOUT(status) || IS_CHMPXSTS_DOWN(status) || IS_CHMPXSTS_DELETE(status)){
-			ERR_CHMPRN("Server is status(0x%016" PRIx64 ":%s), not enough status to deleting.", status, STR_CHMPXSTS_FULL(status).c_str());
-			strResponse = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
-			return false;
-		}
+	// Check target server status for transfer command.
+	chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
+	if(IS_CHMPXSTS_SLAVE(status)){
+		ERR_CHMPRN("Could not operate to SERVICEOUT for chmpxid(0x%016" PRIx64 ") as %s:%d which is slave node.", chmpxid, hostname, ctlport);
+		strResponse = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		return false;
+	}
 
-		// new status
-		SET_CHMPXSTS_DELETE(status);
-		SET_CHMPXSTS_PENDING(status);
-
-		// set new status(set suspend in this method)
-		if(!pImData->SetSelfStatus(status)){
-			ERR_CHMPRN("Failed to change server status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str());
-			strResponse = CTL_RES_ERROR_CHANGE_STATUS;
-			return false;
-		}
-
-		// Update pending hash.
-		if(!pImData->UpdatePendingHash()){
-			ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
-			strResponse = CTL_RES_ERROR_CHANGE_STATUS;
-			return false;
-		}
-
-		// send status update
-		CHMPXSVR	chmpxsvr;
-		if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
-			ERR_CHMPRN("Could not get self chmpx information.");
-			strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-			return false;
-		}
-		chmpxid_t	nextchmpxid = GetNextRingChmpxId();
-		if(CHM_INVALID_CHMPXID == nextchmpxid){
-			WAN_CHMPRN("Could not get next chmpxid, probably there is no server without self chmpx on RING.");
-			if(!PxComSendSlavesStatusChange(&chmpxsvr)){
-				ERR_CHMPRN("Failed to send self status change to slaves.");
-				strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-				return false;
-			}
-			strResponse = CTL_RES_SUCCESS_STATUS_NOTICE;
-		}
-		if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
-			ERR_CHMPRN("Failed to send self status change.");
-			strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-			return false;
-		}
-
-		// If do not merge(almost random deliver mode), do merging, completing it.
-		if(is_auto_merge){
-			// start merge automatically
-			if(CHM_INVALID_CHMPXID == nextchmpxid){
-				if(!MergeStart()){
-					ERR_CHMPRN("Failed to merge or complete merge for \"service out\".");
-					strResponse += "\n";
-					strResponse += CTL_RES_ERROR_MERGE_AUTO;
-					return false;
-				}
-			}else{
-				if(!RequestMergeStart(&strResponse)){
-					ERR_CHMPRN("Failed to merge or complete merge for \"service out\".");
-					strResponse += "\n";
-					strResponse += CTL_RES_ERROR_MERGE_AUTO;
-					return false;
-				}
-			}
-		}
-
-	}else{
-		// set other server status
-		chmpxsts_t	status = pImData->GetServerStatus(chmpxid);
-		if(IS_CHMPXSTS_SLAVE(status) || IS_CHMPXSTS_SRVOUT(status) || IS_CHMPXSTS_DELETE(status)){
-			ERR_CHMPRN("Server is status(0x%016" PRIx64 ":%s), not enough status to deleting.", status, STR_CHMPXSTS_FULL(status).c_str());
-			strResponse = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
-			return false;
-		}
-
+	// check target node is alive.
+	chmpxid_t	selfchmpxid	= pImData->GetSelfChmpxId();
+	if(selfchmpxid != chmpxid){
+		// the target server is not down, then transfer command to target server on control port.
 		if(!IS_CHMPXSTS_DOWN(status)){
 			// can transfer command and do on server.
 			if(!ChmEventSock::RawSendCtlPort(hostname, ctlport, reinterpret_cast<const unsigned char*>(pOrgCommand), strlen(pOrgCommand) + 1, strResponse, sockfd_lockval, sock_retry_count, sock_wait_time, con_retry_count, con_wait_time)){
@@ -6224,83 +7064,16 @@ bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const c
 				strResponse = CTL_RES_ERROR_TRANSFER;
 				return false;
 			}
-			MSG_CHMPRN("Success to transfer command to %s:%d", hostname, ctlport);
-
-		}else{
-			// set status on this server and send status update.
-			//
-			if(!IS_CHMPXSTS_NOTHING(status)){		// SERVICEIN & DOWN
-				ERR_CHMPRN("Server is status(0x%016" PRIx64 ":%s), already deleting or deleted.", status, STR_CHMPXSTS_FULL(status).c_str());
-				strResponse = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
-				return false;
-			}
-
-			// new status
-			SET_CHMPXSTS_DELETE(status);
-			SET_CHMPXSTS_PENDING(status);
-
-			// set new status
-			if(!pImData->SetServerStatus(chmpxid, status)){
-				ERR_CHMPRN("Failed to change server(chmpxid:0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
-				strResponse = CTL_RES_ERROR_CHANGE_STATUS;
-				return false;
-			}
-
-			// Update pending hash.
-			if(!pImData->UpdatePendingHash()){
-				ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
-				strResponse = CTL_RES_ERROR_CHANGE_STATUS;
-				return false;
-			}
-
-			// send status update
-			CHMPXSVR	chmpxsvr;
-			if(!pImData->GetChmpxSvr(chmpxid, &chmpxsvr)){
-				ERR_CHMPRN("Could not get server(0x%016" PRIx64 ") information.", chmpxid);
-				strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-				return false;
-			}
-			chmpxid_t	nextchmpxid = GetNextRingChmpxId();
-			if(CHM_INVALID_CHMPXID == nextchmpxid){
-				WAN_CHMPRN("Could not get next chmpxid, probably there is no server without self chmpx on RING.");
-
-				if(!PxComSendSlavesStatusChange(&chmpxsvr)){
-					ERR_CHMPRN("Failed to send server(0x%016" PRIx64 ") status change to slaves.", chmpxid);
-					strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-					return false;
-				}
-				strResponse = CTL_RES_SUCCESS_STATUS_NOTICE;
-			}else{
-				if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
-					ERR_CHMPRN("Failed to send server(0x%016" PRIx64 ") status change.", chmpxid);
-					strResponse = CTL_RES_ERROR_STATUS_NOTICE;
-					return false;
-				}
-			}
-
-			// If do not merge(almost random deliver mode), do merging, completing it.
-			if(is_auto_merge){
-				// start merge automatically
-				if(CHM_INVALID_CHMPXID == nextchmpxid){
-					if(!MergeStart()){
-						ERR_CHMPRN("Failed to merge or complete merge for \"service out\".");
-						strResponse += "\n";
-						strResponse += CTL_RES_ERROR_MERGE_AUTO;
-						return false;
-					}
-				}else{
-					if(!RequestMergeStart(&strResponse)){
-						ERR_CHMPRN("Failed to merge or complete merge for \"service out\".");
-						strResponse += "\n";
-						strResponse += CTL_RES_ERROR_MERGE_AUTO;
-						return false;
-					}
-				}
-			}
+			MSG_CHMPRN("Success to transfer SERVICEOUT command to %s:%d", hostname, ctlport);
+			return true;
 		}
 	}
 
-	strResponse = CTL_RES_SUCCESS;
+	// Request Service out
+	if(!RequestServiceOut(chmpxid, &strResponse)){
+		ERR_CHMPRN("Could not operate to SERVICEOUT for chmpxid(0x%016" PRIx64 ") which is specified %s:%d.", chmpxid, hostname, ctlport);
+		return false;
+	}
 	return true;
 }
 
@@ -6347,46 +7120,58 @@ bool ChmEventSock::CtlComSelfStatus(string& strResponse)
 	ss << "Maximum MQ Count          = "	<< to_string(maxmqcnt)								<< endl;
 	ss << "Maximum Queue / Chmpx MQ  = "	<< to_string(maxqppxmq)								<< endl;
 	ss << "Maximum Queue / Client MQ = "	<< to_string(maxqpcmq)								<< endl;
-	ss << "Hash"																				<< endl;
+	ss << "Status                    = {"														<< endl;
+	ss << "    Server Status         = 0x"	<< to_hexstring(chmpxsvr.status)					<< "(" << STR_CHMPXSTS_FULL(chmpxsvr.status) << ")" << endl;
+	ss << "    Last Update           = "	<< CvtUpdateTimeToString(chmpxsvr.last_status_time)	<< "(" << to_string(chmpxsvr.last_status_time) << ")" << endl;
+	ss << "}"																					<< endl;
+	ss << "Hash                      = {"														<< endl;
 	ss << "    Enable Hash Value     = 0x"	<< to_hexstring(chmpxsvr.base_hash)					<< endl;
 	ss << "    Pending Hash Value    = 0x"	<< to_hexstring(chmpxsvr.pending_hash)				<< endl;
-	ss << "Status"																				<< endl;
-	ss << "    Server Status         = 0x"	<< to_hexstring(chmpxsvr.status)					<< STR_CHMPXSTS_FULL(chmpxsvr.status) << ")" << endl;
-	ss << "    Last Update           = "	<< to_string(chmpxsvr.last_status_time)				<< endl;
-	ss << "Connection"																			<< endl;
+	ss << "}"																					<< endl;
+	ss << "Connection                = {"														<< endl;
 	ss << "    Port(socket)          = "	<< to_string(chmpxsvr.port)		<< "("				<< (CHM_INVALID_SOCK == sock ? "n/a" : to_string(sock))			<< ")" << endl;
 	ss << "    Control Port(socket)  = "	<< to_string(chmpxsvr.ctlport)	<< "("				<< (CHM_INVALID_SOCK == ctlsock ? "n/a" : to_string(ctlsock))	<< ")" << endl;
-	ss << "    Use SSL               = "	<< (chmpxsvr.ssl.is_ssl ? "yes" : "no")				<< endl;
-	ss << "      Verify Peer         = "	<< (chmpxsvr.ssl.verify_peer ? "yes" : "no")		<< endl;
-	ss << "      CA path type        = "	<< (chmpxsvr.ssl.is_ca_file ? "file" : "dir")		<< endl;
-	ss << "      CA path             = "	<< chmpxsvr.ssl.capath								<< endl;
-	ss << "      Server Cert         = "	<< chmpxsvr.ssl.server_cert							<< endl;
-	ss << "      Server Private Key  = "	<< chmpxsvr.ssl.server_prikey						<< endl;
-	ss << "      Slave Cert          = "	<< chmpxsvr.ssl.slave_cert							<< endl;
-	ss << "      Slave Private Key   = "	<< chmpxsvr.ssl.slave_prikey						<< endl;
-	ss << "Connection Count"																	<< endl;
+	ss << "    SSL Connection        = "	<< (chmpxsvr.ssl.is_ssl ? "yes" : "no")				<< endl;
+	if(chmpxsvr.ssl.is_ssl){
+		ss << "    SSL Parameters        = {"													<< endl;
+		ss << "        Verify Peer       = "	<< (chmpxsvr.ssl.verify_peer ? "yes" : "no")	<< endl;
+		ss << "        CA path type      = "	<< (chmpxsvr.ssl.is_ca_file ? "file" : "dir")	<< endl;
+		ss << "        CA path           = "	<< chmpxsvr.ssl.capath							<< endl;
+		ss << "        Server Cert       = "	<< chmpxsvr.ssl.server_cert						<< endl;
+		ss << "        Server Private Key= "	<< chmpxsvr.ssl.server_prikey					<< endl;
+		ss << "        Slave Cert        = "	<< chmpxsvr.ssl.slave_cert						<< endl;
+		ss << "        Slave Private Key = "	<< chmpxsvr.ssl.slave_prikey					<< endl;
+		ss << "        Slave Private Key = "	<< chmpxsvr.ssl.slave_prikey					<< endl;
+		ss << "    }"																			<< endl;
+	}
+	ss << "}"																					<< endl;
+	ss << "Connection Count          = {"														<< endl;
 	ss << "    To Servers            = "	<< to_string(svrcnt)								<< endl;
 	ss << "    From Slaves           = "	<< to_string(slvcnt)								<< endl;
-	ss << "    To Control port       = "	<< to_string(clntcnt)								<< endl;
-	ss << "Stats"																				<< endl;
-	ss << "  To(From) Servers"																	<< endl;
-	ss << "    send count            = "	<< to_string(server_stat.total_sent_count)			<< " count"	<< endl;
-	ss << "    receive count         = "	<< to_string(server_stat.total_received_count)		<< " count"	<< endl;
-	ss << "    total                 = "	<< to_string(server_stat.total_body_bytes)			<< " bytes"	<< endl;
-	ss << "    minimum               = "	<< to_string(server_stat.min_body_bytes)			<< " bytes"	<< endl;
-	ss << "    maximum               = "	<< to_string(server_stat.max_body_bytes)			<< " bytes"	<< endl;
-	ss << "    total                 = "	<< to_string(server_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.total_elapsed_time.tv_nsec) << "ns"	<< endl;
-	ss << "    minmum                = "	<< to_string(server_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.min_elapsed_time.tv_nsec) << "ns"	<< endl;
-	ss << "    maximum               = "	<< to_string(server_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.max_elapsed_time.tv_nsec) << "ns"	<< endl;
-	ss << "  To(From) Slaves"																	<< endl;
-	ss << "    send count            = "	<< to_string(slave_stat.total_sent_count)			<< " count"	<< endl;
-	ss << "    receive count         = "	<< to_string(slave_stat.total_received_count)		<< " count"	<< endl;
-	ss << "    total                 = "	<< to_string(slave_stat.total_body_bytes)			<< " bytes"	<< endl;
-	ss << "    minimum               = "	<< to_string(slave_stat.min_body_bytes)				<< " bytes"	<< endl;
-	ss << "    maximum               = "	<< to_string(slave_stat.max_body_bytes)				<< " bytes"	<< endl;
-	ss << "    total                 = "	<< to_string(slave_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.total_elapsed_time.tv_nsec) << "ns"	<< endl;
-	ss << "    minmum                = "	<< to_string(slave_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.min_elapsed_time.tv_nsec) << "ns"	<< endl;
-	ss << "    maximum               = "	<< to_string(slave_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.max_elapsed_time.tv_nsec) << "ns"	<< endl;
+	ss << "    On Control port       = "	<< to_string(clntcnt)								<< endl;
+	ss << "}"																					<< endl;
+	ss << "Stats                     = {"														<< endl;
+	ss << "    To(From) Servers      = {"														<< endl;
+	ss << "        send count        = "	<< to_string(server_stat.total_sent_count)			<< " count"	<< endl;
+	ss << "        receive count     = "	<< to_string(server_stat.total_received_count)		<< " count"	<< endl;
+	ss << "        total             = "	<< to_string(server_stat.total_body_bytes)			<< " bytes"	<< endl;
+	ss << "        minimum           = "	<< to_string(server_stat.min_body_bytes)			<< " bytes"	<< endl;
+	ss << "        maximum           = "	<< to_string(server_stat.max_body_bytes)			<< " bytes"	<< endl;
+	ss << "        total             = "	<< to_string(server_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.total_elapsed_time.tv_nsec)<< "ns"	<< endl;
+	ss << "        minmum            = "	<< to_string(server_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "        maximum           = "	<< to_string(server_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.max_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "    }"																				<< endl;
+	ss << "    To(From) Slaves       = {"														<< endl;
+	ss << "        send count        = "	<< to_string(slave_stat.total_sent_count)			<< " count"	<< endl;
+	ss << "        receive count     = "	<< to_string(slave_stat.total_received_count)		<< " count"	<< endl;
+	ss << "        total             = "	<< to_string(slave_stat.total_body_bytes)			<< " bytes"	<< endl;
+	ss << "        minimum           = "	<< to_string(slave_stat.min_body_bytes)				<< " bytes"	<< endl;
+	ss << "        maximum           = "	<< to_string(slave_stat.max_body_bytes)				<< " bytes"	<< endl;
+	ss << "        total             = "	<< to_string(slave_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.total_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "        minmum            = "	<< to_string(slave_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "        maximum           = "	<< to_string(slave_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.max_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "    }"																				<< endl;
+	ss << "}"																					<< endl;
 
 	strResponse = ss.str();
 
@@ -6414,7 +7199,7 @@ bool ChmEventSock::CtlComAllServerStatus(string& strResponse)
 
 	// set output buffer
 	stringstream	ss;
-	ss << "RING Name                  = "	<< group										<< endl << endl;
+	ss << "RING Name              = "	<< group										<< endl;
 
 	for(long cnt = 0; cnt < count; cnt++){
 		ss << "No."							<< to_string(cnt + 1)							<< endl;
@@ -6431,13 +7216,56 @@ bool ChmEventSock::CtlComAllServerStatus(string& strResponse)
 			ss << "    Slave Cert         = "	<< pchmpxsvrs[cnt].ssl.slave_cert					<< endl;
 			ss << "    Slave Private Key  = "	<< pchmpxsvrs[cnt].ssl.slave_prikey					<< endl;
 		}
-		ss << "    Server Status      = 0x"	<< to_hexstring(pchmpxsvrs[cnt].status)			<< STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status) << ")" << endl;
-		ss << "    Last Update        = "	<< to_string(pchmpxsvrs[cnt].last_status_time)	<< endl;
-		ss << "    Enable Hash Value  = 0x"	<< to_hexstring(pchmpxsvrs[cnt].base_hash)		<< endl;
-		ss << "    Pending Hash Value = 0x"	<< to_hexstring(pchmpxsvrs[cnt].pending_hash)	<< endl;
+		ss << "    Server Status      = 0x"	<< to_hexstring(pchmpxsvrs[cnt].status)						<< "(" << STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status) << ")" << endl;
+		ss << "    Last Update        = "	<< CvtUpdateTimeToString(pchmpxsvrs[cnt].last_status_time)	<< "(" << to_string(pchmpxsvrs[cnt].last_status_time) << ")" << endl;
+		ss << "    Enable Hash Value  = 0x"	<< to_hexstring(pchmpxsvrs[cnt].base_hash)					<< endl;
+		ss << "    Pending Hash Value = 0x"	<< to_hexstring(pchmpxsvrs[cnt].pending_hash)				<< endl;
 	}
 	CHM_Free(pchmpxsvrs);
 	strResponse = ss.str();
+
+	return true;
+}
+
+bool ChmEventSock::CtlComUpdateStatus(string& strResponse)
+{
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		strResponse = CTL_RES_INT_ERROR;
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	chmpxsts_t	status	= pImData->GetSelfStatus();
+	if(IS_CHMPXSTS_SLAVE(status)){
+		ERR_CHMPRN("Could not operate to UPDATESTATUS on slave node.");
+		strResponse = CTL_RES_ERROR_COMMAND_ON_SERVER;
+		return false;
+	}
+
+	chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
+	if(CHM_INVALID_CHMPXID == nextchmpxid){
+		ERR_CHMPRN("Could not operate to UPDATESTATUS, because there is no server node in RING.");
+		strResponse = CTL_RES_SUCCESS_NOSERVER;
+		return false;
+	}
+
+	// Update self last status updating time
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
+	}
+	CHMPXSVR	chmpxsvr;
+	if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
+		ERR_CHMPRN("Could not get self chmpx information.");
+		strResponse = CTL_RES_ERROR_UPDATE_STATUS_INTERR;
+		return false;
+	}
+	if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
+		ERR_CHMPRN("Failed to send self status change.");
+		strResponse = CTL_RES_ERROR_UPDATE_STATUS_SENDERR;
+		return false;
+	}
+	strResponse = CTL_RES_SUCCESS;
 
 	return true;
 }
@@ -6546,7 +7374,7 @@ bool ChmEventSock::CtlComAllTraceView(string& strResponse, logtype_t dirmask, lo
 // [NOTE]
 // If you need to lock the socket, you must lock it before calling this method.
 //
-bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid)
+bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_sock_close)
 {
 	if(CHM_INVALID_SOCK == sock || CHM_INVALID_CHMPXID == chmpxid){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -6582,6 +7410,16 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid)
 	bool	is_closed = false;
 	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pComPkt, is_closed, false, sock_retry_count, sock_wait_time)){		// as default nonblocking
 		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_REQ to sock(%d).", sock);
+
+		// [NOTE]
+		// When this methos is called from InitialAllServerStatus(), the sock is not mapped.
+		// Then we close sock when need_sock_close is true.
+		//
+		if(need_sock_close && is_closed){
+			if(!RawNotifyHup(sock)){
+				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
+			}
+		}
 		CHM_Free(pComPkt);
 		return false;
 	}
@@ -6603,6 +7441,11 @@ bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
 	//PPXCOM_STATUS_REQ	pStatusReq	= CVT_COMPTR_STATUS_REQ(pComAll);	// unused now
 	*ppResComPkt					= NULL;
+
+	// Update self last status updating time 
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
+	}
 
 	// get all server status
 	PCHMPXSVR	pchmpxsvrs	= NULL;
@@ -6686,21 +7529,13 @@ bool ChmEventSock::PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 
 		// If server mode, update hash values
 		if(is_server_mode){
-			if(!pImData->UpdatePendingHash()){
-				ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
-				return false;
-			}
 			// check self status changing( normal -> merging )
 			//
 			// [NOTICE]
-			// MergeChmpxSvrs() can change self status from CHMPXSTS_SRVIN_DOWN_NORMAL or CHMPXSTS_SRVIN_DOWN_DELPENDING
-			// to CHMPXSTS_SRVIN_UP_MERGING, if it is neeed.
-			// If status is changed, we need to start merging.
-			//
-			// BUT we do not start merging here, because the caller funstion do it. 
+			// MergeChmpxSvrs() can change self status, then we put messaging.
 			//
 			chmpxsts_t	newstatus = pImData->GetSelfStatus();
-			if((IS_CHMPXSTS_NOTHING(bupstatus) || IS_CHMPXSTS_PENDING(bupstatus)) && (IS_CHMPXSTS_DOING(newstatus) || IS_CHMPXSTS_DONE(newstatus))){
+			if(bupstatus != newstatus){
 				WAN_CHMPRN("self status changed from 0x%016" PRIx64 ":%s to 0x%016" PRIx64 ":%s.", bupstatus, STR_CHMPXSTS_FULL(bupstatus).c_str(), newstatus, STR_CHMPXSTS_FULL(newstatus).c_str());
 			}
 		}
@@ -6943,7 +7778,7 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 			}
 
 			// Send request
-			if(!PxComSendStatusReq(nextsock, nextchmpxid)){
+			if(!PxComSendStatusReq(nextsock, nextchmpxid, true)){	// if error, need to close sock in method.
 				ERR_CHMPRN("Failed to send PXCOM_STATUS_REQ.");
 				UnlockSendSock(nextsock);			// UNLOCK SOCKET
 				return false;
@@ -7045,6 +7880,11 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 	return true;
 }
 
+//
+// [NOTICE]
+// This packet is not used now. If you need to use this packet, you MUST call
+// UpdateSelfLastStatusTime() function before this function for pchmpxsvrs.
+//
 bool ChmEventSock::PxComSendStatusUpdate(chmpxid_t chmpxid, PCHMPXSVR pchmpxsvrs, long count)
 {
 	if(CHM_INVALID_CHMPXID == chmpxid || !pchmpxsvrs || count <= 0L){
@@ -7148,11 +7988,6 @@ bool ChmEventSock::PxComReceiveStatusUpdate(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			}else{
 				MSG_CHMPRN("Succeed update status.");
 				ResultCode = CHMPX_COM_RES_SUCCESS;
-
-				// Update pending hash.
-				if(!pImData->UpdatePendingHash()){
-					ERR_CHMPRN("Failed to update pending hash for all servers, but continue....");
-				}
 			}
 		}
 
@@ -7265,18 +8100,18 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 	if(pComHead->dept_ids.chmpxid == selfchmpxid){
 		// around
 		//
+		chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			ERR_CHMPRN("Could not get next server chmpxid.");
+			return false;
+		}
 		if(CHMPX_COM_RES_SUCCESS == pReqStsConfirm->head.result){
 			// Succeed status confirm, do next step
 			//
-			chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
-			if(CHM_INVALID_CHMPXID == nextchmpxid){
-				ERR_CHMPRN("Could not get next server chmpxid.");
-				return false;
-			}
 
-			// Check suspending server
-			if(IsSuspendServerInRing()){
-				WAN_CHMPRN("Found suspendind servers, so then could not start to merge.");
+			// If it is merging now, we do not start merging.
+			if(!CheckAllStatusForMergeStart()){
+				WAN_CHMPRN("Now merging, then could not start to new merge. but it will start after finishing merging.");
 				return true;
 			}
 
@@ -7287,9 +8122,39 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			}
 
 		}else{
-			// Failed status confirm
-			ERR_CHMPRN("PXCOM_STATUS_CONFIRM is failed, do nothing to recover...");
-			return false;
+			// Failed status confirm, Thus retry to send status confirm
+			ERR_CHMPRN("PXCOM_STATUS_CONFIRM is failed, thus update self status and retry send status confirm.");
+
+			// Update self last status updating time for retrying
+			if(!pImData->UpdateSelfLastStatusTime()){
+				ERR_CHMPRN("Could not update own updating status time, but continue...");
+			}
+			CHMPXSVR	chmpxsvr;
+			if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
+				ERR_CHMPRN("Could not get self chmpx information.");
+				return false;
+			}
+			if(!PxComSendStatusChange(nextchmpxid, &chmpxsvr)){
+				ERR_CHMPRN("Failed to send self status change.");
+				return false;
+			}
+
+			PCHMPXSVR	pchmpxsvrs	= NULL;
+			long		count		= 0L;
+			if(!pImData->GetChmpxSvrs(&pchmpxsvrs, count)){
+				ERR_CHMPRN("Could not get all server status, so stop retry confirm status.");
+				return false;
+			}
+			// send status_confirm
+			if(!PxComSendStatusConfirm(nextchmpxid, pchmpxsvrs, count)){
+				ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CONFIRM.");
+				CHM_Free(pchmpxsvrs);
+				return false;
+			}
+			CHM_Free(pchmpxsvrs);
+
+			// Not start to merge, but retry to get confirm
+			return true;
 		}
 
 	}else{
@@ -7310,6 +8175,7 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		}else{
 			// Compare
 			if(!pImData->CompareChmpxSvrs(pReqChmsvrs, pReqStsConfirm->count)){
+				MSG_CHMPRN("Status(%ld count status) could not comfirm.", pReqStsConfirm->count);
 				ResultCode = CHMPX_COM_RES_ERROR;
 			}else{
 				ResultCode = CHMPX_COM_RES_SUCCESS;
@@ -7359,7 +8225,7 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 }
 
 //
-// STATUS_CHANGE is only sending packet to slaves.
+// Send server status to all servers(on ring), and if is_send_slaves, sends packet to slaves.
 //
 bool ChmEventSock::PxComSendStatusChange(chmpxid_t chmpxid, PCHMPXSVR pserver, bool is_send_slaves)
 {
@@ -7513,13 +8379,6 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 		if(CHMPX_COM_RES_SUCCESS != pStatusChange->head.result){
 			MSG_CHMPRN("Already error occured before this server.");
 			ResultCode = CHMPX_COM_RES_ERROR;
-		}
-
-		// Update pending hash.
-		if(is_server_mode){
-			if(!pImData->UpdatePendingHash()){
-				WAN_CHMPRN("Failed to update pending hash for all servers, so stop update status, but continue...");
-			}
 		}
 
 		// [NOTICE]
@@ -7893,8 +8752,10 @@ bool ChmEventSock::PxComSendMergeComplete(chmpxid_t chmpxid)
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, bool& is_completed)
 {
+	is_completed = false;
+
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
 		return false;
@@ -7914,6 +8775,7 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		if(CHMPX_COM_RES_SUCCESS == pMergeComplete->head.result){
 			// Succeed
 			MSG_CHMPRN("PXCOM_MERGE_COMPLETE is succeed, All server start to merge.");
+			is_completed = true;
 
 			// If there is DELETE Done server, do SERVICEOUT status here!
 			chmpxid_t	nextchmpxid = GetNextRingChmpxId();
@@ -7997,23 +8859,417 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			}else{
 				// check self status
 				chmpxsts_t	status = pImData->GetSelfStatus();
-				if(!IS_CHMPXSTS_SRVOUT(status)){
-					if((IS_CHMPXSTS_NOACT(status) || IS_CHMPXSTS_ADD(status)) && IS_CHMPXSTS_SUSPEND(status)){
-						if(!IS_CHMPXSTS_DONE(status)){
-							WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
-							pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
-						}else{
-							// [NOTE]
-							// maybe, case of SERVICEIN/UP/NOACT/DONE/SUSPEND
-							// This status can be because serviceout command for other server when there many suspend server.
+				if(IS_CHMPXSTS_SRVIN(status)){
+					if(IS_CHMPXSTS_UP(status)){
+						if(IS_CHMPXSTS_NOACT(status)){
+							if(IS_CHMPXSTS_SUSPEND(status)){
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else if(IS_CHMPXSTS_DOING(status)){
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is DOING yet, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else{
+								is_completed = true;
+							}
+
+						}else if(IS_CHMPXSTS_ADD(status)){
+							if(!IS_CHMPXSTS_PENDING(status) && IS_CHMPXSTS_SUSPEND(status)){	// only suspend status is set to PENDING, it is allowed
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else if(IS_CHMPXSTS_DOING(status)){
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is DOING yet, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else{
+								is_completed = true;
+							}
+
+						}else if(IS_CHMPXSTS_DELETE(status)){
+							if(!IS_CHMPXSTS_DONE(status) && IS_CHMPXSTS_SUSPEND(status)){		// DONE and SUSPEND is allowed
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SUSPEND, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else if(IS_CHMPXSTS_DOING(status)){
+								WAN_CHMPRN("Server status(0x%016" PRIx64 ":%s) is DOING yet, so could not change status.", status, STR_CHMPXSTS_FULL(status).c_str());
+								pResMergeComplete->head.result = CHMPX_COM_RES_ERROR;
+							}else{
+								is_completed = true;
+							}
 						}
+					}else if(IS_CHMPXSTS_DOWN(status)){
+						// Allow all DOWN status
+						is_completed = true;
 					}
 				}else{
-					MSG_CHMPRN("Server status(0x%016" PRIx64 ":%s) is SERVICEOUT, so could not change status, but return success", status, STR_CHMPXSTS_FULL(status).c_str());
+					// Not care for SERVICE OUT servers
+					is_completed = true;
 				}
 			}
 			*ppResComPkt = pResComPkt;
 		}
+	}
+	return true;
+}
+
+bool ChmEventSock::PxComSendMergeSuspend(chmpxid_t chmpxid)
+{
+	if(CHM_INVALID_CHMPXID == chmpxid){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Make packet
+	PCOMPKT	pComPkt;
+	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_SUSPEND))){
+		ERR_CHMPRN("Could not allocate memory for COMPKT.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+	PPXCOM_MERGE_SUSPEND	pMergeSuspend	= CVT_COMPTR_MERGE_SUSPEND(pComAll);
+	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_SUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+	pMergeSuspend->head.type	= CHMPX_COM_MERGE_SUSPEND;
+	pMergeSuspend->head.result	= CHMPX_COM_RES_SUCCESS;
+	pMergeSuspend->head.length	= sizeof(PXCOM_MERGE_SUSPEND);
+
+	// Send request
+	if(!Send(pComPkt, NULL, 0L)){
+		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_SUSPEND to chmpxid(0x%016" PRIx64 ").", chmpxid);
+		CHM_Free(pComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
+
+	return true;
+}
+
+bool ChmEventSock::PxComReceiveMergeSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+{
+	if(!pComHead || !pComAll || !ppResComPkt){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
+	PPXCOM_MERGE_SUSPEND	pMergeSuspend	= CVT_COMPTR_MERGE_SUSPEND(pComAll);
+	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
+	*ppResComPkt							= NULL;
+
+	if(pComHead->dept_ids.chmpxid == selfchmpxid){
+		// around -> next step: do merging
+		//
+		if(CHMPX_COM_RES_SUCCESS == pMergeSuspend->head.result){
+			// Succeed
+			MSG_CHMPRN("PXCOM_MERGE_SUSPEND is succeed, All server suspend auto merging.");
+		}else{
+			// Error
+			ERR_CHMPRN("PXCOM_MERGE_SUSPEND is failed, Some server could not suspend auto merging. please check all server.");
+			return false;
+		}
+	}else{
+		// update own chmshm & transfer packet.
+		//
+		chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			ERR_CHMPRN("Could not get next server chmpxid.");
+			return false;
+		}
+
+		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
+			// Deperture chmpx maybe DOWN!
+			//
+			// [NOTICE]
+			// This case is very small case, deperture server sends this packet but that server could not
+			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
+			// So we do not transfer this packet, because it could not be stopped in RING.
+			//
+			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			*ppResComPkt = NULL;
+
+		}else{
+			// make response data buffer
+			PCOMPKT	pResComPkt;
+			if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_SUSPEND))){
+				ERR_CHMPRN("Could not allocation memory.");
+				return false;
+			}
+
+			// compkt
+			PPXCOM_ALL				pResComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+			PPXCOM_MERGE_SUSPEND	pResMergeSuspend	= CVT_COMPTR_MERGE_SUSPEND(pResComAll);
+
+			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_SUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+			// merge_start(copy)
+			pResMergeSuspend->head.type		= pMergeSuspend->head.type;
+			pResMergeSuspend->head.result	= pMergeSuspend->head.result;		// always no error.
+			pResMergeSuspend->head.length	= pMergeSuspend->head.length;
+
+			if(CHMPX_COM_RES_SUCCESS != pMergeSuspend->head.result){
+				// already error occured, so ignore this packet.
+				WAN_CHMPRN("Already error occured before this server, but doing.");
+				pResMergeSuspend->head.result = pMergeSuspend->head.result;
+			}else{
+				// Change suspend flag
+				if(!pImData->SuspendAutoMerge()){
+					WAN_CHMPRN("Could not change auto merging flag to suspend.");
+					pResMergeSuspend->head.result = CHMPX_COM_RES_ERROR;
+				}else if(startup_servicein){
+					startup_servicein = false;
+				}
+			}
+			*ppResComPkt = pResComPkt;
+		}
+	}
+	return true;
+}
+
+bool ChmEventSock::PxComSendMergeNoSuspend(chmpxid_t chmpxid)
+{
+	if(CHM_INVALID_CHMPXID == chmpxid){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Make packet
+	PCOMPKT	pComPkt;
+	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_NOSUSPEND))){
+		ERR_CHMPRN("Could not allocate memory for COMPKT.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+	PPXCOM_MERGE_NOSUSPEND	pMergeNoSuspend	= CVT_COMPTR_MERGE_NOSUSPEND(pComAll);
+	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_NOSUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+	pMergeNoSuspend->head.type		= CHMPX_COM_MERGE_NOSUSPEND;
+	pMergeNoSuspend->head.result	= CHMPX_COM_RES_SUCCESS;
+	pMergeNoSuspend->head.length	= sizeof(PXCOM_MERGE_NOSUSPEND);
+
+	// Send request
+	if(!Send(pComPkt, NULL, 0L)){
+		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_NOSUSPEND to chmpxid(0x%016" PRIx64 ").", chmpxid);
+		CHM_Free(pComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
+
+	return true;
+}
+
+bool ChmEventSock::PxComReceiveMergeNoSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+{
+	if(!pComHead || !pComAll || !ppResComPkt){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
+	PPXCOM_MERGE_NOSUSPEND	pMergeNoSuspend	= CVT_COMPTR_MERGE_NOSUSPEND(pComAll);
+	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
+	*ppResComPkt							= NULL;
+
+	if(pComHead->dept_ids.chmpxid == selfchmpxid){
+		// around -> next step: do merging
+		//
+		if(CHMPX_COM_RES_SUCCESS == pMergeNoSuspend->head.result){
+			// Succeed
+			MSG_CHMPRN("PXCOM_MERGE_NOSUSPEND is succeed, All server reset suspend auto merging.");
+		}else{
+			// Error
+			ERR_CHMPRN("PXCOM_MERGE_NOSUSPEND is failed, Some server could not reset suspend auto merging. please check all server.");
+			return false;
+		}
+	}else{
+		// update own chmshm & transfer packet.
+		//
+		chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			ERR_CHMPRN("Could not get next server chmpxid.");
+			return false;
+		}
+
+		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
+			// Deperture chmpx maybe DOWN!
+			//
+			// [NOTICE]
+			// This case is very small case, deperture server sends this packet but that server could not
+			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
+			// So we do not transfer this packet, because it could not be stopped in RING.
+			//
+			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			*ppResComPkt = NULL;
+
+		}else{
+			// make response data buffer
+			PCOMPKT	pResComPkt;
+			if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_NOSUSPEND))){
+				ERR_CHMPRN("Could not allocation memory.");
+				return false;
+			}
+
+			// compkt
+			PPXCOM_ALL				pResComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+			PPXCOM_MERGE_NOSUSPEND	pResMergeNoSuspend	= CVT_COMPTR_MERGE_NOSUSPEND(pResComAll);
+
+			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_NOSUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+			// merge_start(copy)
+			pResMergeNoSuspend->head.type	= pMergeNoSuspend->head.type;
+			pResMergeNoSuspend->head.result	= pMergeNoSuspend->head.result;		// always no error.
+			pResMergeNoSuspend->head.length	= pMergeNoSuspend->head.length;
+
+			if(CHMPX_COM_RES_SUCCESS != pMergeNoSuspend->head.result){
+				// already error occured, so ignore this packet.
+				WAN_CHMPRN("Already error occured before this server, but doing.");
+				pResMergeNoSuspend->head.result = pMergeNoSuspend->head.result;
+			}else{
+				// Change suspend flag
+				if(!pImData->ResetAutoMerge()){
+					WAN_CHMPRN("Could not change auto merging flag to not suspend.");
+					pResMergeNoSuspend->head.result = CHMPX_COM_RES_ERROR;
+				}
+			}
+			*ppResComPkt = pResComPkt;
+		}
+	}
+	return true;
+}
+
+bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
+{
+	if(CHM_INVALID_SOCK == sock || CHM_INVALID_CHMPXID == chmpxid){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Make packet
+	PCOMPKT	pComPkt;
+	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_SUSPEND_GET))){
+		ERR_CHMPRN("Could not allocate memory for COMPKT.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL					pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+	PPXCOM_MERGE_SUSPEND_GET	pMergeSuspendGet= CVT_COMPTR_MERGE_SUSPEND_GET(pComAll);
+	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_SUSPEND_GET, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+	pMergeSuspendGet->head.type		= CHMPX_COM_MERGE_SUSPEND_GET;
+	pMergeSuspendGet->head.result	= CHMPX_COM_RES_SUCCESS;
+	pMergeSuspendGet->head.length	= sizeof(PXCOM_MERGE_SUSPEND_GET);
+
+	// Send request(direct)
+	bool	is_closed = false;
+	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pComPkt, is_closed, false, sock_retry_count, sock_wait_time)){		// as default nonblocking
+		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_SUSPEND_GET to sock(%d).", sock);
+
+		// [NOTE]
+		// This methos is called from only InitialAllServerStatus(), then the sock is not mapped.
+		// Then we do not close sock here, it will be closed in InitialAllServerStatus().
+		//
+		CHM_Free(pComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
+
+	return true;
+}
+
+bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+{
+	if(!pComHead || !pComAll || !ppResComPkt){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*					pImData			= pChmCntrl->GetImDataObj();
+//	PPXCOM_MERGE_SUSPEND_GET	pMergeSuspendGet= CVT_COMPTR_MERGE_SUSPEND_GET(pComAll);
+	*ppResComPkt								= NULL;
+
+	// make response data
+	PCOMPKT	pResComPkt;
+	if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_MERGE_SUSPEND_RES))){
+		ERR_CHMPRN("Could not allocation memory.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL					pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+	PPXCOM_MERGE_SUSPEND_RES	pMergeSuspendRes= CVT_COMPTR_MERGE_SUSPEND_RES(pResComAll);
+	SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_SUSPEND_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, 0);		// switch chmpxid
+
+	pMergeSuspendRes->head.type		= CHMPX_COM_MERGE_SUSPEND_RES;
+	pMergeSuspendRes->head.result	= CHMPX_COM_RES_SUCCESS;
+	pMergeSuspendRes->head.length	= sizeof(PXCOM_MERGE_SUSPEND_RES);
+	pMergeSuspendRes->is_suspend	= pImData->GetAutoMergeMode();		// get merge suspend mode
+
+	*ppResComPkt = pResComPkt;
+
+	return true;
+}
+
+bool ChmEventSock::PxComReceiveMergeSuspendRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll)
+{
+	if(!pComHead || !pComAll){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*					pImData			= pChmCntrl->GetImDataObj();
+	PPXCOM_MERGE_SUSPEND_RES	pMergeSuspendRes= CVT_COMPTR_MERGE_SUSPEND_RES(pComAll);
+	chmpxid_t					selfchmpxid		= pImData->GetSelfChmpxId();
+
+	if(pComHead->term_ids.chmpxid == selfchmpxid){
+		// To me
+		if(CHMPX_COM_RES_SUCCESS != pMergeSuspendRes->head.result){
+			WAN_CHMPRN("PXCOM_MERGE_SUSPEND_RES is failed, somthing wrong or target ring does not support this command.");
+			return true;
+		}
+
+		// set suspend merging mode
+		if(pMergeSuspendRes->is_suspend){
+			MSG_CHMPRN("PXCOM_MERGE_SUSPEND_RES is received, and set suspending merging mode.");
+			pImData->SuspendAutoMerge();
+		}else{
+			MSG_CHMPRN("PXCOM_MERGE_SUSPEND_RES is received, and reset suspending merging mode.");
+			pImData->ResetAutoMerge();
+		}
+
+	}else{
+		// To other chmpxid
+		ERR_CHMPRN("Received PXCOM_MERGE_SUSPEND_RES packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
+		return false;
 	}
 	return true;
 }
@@ -8078,6 +9334,18 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		//
 		if(CHMPX_COM_RES_SUCCESS == pServerDown->head.result){
 			// Succeed notify server down & status update on RING
+			if(CHM_INVALID_CHMPXID == pServerDown->chmpxid){
+				ERR_CHMPRN("PXCOM_SERVER_DOWN target chmpxid is something wrong.");
+				return false;
+			}
+			// Check automerge
+			if(IsAutoMerge()){
+				// Request Service out
+				if(!RequestServiceOut(pServerDown->chmpxid)){
+					ERR_CHMPRN("Could not operate to SERVICEOUT by automerge for chmpxid(0x%016" PRIx64 ").", pServerDown->chmpxid);
+					return false;
+				}
+			}
 			return true;
 
 		}else{
@@ -8102,13 +9370,20 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 			}
 		}
 
-		// set status.
-		chmpxsts_t	status = pImData->GetServerStatus(pServerDown->chmpxid);
+		// check status and set new status
+		chmpxsts_t	status		= pImData->GetServerStatus(pServerDown->chmpxid);
+		chmpxsts_t	old_status	= status;
 
 		CHANGE_CHMPXSTS_TO_DOWN(status);
-		if(!pImData->SetServerStatus(pServerDown->chmpxid, status)){
-			ERR_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) to chmpxid(0x%016" PRIx64 "), but continue...", status, STR_CHMPXSTS_FULL(status).c_str(), pServerDown->chmpxid);
-			ResultCode = CHMPX_COM_RES_ERROR;
+		if(status == old_status){
+			MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by server down notify.", pServerDown->chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+		}else{
+			MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") is changed status(0x%016" PRIx64 ":%s) from old status(0x%016" PRIx64 ":%s) by server down notify.", pServerDown->chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+
+			if(!pImData->SetServerStatus(pServerDown->chmpxid, status)){
+				ERR_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) to chmpxid(0x%016" PRIx64 "), but continue...", status, STR_CHMPXSTS_FULL(status).c_str(), pServerDown->chmpxid);
+				ResultCode = CHMPX_COM_RES_ERROR;
+			}
 		}
 		if(CHMPX_COM_RES_SUCCESS != pServerDown->head.result){
 			MSG_CHMPRN("Already error occured before this server.");
@@ -8188,22 +9463,22 @@ bool ChmEventSock::PxCltReceiveJoinNotify(PCOMHEAD pComHead, PPXCLT_ALL pComAll)
 	}
 
 	// Check status
-	chmpxsts_t	status = pImData->GetSelfStatus();
+	chmpxsts_t	status		= pImData->GetSelfStatus();
+	chmpxsts_t	old_status	= status;
 	if(IS_CHMPXSTS_NOSUP(status)){
 		MSG_CHMPRN("Already self status(0x%016" PRIx64 ":%s) is NO SUSPEND.", status, STR_CHMPXSTS_FULL(status).c_str());
 		return true;
 	}
 
 	// new status
-	bool	do_merging_now = false;
 	if(IS_CHMPXSTS_SRVIN(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)){
 		// [NOTICE]
-		// CHMPXSTS_SRVIN_UP_MERGING is "doing" status, so we need to start merging.
+		// CHMPXSTS_SRVIN_UP_PENDING is "pending" status, so we need to start merging.
 		//
-		status			= CHMPXSTS_SRVIN_UP_MERGING;
-		do_merging_now	= true;
+		status = CHMPXSTS_SRVIN_UP_PENDING;
 	}
 	CHANGE_CHMPXSTS_TO_NOSUP(status);
+	MSG_CHMPRN("Status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
 	// set status(set suspend in this method)
 	if(!pImData->SetSelfStatus(status)){
@@ -8212,7 +9487,7 @@ bool ChmEventSock::PxCltReceiveJoinNotify(PCOMHEAD pComHead, PPXCLT_ALL pComAll)
 	}
 
 	// Update pending hash.
-	if(!pImData->UpdatePendingHash()){
+	if(!pImData->UpdateHash(HASHTG_PENDING)){
 		ERR_CHMPRN("Failed to update pending hash for all servers, so stop update status.");
 		return false;
 	}
@@ -8238,26 +9513,9 @@ bool ChmEventSock::PxCltReceiveJoinNotify(PCOMHEAD pComHead, PPXCLT_ALL pComAll)
 	}
 
 	// If do not merge(almost random deliver mode), do merging, completing it.
-	if(is_auto_merge || do_merging_now){
-		// If server does not have been added servicein yet, do it.
-		if(IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_NOACT(status)){
-			if(!RequestServiceIn()){
-				ERR_CHMPRN("Failed to request \"servce in\" status before auto merging.");
-				return false;
-			}
-		}
-		// start merge automatically.
-		if(CHM_INVALID_CHMPXID == nextchmpxid){
-			if(!MergeStart()){
-				ERR_CHMPRN("Failed to merge or complete merge for \"service in\".");
-				return false;
-			}
-		}else{
-			if(!RequestMergeStart()){
-				ERR_CHMPRN("Failed to merge or complete merge for \"service in\".");
-				return false;
-			}
-		}
+	if(!ContinuousAutoMerge()){
+		ERR_CHMPRN("Failed to start merging.");
+		return false;
 	}
 	return true;
 }

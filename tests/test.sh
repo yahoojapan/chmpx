@@ -85,10 +85,10 @@ else
 	echo "RESULT --> FAILED"
 	exit 1
 fi
-if [ -f ${BASEDIR}/${PLATFORM_CURRENT}/chmconftest ]; then
-	CHMCONFTEST=${BASEDIR}/${PLATFORM_CURRENT}/chmconftest
+if [ -f ${BASEDIR}/${PLATFORM_CURRENT}/chmpxconftest ]; then
+	CHMCONFTEST=${BASEDIR}/${PLATFORM_CURRENT}/chmpxconftest
 else
-	echo "ERROR: there is no chmconftest binary"
+	echo "ERROR: there is no chmpxconftest binary"
 	echo "RESULT --> FAILED"
 	exit 1
 fi

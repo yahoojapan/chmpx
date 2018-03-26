@@ -144,6 +144,7 @@ DECL_EXTERN_C_START
 #define	CHMPXSTS_SRVOUT_DOWN_NORMAL			(CHMPXSTS_VAL_DOWN	| CHMPXSTS_VAL_SRVOUT	| CHMPXSTS_VAL_NOACT	| CHMPXSTS_VAL_NOTHING)
 
 #define	CHMPXSTS_SRVIN_UP_NORMAL			(CHMPXSTS_VAL_UP	| CHMPXSTS_VAL_SRVIN	| CHMPXSTS_VAL_NOACT	| CHMPXSTS_VAL_NOTHING)
+#define	CHMPXSTS_SRVIN_UP_PENDING			(CHMPXSTS_VAL_UP	| CHMPXSTS_VAL_SRVIN	| CHMPXSTS_VAL_NOACT	| CHMPXSTS_VAL_PENDING)
 #define	CHMPXSTS_SRVIN_UP_MERGING			(CHMPXSTS_VAL_UP	| CHMPXSTS_VAL_SRVIN	| CHMPXSTS_VAL_NOACT	| CHMPXSTS_VAL_DOING)
 #define	CHMPXSTS_SRVIN_UP_MERGED			(CHMPXSTS_VAL_UP	| CHMPXSTS_VAL_SRVIN	| CHMPXSTS_VAL_NOACT	| CHMPXSTS_VAL_DONE)
 
@@ -206,6 +207,7 @@ DECL_EXTERN_C_START
 #define	IS_SAFE_CHMPXSTS_EX(status)		(	CHMPXSTS_SLAVE_UP_NORMAL		== status || \
 											CHMPXSTS_SLAVE_DOWN_NORMAL		== status || \
 											CHMPXSTS_SRVIN_UP_NORMAL		== status || \
+											CHMPXSTS_SRVIN_UP_PENDING		== status || \
 											CHMPXSTS_SRVIN_UP_MERGING		== status || \
 											CHMPXSTS_SRVIN_UP_MERGED		== status || \
 											CHMPXSTS_SRVIN_UP_ADDPENDING	== status || \
@@ -224,7 +226,12 @@ DECL_EXTERN_C_START
 											IS_SAFE_CHMPXSTS_EX((status & ~CHMPXSTS_MASK_SUSPEND))	)
 
 //---------------------
+#define	IS_CHMPXSTS_SERVICING(status)	(	CHMPXSTS_SRVIN_UP_NORMAL		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
+                                            CHMPXSTS_SRVIN_UP_DELPENDING	== (status & ~CHMPXSTS_MASK_SUSPEND) || \
+                                            CHMPXSTS_SRVIN_UP_DELETING		== (status & ~CHMPXSTS_MASK_SUSPEND) )
+
 #define	IS_CHMPXSTS_BASEHASH(status)	(	CHMPXSTS_SRVIN_UP_NORMAL		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
+											CHMPXSTS_SRVIN_UP_PENDING		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_MERGING		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_MERGED		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_DELPENDING	== (status & ~CHMPXSTS_MASK_SUSPEND) || \
@@ -235,6 +242,7 @@ DECL_EXTERN_C_START
 											CHMPXSTS_SRVIN_DOWN_DELETED		== (status & ~CHMPXSTS_MASK_SUSPEND) )
 
 #define	IS_CHMPXSTS_PENDINGHASH(status)	(	CHMPXSTS_SRVIN_UP_NORMAL		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
+											CHMPXSTS_SRVIN_UP_PENDING		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_MERGING		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_MERGED		== (status & ~CHMPXSTS_MASK_SUSPEND) || \
 											CHMPXSTS_SRVIN_UP_ADDPENDING	== (status & ~CHMPXSTS_MASK_SUSPEND) || \
@@ -261,29 +269,85 @@ DECL_EXTERN_C_START
 //---------------------
 #define	CHANGE_CHMPXSTS_TO_DOWN(status)	\
 		{ \
-			if(IS_CHMPXSTS_ADD(status)){ \
-				status = CHMPXSTS_SRVOUT_DOWN_NORMAL; \
-			}else if(IS_CHMPXSTS_SRVIN(status)){ \
-				if(CHMPXSTS_SRVIN_UP_DELETING == status){ \
-					status = CHMPXSTS_SRVIN_DOWN_DELETED; \
-				}else if(IS_CHMPXSTS_DELETE(status)){ \
-					SET_CHMPXSTS_DOWN(status); \
-					SET_CHMPXSTS_NOSUP(status); \
-				}else{ \
-					status = CHMPXSTS_SRVIN_DOWN_NORMAL; \
+			if(IS_CHMPXSTS_SRVIN(status)){ \
+				if(IS_CHMPXSTS_UP(status)){ \
+					if(IS_CHMPXSTS_NOACT(status)){ \
+						status = CHMPXSTS_SRVIN_DOWN_NORMAL; \
+					}else if(IS_CHMPXSTS_ADD(status)){ \
+						status = CHMPXSTS_SRVOUT_DOWN_NORMAL; \
+					}else if(IS_CHMPXSTS_DELETE(status)){ \
+						if(IS_CHMPXSTS_OPERATING(status)){ \
+							status = CHMPXSTS_SRVIN_DOWN_DELETED; \
+						}else{ \
+							status = CHMPXSTS_SRVIN_DOWN_DELPENDING; \
+						} \
+					} \
+				}else if(IS_CHMPXSTS_DOWN(status)){ \
+					if(IS_CHMPXSTS_DELETE(status)){ \
+						status = CHMPXSTS_SRVIN_DOWN_DELPENDING; \
+					}else{ \
+						status = CHMPXSTS_SRVIN_DOWN_NORMAL; \
+					} \
 				} \
-			}else{ \
-				SET_CHMPXSTS_DOWN(status); \
-				SET_CHMPXSTS_NOSUP(status); \
+			}else if(IS_CHMPXSTS_SRVOUT(status)){ \
+				status = CHMPXSTS_SRVOUT_DOWN_NORMAL; \
 			} \
 		}
 
-#define	CHANGE_CHMPXSTS_TO_MERGESTOP(status)	\
+#define	CHANGE_CHMPXSTS_TO_SRVOUT(status)	\
 		{ \
-			if(IS_CHMPXSTS_ADD(status) || IS_CHMPXSTS_DELETE(status)){ \
-				SET_CHMPXSTS_PENDING(status); \
-			}else if(IS_CHMPXSTS_NOACT(status)){ \
-				SET_CHMPXSTS_NOTHING(status); \
+			if(IS_CHMPXSTS_SRVIN(status)){ \
+				if(IS_CHMPXSTS_UP(status)){ \
+					if(IS_CHMPXSTS_NOACT(status)){ \
+						if(!IS_CHMPXSTS_OPERATING(status)){ \
+							status = CHMPXSTS_SRVIN_UP_DELPENDING; \
+							if(IS_CHMPXSTS_NOSUP(status)){ \
+								CHANGE_CHMPXSTS_TO_NOSUP(status); \
+							}else{ \
+								CHANGE_CHMPXSTS_TO_SUSPEND(status); \
+							} \
+						} \
+					}else if(IS_CHMPXSTS_ADD(status)){ \
+						if(!IS_CHMPXSTS_OPERATING(status)){ \
+							status = CHMPXSTS_SRVOUT_UP_NORMAL; \
+							if(IS_CHMPXSTS_NOSUP(status)){ \
+								CHANGE_CHMPXSTS_TO_NOSUP(status); \
+							}else{ \
+								CHANGE_CHMPXSTS_TO_SUSPEND(status); \
+							} \
+						} \
+					} \
+				}else if(IS_CHMPXSTS_DOWN(status)){ \
+					if(IS_CHMPXSTS_NOACT(status)){ \
+						status = CHMPXSTS_SRVIN_DOWN_DELPENDING; \
+					} \
+				} \
+			} \
+		}
+
+#define	CHANGE_CHMPXSTS_TO_SRVIN(status)	\
+		{ \
+			if(IS_CHMPXSTS_SRVIN(status)){ \
+				if(IS_CHMPXSTS_UP(status)){ \
+					if(IS_CHMPXSTS_DELETE(status)){ \
+						if(IS_CHMPXSTS_PENDING(status)){ \
+							if(IS_CHMPXSTS_NOSUP(status)){ \
+								status = CHMPXSTS_SRVIN_UP_PENDING; \
+							}else{ \
+								status = CHMPXSTS_SRVIN_UP_NORMAL; \
+								CHANGE_CHMPXSTS_TO_SUSPEND(status); \
+							} \
+						} \
+					} \
+				} \
+			}else if(IS_CHMPXSTS_SRVOUT(status)){ \
+				if(IS_CHMPXSTS_UP(status)){ \
+					if(IS_CHMPXSTS_NOACT(status)){ \
+						if(IS_CHMPXSTS_NOSUP(status)){ \
+							status = CHMPXSTS_SRVIN_UP_ADDPENDING; \
+						} \
+					} \
+				} \
 			} \
 		}
 
@@ -637,6 +701,7 @@ typedef struct chminfo{
 	int				evmq_thread_cnt;		// MQ thread count
 	bool			is_random_deliver;
 	bool			is_auto_merge;
+	bool			is_auto_merge_suspend;	// suspend auto merging flag for that is_auto_merge is true
 	bool			is_do_merge;
 	long			max_mqueue;				// = max MQ count
 	long			chmpx_mqueue;			// = Chmpx MQ count

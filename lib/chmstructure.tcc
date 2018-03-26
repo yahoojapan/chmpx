@@ -127,6 +127,75 @@ void FREE_HNAMESSLMAP(T& info)
 }
 
 //---------------------------------------------------------
+// Status last update time
+//---------------------------------------------------------
+// [NOTICE]
+// The old status last update time was initially a function time(NULL)
+// result value. This is now expressed as time(NULL) + us(microsecond).
+// For the value, the time_t contains the time(NULL) value in the upper
+// 40 bits and the us(microsecond) value in the lower 24 bits.
+// There is a possibility of connection of new and old chmpx processes,
+// and timespec structure can not be used as it is.
+//
+// We plan to change it to timespec structure in the future.
+// Following utility functions are converter for new format.
+//
+#define	STATUS_UPDATE_TIME_HI_MASK		static_cast<time_t>(0xffffffffff000000)
+#define	STATUS_UPDATE_TIME_LOW_MASK		static_cast<time_t>(0x0000000000ffffff)
+
+static time_t	basis_update_time		= (((time(NULL) / (365 * 24 * 60 * 60)) * (365 * 24 * 60 * 60)) << 24) & STATUS_UPDATE_TIME_HI_MASK;
+
+inline time_t GetStatusLastUpdateTime(void)
+{
+	struct timespec	ts = {0, 0};
+	if(!RT_TIMESPEC(&ts)){
+		ts.tv_sec	= time(NULL);
+		ts.tv_nsec	= 0;
+	}
+	return (((ts.tv_sec << 24) & STATUS_UPDATE_TIME_HI_MASK) | (static_cast<time_t>(ts.tv_nsec / 1000) & STATUS_UPDATE_TIME_LOW_MASK));
+}
+
+inline time_t NormalizeStatusLastUpdateTime(time_t base)
+{
+	if(base >= basis_update_time){
+		return base;
+	}
+	return ((base << 24) & STATUS_UPDATE_TIME_HI_MASK);
+}
+
+//
+// return	-1	: src1 < src2
+//			0	: src1 == src2
+//			1	: src1 > src2
+//
+inline bool CompareStatusUpdateTime(time_t src1, time_t src2)
+{
+	time_t	result = NormalizeStatusLastUpdateTime(src1) - NormalizeStatusLastUpdateTime(src2);
+	return ((result < 0) ? -1 : (0 < result) ? 1 : 0);
+}
+
+inline void ParseUpdateTime(time_t updatetime, time_t& sec, long& nsec)
+{
+	updatetime	= NormalizeStatusLastUpdateTime(updatetime);
+	sec			= (updatetime & STATUS_UPDATE_TIME_HI_MASK) >> 24;
+	nsec		= static_cast<long>((updatetime & STATUS_UPDATE_TIME_LOW_MASK) * 1000);
+}
+
+inline std::string CvtUpdateTimeToString(time_t updatetime)
+{
+	time_t		sec	= 0;
+	long		nsec= 0;
+	ParseUpdateTime(updatetime, sec, nsec);
+
+	char		buf[128];
+	struct tm*	tm = localtime(&sec);
+	strftime(buf, sizeof(buf), "%Y-%m-%d %Hh %Mm %Ss ", tm);
+
+	std::string	result = std::string(buf) + to_string(nsec / (1000 * 1000)) + std::string("ms ") + to_string((nsec / 1000) % 1000)  + std::string("us");
+	return result;
+}
+
+//---------------------------------------------------------
 // Basic template
 //---------------------------------------------------------
 template<typename T>
@@ -618,6 +687,7 @@ class chmpx_lap : public structure_lap<T>
 		bool Set(int sock, int ctlsock, int selfsock, int selfctlsock, int type);
 		bool Set(chmhash_t base, chmhash_t pending, int type);
 		bool SetStatus(chmpxsts_t status);
+		bool UpdateLastStatusTime(void);
 		bool Remove(int sock);
 
 		bool Get(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
@@ -893,6 +963,8 @@ bool chmpx_lap<T>::InitializeServer(PCHMPXSVR chmpxsvr, const char* group)
 		ERR_CHMPRN("Why does not same chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ").", chmpxsvr->chmpxid, basic_type::pAbsPtr->chmpxid);
 		return false;
 	}
+	MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status is initialized (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
+
 	basic_type::pAbsPtr->base_hash			= chmpxsvr->base_hash;
 	basic_type::pAbsPtr->pending_hash		= chmpxsvr->pending_hash;
 	basic_type::pAbsPtr->last_status_time	= chmpxsvr->last_status_time;
@@ -1031,7 +1103,7 @@ bool chmpx_lap<T>::Set(chmhash_t base, chmhash_t pending, int type)
 		}
 	}
 	if(is_set){
-		basic_type::pAbsPtr->last_status_time = time(NULL);	// Only update status time
+		basic_type::pAbsPtr->last_status_time = GetStatusLastUpdateTime();	// Only update status time
 	}
 	return is_set;
 }
@@ -1097,7 +1169,22 @@ bool chmpx_lap<T>::SetStatus(chmpxsts_t status)
 	}
 
 	basic_type::pAbsPtr->status				= status;
-	basic_type::pAbsPtr->last_status_time	= time(NULL);	// Only update status time
+	basic_type::pAbsPtr->last_status_time	= GetStatusLastUpdateTime();	// Only update status time
+	return true;
+}
+
+template<typename T>
+bool chmpx_lap<T>::UpdateLastStatusTime(void)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPX does not set.");
+		return false;
+	}
+	if('\0' == basic_type::pAbsPtr->name[0]){
+		ERR_CHMPRN("PCHMPX does not initialized.");
+		return false;
+	}
+	basic_type::pAbsPtr->last_status_time	= GetStatusLastUpdateTime();	// Only update status time
 	return true;
 }
 
@@ -1403,9 +1490,12 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 	}
 
-	if(basic_type::pAbsPtr->last_status_time <= chmpxsvr->last_status_time){
+	if(0 <= CompareStatusUpdateTime(basic_type::pAbsPtr->last_status_time, chmpxsvr->last_status_time)){
+		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status is changed from (0x%016" PRIx64 ":%s) to (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, basic_type::pAbsPtr->status, STR_CHMPXSTS_FULL(basic_type::pAbsPtr->status).c_str(), chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
 		basic_type::pAbsPtr->last_status_time	= chmpxsvr->last_status_time;
 		basic_type::pAbsPtr->status				= chmpxsvr->status;
+	}else{
+		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status is did not change from (0x%016" PRIx64 ":%s) to (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, basic_type::pAbsPtr->status, STR_CHMPXSTS_FULL(basic_type::pAbsPtr->status).c_str(), chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
 	}
 	return true;
 }
@@ -1491,6 +1581,7 @@ class chmpxlist_lap : public structure_lap<T>
 		bool ToFirst(void);
 		bool ToLast(void);
 		bool ToNext(bool is_cycle = true, bool is_base_hash = false, bool is_up_servers = false, bool is_allow_same_server = true, bool without_suspend = false);
+		bool ToNextUpServicing(bool is_cycle = true, bool is_allow_same_server = true, bool without_suspend = false);
 		long Count(void);
 		long Count(bool toward_normal);
 		long GetChmpxIds(chmpxidlist_t& list, chmpxsts_t status_mask = CHMPXSTS_MASK_ALL, bool part_match = true, bool is_to_first = false);
@@ -1498,8 +1589,9 @@ class chmpxlist_lap : public structure_lap<T>
 
 		long BaseHashCount(bool is_to_first = false);
 		long PendingHashCount(bool is_to_first = false);
-		bool SetPendingHash(bool is_to_first = false);
+		bool UpdateHash(int type, bool is_to_first = false);
 		bool IsOperating(bool is_to_first = false);
+		bool CheckAllServiceOutStatus(void);
 
 		st_ptr_type PopFront(void);
 		st_ptr_type PopAny(void);
@@ -1895,6 +1987,77 @@ bool chmpxlist_lap<T>::ToNext(bool is_cycle, bool is_base_hash, bool is_up_serve
 	return is_allow_same_server;
 }
 
+//
+// If is_allow_same_server is false when is_cycle is true, this method returns false when the next server
+// is same as start server.
+//
+template<typename T>
+bool chmpxlist_lap<T>::ToNextUpServicing(bool is_cycle, bool is_allow_same_server, bool without_suspend)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPXLIST does not set.");
+		return false;
+	}
+	chmpxlap	curchmpx;
+	bool		is_cycled= false;
+	st_ptr_type	startpos = basic_type::pAbsPtr;
+
+	if(!basic_type::pAbsPtr->next){
+		if(!is_cycle){
+			if(is_allow_same_server){
+				curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+				chmpxsts_t	status = curchmpx.GetStatus();
+				if(IS_CHMPXSTS_SERVICING(status) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
+					return true;
+				}
+				// current(same) server is not servicing
+			}
+			return false;
+		}
+		is_cycled = true;
+		ToFirst();
+	}else{
+		basic_type::pAbsPtr = CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->next, st_ptr_type);
+	}
+
+	while(startpos != basic_type::pAbsPtr){
+		curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+
+		chmpxsts_t	status = curchmpx.GetStatus();
+		if(IS_CHMPXSTS_SERVICING(status) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
+			return true;
+		}
+		if(!basic_type::pAbsPtr->next){
+			if(!is_cycle || is_cycled){
+				basic_type::pAbsPtr = startpos;		// restore
+				if(is_allow_same_server){
+					curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+					chmpxsts_t	status = curchmpx.GetStatus();
+					if(IS_CHMPXSTS_SERVICING(status) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
+						return true;
+					}
+					// current(same) server is not servicing
+				}
+				return false;
+			}
+			is_cycled = true;
+			ToFirst();
+		}else{
+			basic_type::pAbsPtr = CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->next, st_ptr_type);
+		}
+	}
+
+	if(is_allow_same_server){
+		curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+		chmpxsts_t	status = curchmpx.GetStatus();
+		if(IS_CHMPXSTS_SERVICING(status) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
+			return true;
+		}
+		// current(same) server is not servicing
+	}
+	return false;
+}
+
 template<typename T>
 long chmpxlist_lap<T>::Count(void)
 {
@@ -2052,7 +2215,7 @@ long chmpxlist_lap<T>::PendingHashCount(bool is_to_first)
 // This method is linear search in list, then it is not good performance.
 //
 template<typename T>
-bool chmpxlist_lap<T>::SetPendingHash(bool is_to_first)
+bool chmpxlist_lap<T>::UpdateHash(int type, bool is_to_first)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXLIST does not set.");
@@ -2066,11 +2229,12 @@ bool chmpxlist_lap<T>::SetPendingHash(bool is_to_first)
 	chmpxlap	curchmpx;
 	chmpxsts_t	status;
 	chmhash_t	base;
+	chmhash_t	newbase;
 	chmhash_t	pending;
 	chmhash_t	newpending;
 
 	ToFirst();
-	for(newpending = 0L, cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
+	for(newbase = 0L, newpending = 0L, cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
 		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
 
 		status	= curchmpx.GetStatus();
@@ -2081,14 +2245,24 @@ bool chmpxlist_lap<T>::SetPendingHash(bool is_to_first)
 			ERR_CHMPRN("Failed to get hash values.");
 			return false;
 		}
-		if(IS_CHMPXSTS_PENDINGHASH(status)){
-			if(pending == newpending){
-				// OK, nothing to update.
+
+		if(IS_HASHTG_BASE(type)){
+			// Over write new base hash value
+			if(IS_CHMPXSTS_BASEHASH(status)){
+				curchmpx.Set(newbase, 0L, HASHTG_BASE);
+				++newbase;
 			}else{
-				// Set new pending hash value
-				curchmpx.Set(0L, newpending, HASHTG_PENDING);
+				curchmpx.Set(CHM_INVALID_HASHVAL, 0L, HASHTG_BASE);			// set CHM_INVALID_HASHVAL
 			}
-			newpending++;
+		}
+		if(IS_HASHTG_PENDING(type)){
+			// Over write new pending hash value
+			if(IS_CHMPXSTS_PENDINGHASH(status)){
+				curchmpx.Set(0L, newpending, HASHTG_PENDING);
+				++newpending;
+			}else{
+				curchmpx.Set(0L, CHM_INVALID_HASHVAL, HASHTG_PENDING);		// set CHM_INVALID_HASHVAL
+			}
 		}
 	}
 	return true;
@@ -2119,6 +2293,63 @@ bool chmpxlist_lap<T>::IsOperating(bool is_to_first)
 		}
 	}
 	return false;
+}
+
+//
+// This method checks all the server chmpx's status required when all the chmpx servers
+// on RING go to the DOWN status.
+// In this case, it is possible that there is a server with SERVICE IN status.
+// However, at this time all the server chmpx on the RING should be SERVICE OUT status
+// for the slave chmpx.
+// Therefore, this function checks all the server chmpx's status and sets all server
+// chmpx to the appropriate status(SERVICE OUT and DOWN).
+//
+template<typename T>
+bool chmpxlist_lap<T>::CheckAllServiceOutStatus(void)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		//MSG_CHMPRN("PCHMPXLIST does not set.");
+		return false;
+	}
+
+	// search UP chmpx server
+	ToFirst();
+	bool		is_found_svr = false;
+	st_ptr_type	cur;
+	chmpxlap	curchmpx;
+	for(cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
+		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+
+		chmpxsts_t	status = curchmpx.GetStatus();
+		if(IS_CHMPXSTS_SLAVE(status)){
+			// this is slave chmpx
+			continue;
+		}
+		is_found_svr = true;
+
+		if(IS_CHMPXSTS_UP(status)){
+			// find UP chmpx server, then nothing to do no more.
+			return true;
+		}
+	}
+	if(!is_found_svr){
+		// there is no server chmpx.
+		return true;
+	}
+
+	// Do change status to SERVICE OUT & DOWN to all server chmpx
+	ToFirst();
+	bool	result	= true;
+	for(cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
+		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+
+		// set SERVICE OUT & DOWN status, and invalid base/pending hash value
+		if(!curchmpx.SetStatus(CHMPXSTS_SRVOUT_DOWN_NORMAL) || !curchmpx.Set(CHM_INVALID_HASHVAL, CHM_INVALID_HASHVAL, HASHTG_BOTH)){
+			WAN_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) to chmpxid(0x%016" PRIx64 ") when no server chmpx up.", static_cast<chmpxsts_t>(CHMPXSTS_SRVOUT_DOWN_NORMAL), STR_CHMPXSTS_FULL(static_cast<chmpxsts_t>(CHMPXSTS_SRVOUT_DOWN_NORMAL)).c_str(), curchmpx.GetChmpxId());
+			result = false;
+		}
+	}
+	return result;
 }
 
 template<typename T>
@@ -2307,7 +2538,7 @@ template<typename T>
 bool chmpxlist_lap<T>::Find(chmpxid_t chmpxid)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
-		ERR_CHMPRN("PCHMPXLIST does not set.");
+		//MSG_CHMPRN("PCHMPXLIST does not set.");
 		return false;
 	}
 
@@ -2327,7 +2558,7 @@ bool chmpxlist_lap<T>::Find(int sock, bool is_to_first)
 		return false;
 	}
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
-		ERR_CHMPRN("PCHMPXLIST does not set.");
+		//MSG_CHMPRN("PCHMPXLIST does not set.");
 		return false;
 	}
 	if(is_to_first){
@@ -2421,6 +2652,10 @@ chmpxid_t chmpxlist_lap<T>::FindByStatus(chmpxsts_t status, bool part_match, boo
 // This method calls BaseHashCount(), then it is not good performance.
 // And rand() function is not good.
 // Should use chmpxman_lap<T>::GetRandomServerChmpxId() instead of this.
+//
+// [NOTE]
+// This method returns UP server node, it means UP with SUSPEND/PENDING/DOING/DONE
+// status.
 //
 template<typename T>
 chmpxid_t chmpxlist_lap<T>::GetRandomChmpxId(bool is_up_servers)
@@ -4419,7 +4654,7 @@ class chmpxman_lap : public structure_lap<T>
 		chmpxid_t GetChmpxIdBySock(int sock, int type = CLOSETG_BOTH) const;
 		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
-		chmpxid_t GetRandomServerChmpxId(bool is_up_servers = false, bool without_suspend = false);
+		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
 		bool GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, chmhashlist_t& basehashs, bool with_pending, bool without_down = true, bool without_suspend = true);
 		bool GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending, bool without_down = true, bool without_suspend = true);
@@ -4445,8 +4680,9 @@ class chmpxman_lap : public structure_lap<T>
 		bool SetServerSocks(chmpxid_t chmpxid, int sock, int ctlsock, int type);
 		bool SetServerHash(chmpxid_t chmpxid, chmhash_t base, chmhash_t pending, int type);
 		bool SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status, bool is_client_join);
+		bool UpdateLastStatusTime(chmpxid_t chmpxid = CHM_INVALID_CHMPXID);
 		bool RemoveServerSock(chmpxid_t chmpxid, int sock);
-		bool UpdatePendingHash(bool is_allow_operating = true);
+		bool UpdateHash(int type, bool is_allow_operating = true, bool is_allow_slave_mode = true);
 		bool SetSelfSocks(int sock, int ctlsock);
 		bool SetSelfHash(chmhash_t base, chmhash_t pending, int type);
 		bool SetSelfStatus(chmpxsts_t status, bool is_client_join);
@@ -4456,6 +4692,7 @@ class chmpxman_lap : public structure_lap<T>
 		bool SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock);
 		bool RemoveSlave(chmpxid_t chmpxid, int eqfd);
+		bool CheckSockInAllChmpx(int sock) const;
 
 		bool AddStat(chmpxid_t chmpxid, bool is_sent, size_t length, const struct timespec& elapsed_time);
 		bool GetStat(PCHMSTAT pserver, PCHMSTAT pslave) const;
@@ -4938,77 +5175,125 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 	if(IsServerMode()){
 		selfchmpxid = GetSelfChmpxId();
 	}
+	bool	is_error = false;
 
-	// First over write/insert
+	//
+	// First) over write/insert chmpx status data to existed imdata
+	//
 	for(long cnt = 0; cnt < count; cnt++){
 		if(svrchmpxlist.GetAbsPtr() && svrchmpxlist.Find(pchmpxsvrs[cnt].chmpxid)){
-			// Found -> merge
+			//
+			// Found chmpxid in imdata -> need to merge
+			//
 			chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 
-			// check self status
-			if(selfchmpxid == pchmpxsvrs[cnt].chmpxid){
-				if(svrchmpx.GetStatus() != pchmpxsvrs[cnt].status){
-					// check self status changing
-					if(IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && (is_init_process || CHM_INVALID_SOCK != svrchmpx.GetSock(SOCKTG_SELFSOCK))){
-						// This case is that the server is up after the server have been down.
-						//
-						// [NOTICE]
-						// You should service out the down server, before you up it.
-						//
-						if(CHMPXSTS_SRVIN_DOWN_NORMAL == pchmpxsvrs[cnt].status){
+			// check status for self
+			if(selfchmpxid == pchmpxsvrs[cnt].chmpxid && svrchmpx.GetStatus() != pchmpxsvrs[cnt].status){
+				//
+				// check self status changing
+				//
+				if(IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status) && (is_init_process || CHM_INVALID_SOCK != svrchmpx.GetSock(SOCKTG_SELFSOCK))){
+					// This case is that the server is up after the server have been down.
+					//
+					// [NOTICE]
+					// You should service out the down server, before you up it.
+					//
+					if(IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status)){
+						if(IS_CHMPXSTS_NOACT(pchmpxsvrs[cnt].status)){
 							if(!is_client_join){
+								// [SERVICE IN] [DOWN] [NOACT] [NOTHING] [SUSPEND] ---> [SERVICE IN] [UP] [NOACT] [NOTHING] [SUSPEND]
 								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_NORMAL(suspend).", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_NORMAL;	// suspend (set later)
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_NORMAL;
 							}else{
-								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_MERGING.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_MERGING;	// nosuspend
+								// [SERVICE IN] [DOWN] [NOACT] [NOTHING] [NOSUSPEND] ---> [SERVICE IN] [UP] [NOACT] [PENDING] [NOSUSPEND]
+								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_PENDING(nosuspend).", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_PENDING;
 							}
-
-						}else if(CHMPXSTS_SRVIN_DOWN_DELPENDING == pchmpxsvrs[cnt].status){
-							if(!is_client_join){
-								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_NORMAL(suspend).", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_NORMAL;	// suspend (set later)
+						}else if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status)){
+							if(IS_CHMPXSTS_PENDING(pchmpxsvrs[cnt].status)){
+								// [SERVICE IN] [DOWN] [DELETE] [PENDING] [SUSPEND/NOSUSPEND] ---> [SERVICE IN] [UP] [DELETE] [PENDING] [SUSPEND/NOSUSPEND]
+								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_DELPENDING.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_DELPENDING;
 							}else{
-								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_MERGING.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_MERGING;	// nosuspend(should be CHMPXSTS_SRVIN_UP_NORMAL?)
+								// [SERVICE IN] [DOWN] [DELETE] [DONE] [SUSPEND/NOSUSPEND] ---> [SERVICE IN] [UP] [DELETE] [DONE] [SUSPEND/NOSUSPEND]
+								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVIN_UP_DELETED.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_UP_DELETED;
 							}
-
-						}else if(CHMPXSTS_SRVIN_DOWN_DELETED == pchmpxsvrs[cnt].status){
-							WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVOUT_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-							pchmpxsvrs[cnt].status = CHMPXSTS_SRVOUT_UP_NORMAL;
-
-						}else{	// CHMPXSTS_SRVOUT_DOWN_NORMAL, CHMPXSTS_SLAVE_DOWN_NORMAL
-							WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVOUT(SLAVE)_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-							SET_CHMPXSTS_UP(pchmpxsvrs[cnt].status);
 						}
-						// suspend
-						CHANGE_CHMPXSTS_SUSPEND_FLAG(pchmpxsvrs[cnt].status, !is_client_join);
 
-					}else if(IS_CHMPXSTS_UP(pchmpxsvrs[cnt].status) && !is_init_process && CHM_INVALID_SOCK == svrchmpx.GetSock(SOCKTG_SELFSOCK)){
-						WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so status is arranged.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
-						CHANGE_CHMPXSTS_TO_DOWN(pchmpxsvrs[cnt].status);
-
-						// not suspend
-						SET_CHMPXSTS_NOSUP(pchmpxsvrs[cnt].status);
+					}else if(IS_CHMPXSTS_SRVOUT(pchmpxsvrs[cnt].status)){
+						// [SERVICE OUT] [DOWN] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND] ---> [SERVICE OUT] [UP] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND]
+						WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SRVOUT_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+						pchmpxsvrs[cnt].status = CHMPXSTS_SRVOUT_UP_NORMAL;
+					}else{
+						// [SLAVE] [DOWN] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND] ---> [SLAVE] [UP] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND]
+						WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s), so new status is CHMPXSTS_SLAVE_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+						pchmpxsvrs[cnt].status = CHMPXSTS_SLAVE_UP_NORMAL;
 					}
+					// SET [SUSPEND/NOSUSPEND]
+					CHANGE_CHMPXSTS_SUSPEND_FLAG(pchmpxsvrs[cnt].status, !is_client_join);
+
+				}else if(IS_CHMPXSTS_UP(pchmpxsvrs[cnt].status) && !is_init_process && CHM_INVALID_SOCK == svrchmpx.GetSock(SOCKTG_SELFSOCK)){
+					//
+					// This case is impossible.
+					// However, since there is a possibility of occurrence in communication in PX2PX, then confirm it and change to DOWN.
+					//
+					if(IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status)){
+						if(IS_CHMPXSTS_NOACT(pchmpxsvrs[cnt].status)){
+							// [SERVICE IN] [UP] [NOACT] [NOTHING/PENDING/DOING/DONE] [SUSPEND/NOSUSPEND] ---> [SERVICE IN] [DOWN] [NOACT] [NOTHING] [NOSUSPEND]
+							WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SRVIN_DOWN_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+							pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_DOWN_NORMAL;
+
+						}else if(IS_CHMPXSTS_ADD(pchmpxsvrs[cnt].status)){
+							// [SERVICE IN] [UP] [ADD] [NOTHING/PENDING/DOING/DONE] [SUSPEND/NOSUSPEND] ---> [SERVICE OUT] [DOWN] [NOACT] [NOTHING] [NOSUSPEND]
+							WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SRVOUT_DOWN_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+							pchmpxsvrs[cnt].status = CHMPXSTS_SRVOUT_DOWN_NORMAL;
+
+						}else if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status)){
+							if(IS_CHMPXSTS_PENDING(pchmpxsvrs[cnt].status)){
+								// [SERVICE IN] [UP] [DELETE] [PENDING] [SUSPEND/NOSUSPEND] ---> [SERVICE IN] [DOWN] [DELETE] [PENDING] [NOSUSPEND]
+								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SRVIN_DOWN_DELPENDING.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_DOWN_DELPENDING;
+							}else{
+								// [SERVICE IN] [UP] [DELETE] [DOING/DONE] [SUSPEND/NOSUSPEND] ---> [SERVICE IN] [DOWN] [DELETE] [DONE] [NOSUSPEND]
+								WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SRVIN_DOWN_DELETED.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+								pchmpxsvrs[cnt].status = CHMPXSTS_SRVIN_DOWN_DELETED;
+							}
+						}
+
+					}else if(IS_CHMPXSTS_SRVOUT(pchmpxsvrs[cnt].status)){
+						// [SERVICE OUT] [UP] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND] ---> [SERVICE OUT] [DOWN] [NOACT] [NOTHING] [NOSUSPEND]
+						WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SRVOUT_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+						pchmpxsvrs[cnt].status = CHMPXSTS_SRVOUT_UP_NORMAL;
+					}else{
+						// [SLAVE] [UP] [NOACT] [NOTHING] [SUSPEND/NOSUSPEND] ---> [SLAVE] [DOWN] [NOACT] [NOTHING] [NOSUSPEND]
+						WAN_CHMPRN("Self new chmpx status(0x%016" PRIx64 ":%s) is wrong, because self server is down, so new status is CHMPXSTS_SLAVE_UP_NORMAL.", pchmpxsvrs[cnt].status, STR_CHMPXSTS_FULL(pchmpxsvrs[cnt].status).c_str());
+						pchmpxsvrs[cnt].status = CHMPXSTS_SLAVE_UP_NORMAL;
+					}
+					// SET [NOSUSPEND](DOWN status server has always NOSUSPEND status, event if there is no joined client)
+					SET_CHMPXSTS_NOSUP(pchmpxsvrs[cnt].status);
 				}
 			}
-			// merge
-			if(!svrchmpx.MergeChmpxSvr(&pchmpxsvrs[cnt], false, eqfd)){								// not force
+			// merge new status
+			//
+			// [NOTE]
+			// Here, this method merges information of chmpx, but the base/pending hash
+			// value can not be merged correctly.
+			// Since there are addition and deletion of chmpx in the processing after here,
+			// those hash values are recalculated after all processing is completed.
+			//
+			if(!svrchmpx.MergeChmpxSvr(&pchmpxsvrs[cnt], false, eqfd)){						// not force(port/ctlport)
 				WAN_CHMPRN("Failed to merge CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR, but continue...", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
 			}
 
 		}else{
-			// Not found -> Insert new chmpx
+			//
+			// Not found chmpxid in imdata -> insert new chmpx
+			//
 			if(basic_type::pAbsPtr->chmpx_free_count <= 0L){
-				ERR_CHMPRN("No more free CHMPXLIST.");
-
-				// [NOTICE]
-				// care for bash hash count.
-				//
-				basic_type::pAbsPtr->chmpx_bhash_count	= svrchmpxlist.BaseHashCount(true);
-				basic_type::pAbsPtr->is_operating		= svrchmpxlist.IsOperating(true);
-				return false;
+				ERR_CHMPRN("No more free CHMPXLIST, but continue to process till end of this method for hash values.");
+				is_error = true;
+				continue;
 			}
 			// make new chmpx(list) from free chmpx list
 			chmpxlistlap	freechmpxlist(basic_type::pAbsPtr->chmpx_frees, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative
@@ -5037,8 +5322,10 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 		}
 	}
 
-	// Next, remove chmpx server from list
-	if(is_remove){
+	//
+	// Next) remove not found chmpx from imdata
+	//
+	if(!is_error && is_remove){
 		for(bool result = svrchmpxlist.ToFirst(); result; ){
 			chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 			chmpxid_t	chmpxid = svrchmpx.GetChmpxId();
@@ -5066,7 +5353,8 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 			if(NULL == (retrivelist = svrchmpxlist.Retrive())){
 				// Failed to remove it, continue next.
 				WAN_CHMPRN("Failed to remove CHMPX(0x%016" PRIx64 ") from CHMPXSVR, but continue...", chmpxid);
-				result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+				is_error= true;
+				result	= svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
 				continue;
 			}
 			// [NOTICE]
@@ -5076,6 +5364,11 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 
 			// Remove Success
 			chmpxlistlap	retrivechmpxlist(retrivelist, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, true);	// From Abs
+			{
+				// For debug message
+				chmpxlap	retrivechmpx(retrivechmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);						// Get CHMPX from Absolute
+				MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") with status(0x%016" PRIx64 ":%s) is retrived.", retrivechmpx.GetChmpxId(), retrivechmpx.GetStatus(), STR_CHMPXSTS_FULL(retrivechmpx.GetStatus()).c_str());
+			}
 			retrivechmpxlist.Clear(eqfd);
 
 			chmpxlistlap	freechmpxlist(basic_type::pAbsPtr->chmpx_frees, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative(allow NULL)
@@ -5103,12 +5396,22 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 		}
 	}
 
+	// [NOTE]
+	// With the above processing, addition and deletion of chmpx servers and change of those
+	// status are carried out.
+	// Thus we must recalculate here to keep the proper hash value.
+	//
+	if(!UpdateHash(HASHTG_BOTH)){
+		ERR_CHMPRN("Failed recalcurating base/pending hash values after merging chmpx data(above processing is %s).", is_error ? "failed" : "succeed");
+		is_error = true;
+	}
+
 	// set base hash server count
 	basic_type::pAbsPtr->chmpx_bhash_count	= svrchmpxlist.BaseHashCount(true);
 	// operating flag
 	basic_type::pAbsPtr->is_operating		= svrchmpxlist.IsOperating(true);
 
-	return true;
+	return !is_error;
 }
 
 template<typename T>
@@ -5445,7 +5748,7 @@ chmpxid_t chmpxman_lap<T>::GetChmpxIdByStatus(chmpxsts_t status, bool part_match
 }
 
 template<typename T>
-chmpxid_t chmpxman_lap<T>::GetRandomServerChmpxId(bool is_up_servers, bool without_suspend)
+chmpxid_t chmpxman_lap<T>::GetRandomServerChmpxId(bool without_suspend)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
@@ -5463,23 +5766,22 @@ chmpxid_t chmpxman_lap<T>::GetRandomServerChmpxId(bool is_up_servers, bool witho
 		if(!svrchmpxlist.Find(basic_type::pAbsPtr->last_chmpxid)){
 			WAN_CHMPRN("last random chmpxid(0x%016" PRIx64 ") is not found, so using first chmpxid.", basic_type::pAbsPtr->last_chmpxid);
 		}else{
-			if(!svrchmpxlist.ToNext(true, true, is_up_servers, true, without_suspend)){
+			// Found last_chmpxid in list, then skip current
+			if(!svrchmpxlist.ToNextUpServicing(true, true, without_suspend)){		// get strict servicing server
 				ERR_CHMPRN("Failed to get next chmpxid by last random chmpxid(0x%016" PRIx64 "), so using first chmpxid.", basic_type::pAbsPtr->last_chmpxid);
 			}
 		}
 	}
 
-	chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
-
-	// Check
-	chmpxsts_t	status = svrchmpx.GetStatus();
-	if(IS_CHMPXSTS_BASEHASH(status) && (!is_up_servers || IS_CHMPXSTS_UP(status)) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
-		// OK
-		basic_type::pAbsPtr->last_chmpxid = svrchmpx.GetChmpxId();
-	}else{
-		// NG(Maybe, no server is up.)
-		basic_type::pAbsPtr->last_chmpxid = CHM_INVALID_CHMPXID;
+	// get next server from current server
+	if(!svrchmpxlist.ToNextUpServicing(true, true, without_suspend)){				// get strict servicing server
+		ERR_CHMPRN("Failed to get next chmpxid for random chmpxid.");
+		return CHM_INVALID_CHMPXID;
 	}
+	// Set last chmpxid
+	chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
+	basic_type::pAbsPtr->last_chmpxid = svrchmpx.GetChmpxId();
+
 	return basic_type::pAbsPtr->last_chmpxid;
 }
 
@@ -5557,141 +5859,146 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 	basehashs.clear();
 
 	// normalize for target hash
-	chmpxid_t		last_chmpxid		= CHM_INVALID_CHMPXID;
-	chmhash_t		common_hash			= hash % static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count);
-	chmhash_t		target_hash			= CHM_INVALID_HASHVAL;
-	chmhash_t		target_base_hash	= CHM_INVALID_HASHVAL;
-	chmhash_t		target_pending_hash	= CHM_INVALID_HASHVAL;		// not use
+	chmpxid_t		last_chmpxid		= CHM_INVALID_CHMPXID;		// for set last used chmpxid
+	chmhash_t		hash_maxval			= 0;						// count of chmpx has base/pending hash value
+	chmhash_t		target_start_hash	= CHM_INVALID_CHMPXID;		// target hash value for base hash count from hash parameter
+	chmhash_t		target_repl_hash	= CHM_INVALID_HASHVAL;		// target hash value for pending hash count from hash parameter
+	chmhash_t		chmpx_base_hash		= CHM_INVALID_HASHVAL;		// chmpx base hash value
+	chmhash_t		chmpx_pending_hash	= CHM_INVALID_HASHVAL;		// chmpx pending hash value
 	chmpxidmap_t	chmpxidmap;										// for the prevention of duplicate registration
 	chmhashmap_t	chmhashmap;										// for the prevention of duplicate registration
+	chmpxlistlap	svrchmpxlist;
+	chmpxlap		svrchmpx;
+	chmpxid_t		tmpchmpxid			= CHM_INVALID_CHMPXID;
+	chmpxsts_t		status				= 0;
 
-	for(long cnt = 0; cnt < (basic_type::pAbsPtr->replica_count + 1); cnt++){
-		chmpxlap	svrchmpx;
-
-		target_hash = common_hash + static_cast<chmhash_t>(cnt);
-		if(static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count) <= target_hash){
-			target_hash = target_hash % static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count);
-		}
-
-		if(abs_base_arr[target_hash]){
-			svrchmpx.Reset(abs_base_arr[target_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-		}else{
-			// Somthing wrong, but try to search liner.(not good performace)
-			WAN_CHMPRN("There is no chmpxid in base hashed array for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_hash);
-
-			chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-			if(!svrchmpxlist.FindByHash(target_hash, true)){
-				ERR_CHMPRN("There is no chmpxid in base hashed array and list for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 ").", hash, target_hash);
-				continue;
-			}
-			svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
-		}
-
-		chmpxid_t	tmpchmpxid;
-		if(CHM_INVALID_CHMPXID == (tmpchmpxid = svrchmpx.GetChmpxId())){
-			ERR_CHMPRN("Base hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_hash);
-			continue;
-		}
-		chmpxsts_t	status = svrchmpx.GetStatus();
-		if(without_down && IS_CHMPXSTS_DOWN(status)){
-			MSG_CHMPRN("Base hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is DOWN.", target_hash, tmpchmpxid);
-			continue;
-		}
-		if(without_suspend && IS_CHMPXSTS_SUSPEND(status)){
-			MSG_CHMPRN("Base hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is SUSPEND.", target_hash, tmpchmpxid);
-			continue;
-		}
-		if(!svrchmpx.Get(target_base_hash, target_pending_hash)){
-			ERR_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_hash);
-			continue;
-		}
-
-		// check duplicate registration
-		if(chmpxidmap.end() != chmpxidmap.find(tmpchmpxid)){
-			//MSG_CHMPRN("chmpx(0x%016" PRIx64 ") is already registered.", tmpchmpxid);
-			continue;
-		}
-		last_chmpxid			= tmpchmpxid;
-		chmpxidmap[tmpchmpxid]	= true;
-		chmpxids.push_back(tmpchmpxid);
-
-		// check invalid hash and check duplicate registration
-		if(CHM_INVALID_HASHVAL == target_base_hash || chmhashmap.end() != chmhashmap.find(target_base_hash)){
-			//MSG_CHMPRN("chmhash(0x%016" PRIx64 ") is already registered.", target_base_hash);
-			continue;
-		}
-		chmhashmap[target_base_hash] = true;
-		basehashs.push_back(target_base_hash);
-	}
-	if(CHM_INVALID_CHMPXID != last_chmpxid){
-		basic_type::pAbsPtr->last_chmpxid = last_chmpxid;	// for random
-	}
-
-	// If operating, adding other chmpxids
-	if(with_pending && chmpxman_lap<T>::IsOperating()){
-		// update common_hash for pending hash count
-		{
-			chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-			chmhash_t		chmpx_phash_count	= static_cast<chmhash_t>(svrchmpxlist.PendingHashCount());		// svrchmpxlist is top of list
-			common_hash							= hash % chmpx_phash_count;
-		}
+	// For Base hash
+	hash_maxval = static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count);
+	if(0 == hash_maxval){
+		ERR_CHMPRN("There is no up servers for base hash.");
+	}else{
+		target_start_hash = hash % hash_maxval;
 		for(long cnt = 0; cnt < (basic_type::pAbsPtr->replica_count + 1); cnt++){
-			chmpxlap	svrchmpx;
+			target_repl_hash = (target_start_hash + static_cast<chmhash_t>(cnt)) % hash_maxval;
 
-			target_hash = common_hash + static_cast<chmhash_t>(cnt);
-			if(static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count) <= target_hash){
-				target_hash = target_hash % static_cast<chmhash_t>(basic_type::pAbsPtr->chmpx_bhash_count);
-			}
-
-			if(abs_pend_arr[target_hash]){
-				svrchmpx.Reset(abs_pend_arr[target_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+			// get chmpx by base hash value
+			if(abs_base_arr[target_repl_hash]){
+				svrchmpx.Reset(abs_base_arr[target_repl_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 			}else{
 				// Somthing wrong, but try to search liner.(not good performace)
-				WAN_CHMPRN("There is no chmpxid in pending hashed array for hash(0x%016" PRIx64 ") - pending hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_hash);
+				WAN_CHMPRN("There is no chmpxid in base hashed array for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_repl_hash);
 
-				chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-				if(!svrchmpxlist.FindByHash(target_hash, false)){
-					ERR_CHMPRN("There is no chmpxid in pending hashed array and list for hash(0x%016" PRIx64 ") - pending hash(0x%016" PRIx64 ").", hash, target_hash);
+				svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+				if(!svrchmpxlist.FindByHash(target_repl_hash, true)){
+					ERR_CHMPRN("There is no chmpxid in base hashed array and list for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 ").", hash, target_repl_hash);
 					continue;
 				}
 				svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 			}
 
-			chmpxid_t	tmpchmpxid;
+			// check
 			if(CHM_INVALID_CHMPXID == (tmpchmpxid = svrchmpx.GetChmpxId())){
-				ERR_CHMPRN("Pending hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_hash);
+				ERR_CHMPRN("Base hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_repl_hash);
 				continue;
 			}
-			chmpxsts_t	status = svrchmpx.GetStatus();
+			if(!svrchmpx.Get(chmpx_base_hash, chmpx_pending_hash) || CHM_INVALID_HASHVAL == chmpx_base_hash){
+				//MSG_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_repl_hash);
+				continue;
+			}
+			status = svrchmpx.GetStatus();
 			if(without_down && IS_CHMPXSTS_DOWN(status)){
-				MSG_CHMPRN("Pending hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is DOWN.", target_hash, tmpchmpxid);
+				//MSG_CHMPRN("Base hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is DOWN.", target_repl_hash, tmpchmpxid);
 				continue;
 			}
 			if(without_suspend && IS_CHMPXSTS_SUSPEND(status)){
-				MSG_CHMPRN("Pending hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is SUSPEND.", target_hash, tmpchmpxid);
-				continue;
-			}
-			if(!svrchmpx.Get(target_base_hash, target_pending_hash)){
-				ERR_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_hash);
+				//MSG_CHMPRN("Base hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is SUSPEND.", target_repl_hash, tmpchmpxid);
 				continue;
 			}
 
-			// check duplicate registration
-			if(chmpxidmap.end() != chmpxidmap.find(tmpchmpxid)){
+			// register
+			if(chmpxidmap.end() == chmpxidmap.find(tmpchmpxid)){				// check duplicate registration
+				chmpxidmap[tmpchmpxid]	= true;
+				chmpxids.push_back(tmpchmpxid);
+			}else{
 				//MSG_CHMPRN("chmpx(0x%016" PRIx64 ") is already registered.", tmpchmpxid);
-				continue;
 			}
-			chmpxidmap[tmpchmpxid] = true;
-			chmpxids.push_back(tmpchmpxid);
+			if(chmhashmap.end() == chmhashmap.find(chmpx_base_hash)){			// check duplicate registration
+				chmhashmap[chmpx_base_hash] = true;
+				basehashs.push_back(chmpx_base_hash);
+			}else{
+				//MSG_CHMPRN("chmhash(0x%016" PRIx64 ") is already registered.", chmpx_base_hash);
+			}
 
-			// check invalid hash and check duplicate registration
-			if(CHM_INVALID_HASHVAL == target_base_hash || chmhashmap.end() != chmhashmap.find(target_base_hash)){
-				//MSG_CHMPRN("chmhash(0x%016" PRIx64 ") is already registered.", target_base_hash);
-				continue;
-			}
-			chmhashmap[target_base_hash] = true;
-			basehashs.push_back(target_base_hash);
+			// backup lastest chmpxid for random
+			last_chmpxid = tmpchmpxid;
 		}
+	}
+
+	// For pending hash(if operating, adding other chmpxids)
+	if(with_pending && chmpxman_lap<T>::IsOperating()){
+		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+		hash_maxval = static_cast<chmhash_t>(svrchmpxlist.PendingHashCount());	// svrchmpxlist is top of list
+
+		if(0 == hash_maxval){
+			ERR_CHMPRN("There is no up servers for pending hash.");
+		}else{
+			target_start_hash = hash % hash_maxval;
+			for(long cnt = 0; cnt < (basic_type::pAbsPtr->replica_count + 1); cnt++){
+				target_repl_hash = (target_start_hash + static_cast<chmhash_t>(cnt)) % hash_maxval;
+
+				// get chmpx by pending hash value
+				if(abs_pend_arr[target_repl_hash]){
+					svrchmpx.Reset(abs_pend_arr[target_repl_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+				}else{
+					// Somthing wrong, but try to search liner.(not good performace)
+					WAN_CHMPRN("There is no chmpxid in pending hashed array for hash(0x%016" PRIx64 ") - pending hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_repl_hash);
+
+					svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+					if(!svrchmpxlist.FindByHash(target_repl_hash, false)){
+						ERR_CHMPRN("There is no chmpxid in pending hashed array and list for hash(0x%016" PRIx64 ") - pending hash(0x%016" PRIx64 ").", hash, target_repl_hash);
+						continue;
+					}
+					svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+				}
+
+				// check
+				if(CHM_INVALID_CHMPXID == (tmpchmpxid = svrchmpx.GetChmpxId())){
+					ERR_CHMPRN("Pending hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_repl_hash);
+					continue;
+				}
+				if(!svrchmpx.Get(chmpx_base_hash, chmpx_pending_hash) || CHM_INVALID_HASHVAL == chmpx_pending_hash){
+					//MSG_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_repl_hash);
+					continue;
+				}
+				status = svrchmpx.GetStatus();
+				if(without_down && IS_CHMPXSTS_DOWN(status)){
+					//MSG_CHMPRN("Pending hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is DOWN.", target_repl_hash, tmpchmpxid);
+					continue;
+				}
+				if(without_suspend && IS_CHMPXSTS_SUSPEND(status)){
+					//MSG_CHMPRN("Pending hash(0x%016" PRIx64 ") object is chmpxid(0x%016" PRIx64 "), but this server is SUSPEND.", target_repl_hash, tmpchmpxid);
+					continue;
+				}
+
+				// register
+				if(chmpxidmap.end() == chmpxidmap.find(tmpchmpxid)){			// check duplicate registration
+					chmpxidmap[tmpchmpxid]	= true;
+					chmpxids.push_back(tmpchmpxid);
+				}else{
+					//MSG_CHMPRN("chmpx(0x%016" PRIx64 ") is already registered.", tmpchmpxid);
+				}
+				if(chmhashmap.end() == chmhashmap.find(chmpx_pending_hash)){	// check duplicate registration
+					chmhashmap[chmpx_pending_hash] = true;
+					basehashs.push_back(chmpx_pending_hash);
+				}else{
+					//MSG_CHMPRN("chmhash(0x%016" PRIx64 ") is already registered.", chmpx_base_hash);
+				}
+			}
+		}
+	}
+
+	if(CHM_INVALID_CHMPXID != last_chmpxid){
+		basic_type::pAbsPtr->last_chmpxid = last_chmpxid;						// for random
 	}
 	return (0 != chmpxids.size());
 }
@@ -5950,7 +6257,7 @@ bool chmpxman_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& 
 	}
 	chmpxlistlap	slvchmpxlist(basic_type::pAbsPtr->chmpx_slaves, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 	if(!slvchmpxlist.Find(chmpxid)){
-		ERR_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
+		//MSG_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
 	chmpxlap	slvchmpx(slvchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
@@ -5970,7 +6277,7 @@ bool chmpxman_lap<T>::GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) cons
 	}
 	chmpxlistlap	slvchmpxlist(basic_type::pAbsPtr->chmpx_slaves, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 	if(!slvchmpxlist.Find(chmpxid)){
-		MSG_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
+		//MSG_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
 	chmpxlap	slvchmpx(slvchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
@@ -6047,21 +6354,21 @@ bool chmpxman_lap<T>::SetServerHash(chmpxid_t chmpxid, chmhash_t base, chmhash_t
 
 	// If server mode & self chmpxid, set value to self chmpx
 	if(IsServerMode() && GetSelfChmpxId() == chmpxid){
-		chmpxlistlap	selfchmpxlist(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// Get CHMPXLIST from Relative
-		chmpxlap		selfchmpx(selfchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
-		if(!selfchmpx.Set(base, pending, type)){
-			ERR_CHMPRN("Could not set hash value to self.");
-			return false;
-		}
+		return SetSelfHash(base, pending, type);
 	}
 
+	// Other servers
 	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 	if(!svrchmpxlist.Find(chmpxid)){
 		ERR_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
 	chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
-	return svrchmpx.Set(base, pending, type);
+	if(!svrchmpx.Set(base, pending, type)){
+		ERR_CHMPRN("Could not set hash value to chmpxid(0x%016" PRIx64 ").", chmpxid);
+		return false;
+	}
+	return true;
 }
 
 template<typename T>
@@ -6074,11 +6381,12 @@ bool chmpxman_lap<T>::SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status, bool
 
 	chmpxlistlap	svrchmpxlist;
 	chmpxlap		svrchmpx;
+	bool			need_check_all_down = false;
 
 	// check self status
 	if(IsServerMode() && GetSelfChmpxId() == chmpxid){
-		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// Get CHMPXLIST from Relative
-		svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
+		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);		// Get CHMPXLIST from Relative
+		svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 
 		// check self status changing
 		if(IS_CHMPXSTS_DOWN(status) && CHM_INVALID_SOCK != svrchmpx.GetSock(SOCKTG_SELFSOCK)){
@@ -6092,12 +6400,15 @@ bool chmpxman_lap<T>::SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status, bool
 		CHANGE_CHMPXSTS_SUSPEND_FLAG(status, !is_client_join);
 
 	}else{
-		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// Get CHMPXLIST from Relative
 		if(!svrchmpxlist.Find(chmpxid)){
 			ERR_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 			return false;
 		}
 		svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+
+		// need to check all server chmpx down
+		need_check_all_down = true;
 	}
 
 	// set status
@@ -6105,19 +6416,51 @@ bool chmpxman_lap<T>::SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status, bool
 		return false;
 	}
 
+	// need to check all server down
+	//
+	// [NOTE]
+	// This case is only on slave mode chmpx when changing sever status.
+	// If all server status is "DOWN", it means no server has "SERVICE IN".
+	// Then we have to check and set "SERVICE OUT" for all server here.
+	//
+	if(need_check_all_down && IS_CHMPXSTS_DOWN(status)){
+		if(!svrchmpxlist.CheckAllServiceOutStatus()){
+			ERR_CHMPRN("Failed to check status(all server chmpx down), and set status(all server chmpx to service out).");
+			return false;
+		}
+	}
+
 	// set base hash server count
-	basic_type::pAbsPtr->chmpx_bhash_count = svrchmpxlist.BaseHashCount(true);
+	basic_type::pAbsPtr->chmpx_bhash_count	= svrchmpxlist.BaseHashCount(true);
 
 	// operating flag
-	if(basic_type::pAbsPtr->is_operating && !IS_CHMPXSTS_OPERATING(status)){
-		// check all server status.
-		basic_type::pAbsPtr->is_operating = svrchmpxlist.IsOperating(true);
-	}else if(!basic_type::pAbsPtr->is_operating && IS_CHMPXSTS_OPERATING(status)){
-		basic_type::pAbsPtr->is_operating = true;
-	}else{
-		// nothing to do because not changed.
-	}
+	basic_type::pAbsPtr->is_operating		= svrchmpxlist.IsOperating(true);
+
 	return true;
+}
+
+template<typename T>
+bool chmpxman_lap<T>::UpdateLastStatusTime(chmpxid_t chmpxid)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPXMAN does not set.");
+		return false;
+	}
+
+	chmpxlistlap	svrchmpxlist;
+	chmpxlap		svrchmpx;
+	if(CHM_INVALID_CHMPXID == chmpxid || GetSelfChmpxId() == chmpxid){
+		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);		// Get CHMPXLIST from Relative
+		svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+	}else{
+		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+		if(!svrchmpxlist.Find(chmpxid)){
+			ERR_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
+			return false;
+		}
+		svrchmpx.Reset(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+	}
+	return svrchmpx.UpdateLastStatusTime();
 }
 
 template<typename T>
@@ -6136,23 +6479,23 @@ bool chmpxman_lap<T>::IsOperating(void)
 // calicurating hash.
 //
 template<typename T>
-bool chmpxman_lap<T>::UpdatePendingHash(bool is_allow_operating)
+bool chmpxman_lap<T>::UpdateHash(int type, bool is_allow_operating, bool is_allow_slave_mode)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
 		return false;
 	}
-	if(!IsServerMode()){
-		ERR_CHMPRN("Updating pengind hash must be on Server mode.");
+	if(!is_allow_slave_mode && !IsServerMode()){
+		ERR_CHMPRN("Updating hash must be on Server mode.");
 		return false;
 	}
 	if(!is_allow_operating && basic_type::pAbsPtr->is_operating){
-		ERR_CHMPRN("Failed to request updateing pending hash, but blocks it because of operating now.");
+		ERR_CHMPRN("Failed to request updateing hash, but blocks it because of operating now.");
 		return false;
 	}
 	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-	if(!svrchmpxlist.SetPendingHash(false)){
-		ERR_CHMPRN("Failed to set pending hash value to servers.");
+	if(!svrchmpxlist.UpdateHash(type, false)){
+		ERR_CHMPRN("Failed to set hash value to servers.");
 		return false;
 	}
 	return true;
@@ -6214,16 +6557,8 @@ bool chmpxman_lap<T>::SetSelfStatus(chmpxsts_t status, bool is_client_join)
 	if(IsServerMode()){
 		// set base hash server count
 		basic_type::pAbsPtr->chmpx_bhash_count = selfchmpxlist.BaseHashCount(true);
-
 		// operating flag
-		if(basic_type::pAbsPtr->is_operating && !IS_CHMPXSTS_OPERATING(status)){
-			// check all server status.
-			basic_type::pAbsPtr->is_operating = selfchmpxlist.IsOperating(true);
-		}else if(!basic_type::pAbsPtr->is_operating && IS_CHMPXSTS_OPERATING(status)){
-			basic_type::pAbsPtr->is_operating = true;
-		}else{
-			// nothing to do because not changed.
-		}
+		basic_type::pAbsPtr->is_operating		= selfchmpxlist.IsOperating(true);
 	}
 	return true;
 }
@@ -6392,6 +6727,30 @@ bool chmpxman_lap<T>::RemoveSlave(chmpxid_t chmpxid, int eqfd)
 }
 
 template<typename T>
+bool chmpxman_lap<T>::CheckSockInAllChmpx(int sock) const
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPXMAN does not set.");
+		return false;
+	}
+	if(basic_type::pAbsPtr->chmpx_servers){
+		chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+		if(svrchmpxlist.Find(sock, false)){
+			// found
+			return true;
+		}
+	}
+	if(basic_type::pAbsPtr->chmpx_slaves){
+		chmpxlistlap	slvchmpxlist(basic_type::pAbsPtr->chmpx_slaves, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+		if(slvchmpxlist.Find(sock, false)){
+			// found
+			return true;
+		}
+	}
+	return false;
+}
+
+template<typename T>
 bool chmpxman_lap<T>::AddStat(chmpxid_t chmpxid, bool is_sent, size_t length, const struct timespec& elapsed_time)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
@@ -6494,8 +6853,11 @@ class chminfo_lap : public structure_lap<T>
 
 		bool GetGroup(std::string& group) const;
 		bool IsRandomDeliver(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_random_deliver : false); }
-		bool IsAutoMergeConf(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_auto_merge : false); }
-		bool IsDoMergeConf(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_do_merge : false); }
+		bool IsAutoMerge(void) const { return (basic_type::pAbsPtr ? (!basic_type::pAbsPtr->is_auto_merge_suspend && basic_type::pAbsPtr->is_auto_merge) : false); }
+		bool IsDoMerge(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_do_merge : false); }
+		bool SuspendAutoMerge(void);
+		bool ResetAutoMerge(void);
+		bool GetAutoMergeMode(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_auto_merge_suspend : false); }
 		int GetSocketThreadCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->evsock_thread_cnt : 0); }
 		int GetMQThreadCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->evmq_thread_cnt : 0); }
 		long GetMaxMQCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->max_mqueue : -1); }
@@ -6531,7 +6893,7 @@ class chminfo_lap : public structure_lap<T>
 		chmpxid_t GetChmpxIdBySock(int sock, int type = CLOSETG_BOTH) const;
 		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
-		chmpxid_t GetRandomServerChmpxId(bool is_up_servers = false, bool without_suspend = false);
+		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
 		bool GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending, bool without_down = true, bool without_suspend = true);
 		bool GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, bool with_pending, bool without_down = true, bool without_suspend = true);
@@ -6556,8 +6918,9 @@ class chminfo_lap : public structure_lap<T>
 		bool SetServerSocks(chmpxid_t chmpxid, int sock, int ctlsock, int type);
 		bool SetServerHash(chmpxid_t chmpxid, chmhash_t base, chmhash_t pending, int type);
 		bool SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status);
+		bool UpdateLastStatusTime(chmpxid_t chmpxid = CHM_INVALID_CHMPXID);
 		bool RemoveServerSock(chmpxid_t chmpxid, int sock);
-		bool UpdatePendingHash(bool is_allow_operating = true);
+		bool UpdateHash(int type, bool is_allow_operating = true, bool is_allow_slave_mode = true);
 		bool SetSelfSocks(int sock, int ctlsock);
 		bool SetSelfHash(chmhash_t base, chmhash_t pending, int type);
 		bool SetSelfStatus(chmpxsts_t status);
@@ -6566,6 +6929,7 @@ class chminfo_lap : public structure_lap<T>
 		bool SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock, bool is_remove_empty = true);
 		bool RemoveSlave(chmpxid_t chmpxid, int eqfd);
+		bool CheckSockInAllChmpx(int sock) const;
 
 		bool AddStat(chmpxid_t chmpxid, bool is_sent, size_t length, const struct timespec& elapsed_time);
 		bool GetStat(PCHMSTAT pserver, PCHMSTAT pslave) const;
@@ -6595,6 +6959,7 @@ bool chminfo_lap<T>::Initialize(void)
 	basic_type::pAbsPtr->start_time				= 0;
 	basic_type::pAbsPtr->is_random_deliver		= false;
 	basic_type::pAbsPtr->is_auto_merge			= false;
+	basic_type::pAbsPtr->is_auto_merge_suspend	= false;
 	basic_type::pAbsPtr->is_do_merge			= false;
 	basic_type::pAbsPtr->evsock_thread_cnt		= 0;
 	basic_type::pAbsPtr->evmq_thread_cnt		= 0;
@@ -6654,9 +7019,10 @@ bool chminfo_lap<T>::Dump(std::stringstream& sstream, const char* spacer) const
 
 	sstream << (spacer ? spacer : "") << "pid                  = " << basic_type::pAbsPtr->pid					<< std::endl;
 	sstream << (spacer ? spacer : "") << "start_time           = " << basic_type::pAbsPtr->start_time			<< std::endl;
-	sstream << (spacer ? spacer : "") << "is_random_deliver    = " << (basic_type::pAbsPtr->is_random_deliver ? "true" : "false")	<< std::endl;
-	sstream << (spacer ? spacer : "") << "automerge in conf    = " << (basic_type::pAbsPtr->is_auto_merge ? "yes" : "no")			<< std::endl;
-	sstream << (spacer ? spacer : "") << "domerge in conf      = " << (basic_type::pAbsPtr->is_do_merge ? "yes" : "no")				<< std::endl;
+	sstream << (spacer ? spacer : "") << "is_random_deliver    = " << (basic_type::pAbsPtr->is_random_deliver		? "true" : "false")	<< std::endl;
+	sstream << (spacer ? spacer : "") << "automerge in conf    = " << (basic_type::pAbsPtr->is_auto_merge			? "yes" : "no")		<< std::endl;
+	sstream << (spacer ? spacer : "") << "suspend automerge    = " << (basic_type::pAbsPtr->is_auto_merge_suspend	? "yes" : "no")		<< std::endl;
+	sstream << (spacer ? spacer : "") << "domerge in conf      = " << (basic_type::pAbsPtr->is_do_merge				? "yes" : "no")		<< std::endl;
 	sstream << (spacer ? spacer : "") << "socket thread count  = " << basic_type::pAbsPtr->evsock_thread_cnt	<< std::endl;
 	sstream << (spacer ? spacer : "") << "MQ thread count      = " << basic_type::pAbsPtr->evmq_thread_cnt		<< std::endl;
 	sstream << (spacer ? spacer : "") << "max_mqueue           = " << basic_type::pAbsPtr->max_mqueue			<< std::endl;
@@ -6756,6 +7122,7 @@ typename chminfo_lap<T>::st_ptr_type chminfo_lap<T>::Dup(void)
 	pdst->evmq_thread_cnt		= basic_type::pAbsPtr->evmq_thread_cnt;
 	pdst->is_random_deliver		= basic_type::pAbsPtr->is_random_deliver;
 	pdst->is_auto_merge			= basic_type::pAbsPtr->is_auto_merge;
+	pdst->is_auto_merge_suspend	= basic_type::pAbsPtr->is_auto_merge_suspend;
 	pdst->is_do_merge			= basic_type::pAbsPtr->is_do_merge;
 	pdst->max_mqueue			= basic_type::pAbsPtr->max_mqueue;
 	pdst->chmpx_mqueue			= basic_type::pAbsPtr->chmpx_mqueue;
@@ -6859,6 +7226,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 	basic_type::pAbsPtr->start_time				= time(NULL);
 	basic_type::pAbsPtr->is_random_deliver		= pchmcfg->is_random_mode;
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
+	basic_type::pAbsPtr->is_auto_merge_suspend	= false;					// default at loading configuration
 	basic_type::pAbsPtr->is_do_merge			= pchmcfg->is_do_merge;
 	basic_type::pAbsPtr->evsock_thread_cnt		= pchmcfg->sock_thread_cnt;
 	basic_type::pAbsPtr->evmq_thread_cnt		= pchmcfg->mq_thread_cnt;
@@ -6935,7 +7303,12 @@ bool chminfo_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
 	}
 
 	// reset
+	//
+	// [NOTE]
+	// reset is_auto_merge_suspend flag at reloading configration.
+	//
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
+	basic_type::pAbsPtr->is_auto_merge_suspend	= false;
 	basic_type::pAbsPtr->is_do_merge			= pchmcfg->is_do_merge;
 	basic_type::pAbsPtr->evsock_thread_cnt		= pchmcfg->sock_thread_cnt;
 	basic_type::pAbsPtr->evmq_thread_cnt		= pchmcfg->mq_thread_cnt;
@@ -7511,6 +7884,28 @@ bool chminfo_lap<T>::GetGroup(std::string& group) const
 }
 
 template<typename T>
+bool chminfo_lap<T>::SuspendAutoMerge(void)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	basic_type::pAbsPtr->is_auto_merge_suspend = true;
+	return true;
+}
+
+template<typename T>
+bool chminfo_lap<T>::ResetAutoMerge(void)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	basic_type::pAbsPtr->is_auto_merge_suspend = false;
+	return true;
+}
+
+template<typename T>
 bool chminfo_lap<T>::IsServerMode(void) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
@@ -7680,14 +8075,14 @@ chmpxid_t chminfo_lap<T>::GetChmpxIdByStatus(chmpxsts_t status, bool part_match)
 }
 
 template<typename T>
-chmpxid_t chminfo_lap<T>::GetRandomServerChmpxId(bool is_up_servers, bool without_suspend)
+chmpxid_t chminfo_lap<T>::GetRandomServerChmpxId(bool without_suspend)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return CHM_INVALID_CHMPXID;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetRandomServerChmpxId(is_up_servers, without_suspend);
+	return tmpchmpxman.GetRandomServerChmpxId(without_suspend);
 }
 
 template<typename T>
@@ -7955,6 +8350,17 @@ bool chminfo_lap<T>::SetServerStatus(chmpxid_t chmpxid, chmpxsts_t status)
 }
 
 template<typename T>
+bool chminfo_lap<T>::UpdateLastStatusTime(chmpxid_t chmpxid)
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
+	return tmpchmpxman.UpdateLastStatusTime(chmpxid);
+}
+
+template<typename T>
 bool chminfo_lap<T>::IsOperating(void)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
@@ -7966,14 +8372,14 @@ bool chminfo_lap<T>::IsOperating(void)
 }
 
 template<typename T>
-bool chminfo_lap<T>::UpdatePendingHash(bool is_allow_operating)
+bool chminfo_lap<T>::UpdateHash(int type, bool is_allow_operating, bool is_allow_slave_mode)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.UpdatePendingHash(is_allow_operating);
+	return tmpchmpxman.UpdateHash(type, is_allow_operating, is_allow_slave_mode);
 }
 
 template<typename T>
@@ -8051,7 +8457,7 @@ bool chminfo_lap<T>::RemoveSlaveSock(chmpxid_t chmpxid, int sock, bool is_remove
 	}
 
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	if(tmpchmpxman.RemoveSlaveSock(chmpxid, sock)){
+	if(!tmpchmpxman.RemoveSlaveSock(chmpxid, sock)){
 		WAN_CHMPRN("Failed to remove the sock(%d) from slave.", sock);
 	}
 
@@ -8075,6 +8481,17 @@ bool chminfo_lap<T>::RemoveSlave(chmpxid_t chmpxid, int eqfd)
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
 	return tmpchmpxman.RemoveSlave(chmpxid, eqfd);
+}
+
+template<typename T>
+bool chminfo_lap<T>::CheckSockInAllChmpx(int sock) const
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
+	return tmpchmpxman.CheckSockInAllChmpx(sock);
 }
 
 template<typename T>

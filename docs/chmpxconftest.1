@@ -1,0 +1,33 @@
+.TH CHMPXCONFTEST "1" "Mar 2018" "CHMPX" "Consistent Hashing Mq inProcess data eXchange"
+.SH NAME
+CHMPXCONFTEST \- Test configration file or json string Tool for CHMPX by Yahoo! JAPAN
+.SH SYNOPSIS
+.B chmpxconftest [options]
+.SH DESCRIPTION
+.PP
+chmpxconftest is checking/testing chmpx configration file or json string. You can see usage this tool by typing "-h".
+.SH OPTIONS
+.TP
+\fB\-h\fR
+display help
+.TP
+\fB\-conf\ [file\ path]\fR
+specify configration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
+.TP
+\fB\-json\ [json\ string]\fR
+specify configration json string which is same file for CHMPX server/slave node.
+.TP
+\fB\-print_default\fR
+print default value for configration.
+.TP
+\fB\-d\fR\ [SILENT\ |\ ERR\ |\ WAN\ |\ INFO\ |\ DUMP]\fR
+specify debugging level, chmpx displaies debugging message for itself.
+.TP
+.SH SEE ALSO
+.TP
+chmpx(1)
+.SH BUGS
+.TP
+Please report owner and comitter.
+.SH AUTHOR
+chmpxconftest has been written by Takeshi Nakatani <ggtakec@gmail.com>.

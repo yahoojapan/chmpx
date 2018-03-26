@@ -20,23 +20,26 @@
 # REVISION:
 #
 
-bin_PROGRAMS = chmpxbench chmpxstatus
-noinst_PROGRAMS = chmconftest chmstreamtest
+bin_PROGRAMS = chmpxbench chmpxstatus chmpxlinetool chmpxconftest
+noinst_PROGRAMS = chmpxstreamtest
 
 #
 # -lrt: for mqueue
 #
-chmconftest_SOURCES = chmconftest.cc
-chmconftest_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS)
+chmpxconftest_SOURCES = chmpxconftest.cc
+chmpxconftest_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS)
 
 chmpxbench_SOURCES = chmpxbench.cc
 chmpxbench_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS) -lpthread
 
-chmstreamtest_SOURCES = chmstreamtest.cc
-chmstreamtest_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS)
+chmpxstreamtest_SOURCES = chmpxstreamtest.cc
+chmpxstreamtest_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS)
 
 chmpxstatus_SOURCES = chmpxstatus.cc
 chmpxstatus_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS)
+
+chmpxlinetool_SOURCES = chmpxlinetool.cc
+chmpxlinetool_LDADD = -L../lib/.libs -lchmpx $(k2hash_LIBS) $(fullock_LIBS) -lpthread
 
 ACLOCAL_AMFLAGS = -I m4
 AM_CFLAGS = -I../lib $(k2hash_CFLAGS) $(fullock_CFLAGS)
