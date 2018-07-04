@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -24,8 +24,6 @@
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <signal.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 
 #include "chmcommon.h"
 #include "chmcntrl.h"
@@ -73,7 +71,7 @@ void ChmCntrl::LoopBreakHandler(int signum)
 //---------------------------------------------------------
 // Constructor/Destructor
 //---------------------------------------------------------
-ChmCntrl::ChmCntrl(void) : chmcntrltype(CHMCHNTL_TYPE_CHMPXPROC), eqfd(CHM_INVALID_HANDLE), is_ssl_init(false), pConfObj(NULL), pEventMq(NULL), pEventSock(NULL), pEventShm(NULL), auto_rejoin(false), bup_cfg(""), is_close_notify(false)
+ChmCntrl::ChmCntrl(void) : chmcntrltype(CHMCHNTL_TYPE_CHMPXPROC), eqfd(CHM_INVALID_HANDLE), pConfObj(NULL), pEventMq(NULL), pEventSock(NULL), pEventShm(NULL), auto_rejoin(false), bup_cfg(""), is_close_notify(false)
 {
 }
 
@@ -108,11 +106,6 @@ bool ChmCntrl::Clean(bool is_clean_bup)
 
 	if(is_clean_bup){
 		bup_cfg.erase();
-	}
-	// SSL
-	if(is_ssl_init){
-		ERR_free_strings();
-		is_ssl_init = false;
 	}
 	return true;
 }
@@ -222,13 +215,6 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 		}
 	}
 
-	// SSL library initialize
-	if(pConfObj->IsSsl()){
-		SSL_load_error_strings();
-		SSL_library_init();
-		is_ssl_init = true;
-	}
-
 	// Initialize Internal Memory data
 	if(!ImData.Initialize(pConfObj, eqfd, (CHMCHNTL_TYPE_CHMPXPROC == chmcntrltype))){
 		ERR_CHMPRN("Failed to initialize internal memory data.");
@@ -238,7 +224,7 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 
 	// Initialize Sockets
 	if(CHMCHNTL_TYPE_CHMPXPROC == chmcntrltype){
-		pEventSock = new ChmEventSock(eqfd, this);
+		pEventSock = new ChmEventSock(eqfd, this, pConfObj->IsSsl());
 		if(!pEventSock->SetEventQueue()){
 			ERR_CHMPRN("Failed to set/initialize socket event obj.");
 			Clean(bup_cfg.empty());

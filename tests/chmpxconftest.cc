@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -161,6 +161,8 @@ void print_initial_datas(void)
 	printf("----------------------------------------------------------------\n");
 	printf("CHMSHM                 %p\n",	shm);
 	printf(" CHMINFO               %p\n",	&(shm->info));
+	printf("  structure version    %s\n",	CHM_CHMINFO_CUR_VERSION_STR);
+	printf("  structure size       %s\n",	to_string(sizeof(CHMINFO)).c_str());
 	printf("  pid                  %p\n",	&(shm->info.pid));
 	printf("  start_time           %jd\n",	static_cast<intmax_t>(shm->info.start_time));
 	printf("  chmpx_man            %p\n",	&(shm->info.chmpx_man));
@@ -308,4 +310,3 @@ int main(int argc, char** argv)
  *
  * vim:set ts=4 fenc=utf-8:
  */
-

@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -152,15 +152,19 @@ typedef struct chm_cfg_info{
 	int					k2h_cmask_bitcnt;
 	int					k2h_max_element;
 	time_t				date;
+	chmss_ver_t			ssl_min_ver;				// SSL/TLS minimum version
+	std::string			nssdb_dir;					// NSSDB directory path like "SSL_DIR" environment for NSS
 	chmnode_cfginfos_t	servers;
 	chmnode_cfginfos_t	slaves;
 
-	chm_cfg_info() :	groupname(""), revision(UNINITIALIZE_REVISION), is_server_mode(false), is_random_mode(false), self_ctlport(CHM_INVALID_PORT),
-						max_chmpx_count(0L), replica_count(0L), max_server_mq_cnt(0L), max_client_mq_cnt(0L), mqcnt_per_attach(0L), max_q_per_servermq(0L),
-						max_q_per_clientmq(0L), max_mq_per_client(0L), max_histlog_count(0L), retrycnt(-1), mq_retrycnt(-1), mq_ack(true), timeout_wait_socket(-1),
-						timeout_wait_connect(-1), timeout_wait_mq(-1), is_auto_merge(false), is_do_merge(false), timeout_merge(0), sock_thread_cnt(0),
-						mq_thread_cnt(0), max_sock_pool(1), sock_pool_timeout(0), k2h_fullmap(true), k2h_mask_bitcnt(K2HShm::DEFAULT_MASK_BITCOUNT), 
-						k2h_cmask_bitcnt(K2HShm::DEFAULT_COLLISION_MASK_BITCOUNT), k2h_max_element(K2HShm::DEFAULT_MAX_ELEMENT_CNT), date(0L) {}
+	chm_cfg_info() :
+		groupname(""), revision(UNINITIALIZE_REVISION), is_server_mode(false), is_random_mode(false), self_ctlport(CHM_INVALID_PORT),
+		max_chmpx_count(0L), replica_count(0L), max_server_mq_cnt(0L), max_client_mq_cnt(0L), mqcnt_per_attach(0L), max_q_per_servermq(0L),
+		max_q_per_clientmq(0L), max_mq_per_client(0L), max_histlog_count(0L), retrycnt(-1), mq_retrycnt(-1), mq_ack(true), timeout_wait_socket(-1),
+		timeout_wait_connect(-1), timeout_wait_mq(-1), is_auto_merge(false), is_do_merge(false), timeout_merge(0), sock_thread_cnt(0), mq_thread_cnt(0),
+		max_sock_pool(1), sock_pool_timeout(0), k2h_fullmap(true), k2h_mask_bitcnt(K2HShm::DEFAULT_MASK_BITCOUNT), k2h_cmask_bitcnt(K2HShm::DEFAULT_COLLISION_MASK_BITCOUNT),
+		k2h_max_element(K2HShm::DEFAULT_MAX_ELEMENT_CNT), date(0L), ssl_min_ver(CHM_SSLTLS_VER_DEFAULT), nssdb_dir("")
+	{}
 
 	bool compare(const struct chm_cfg_info& other) const
 	{
@@ -196,6 +200,8 @@ typedef struct chm_cfg_info{
 			//k2h_cmask_bitcnt	== other.k2h_cmask_bitcnt		&&
 			//k2h_max_element	== other.k2h_max_element		&&
 			//date				== other.date					&&	// [NOTICE] date is not compared
+			ssl_min_ver			== other.ssl_min_ver			&&
+			nssdb_dir			== other.nssdb_dir				&&
 			servers				== other.servers				&&
 			slaves				== other.slaves					)
 		{

@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -41,12 +41,49 @@ typedef k2h_hash_t		chmhash_t;
 typedef uint64_t		chmpxsts_t;
 typedef uint64_t		chmpxpos_t;
 typedef uint64_t		logtype_t;
+typedef int				chmss_ver_t;				// SSL/TLS minimum version
 
 typedef enum chmpx_mode{
 	CHMPX_UNKNOWN = 0,
 	CHMPX_SERVER,
 	CHMPX_SLAVE
 }CHMPXMODE;
+
+//---------------------------------------------------------
+// Symbols for CHMINFO structure version
+//---------------------------------------------------------
+// [NOTE]
+// Before CHMPX version 1.0.59, those do not have the CHMINFO structure version.
+//
+#define	CHM_CHMINFO_VERSION_BUFLEN		32
+#define	CHM_CHMINFO_VERSION_PREFIX		"CHMINFO_VERSION"
+#define	CHM_CHMINFO_CUR_VERSION			"1.0"
+#define	CHM_CHMINFO_CUR_VERSION_STR		CHM_CHMINFO_VERSION_PREFIX " " CHM_CHMINFO_CUR_VERSION
+
+//---------------------------------------------------------
+// Symbols for SSL/TLS minimum version
+//---------------------------------------------------------
+// [NOTE]
+// These symbols is used in chmconf.cc for analizing option.
+//
+#define	CHM_SSLTLS_VER_ERROR				-1
+#define	CHM_SSLTLS_VER_DEFAULT				0
+#define	CHM_SSLTLS_VER_SSLV2				(CHM_SSLTLS_VER_DEFAULT	+ 1)
+#define	CHM_SSLTLS_VER_SSLV3				(CHM_SSLTLS_VER_SSLV2	+ 1)
+#define	CHM_SSLTLS_VER_TLSV1_0				(CHM_SSLTLS_VER_SSLV3	+ 1)
+#define	CHM_SSLTLS_VER_TLSV1_1				(CHM_SSLTLS_VER_TLSV1_0	+ 1)
+#define	CHM_SSLTLS_VER_TLSV1_2				(CHM_SSLTLS_VER_TLSV1_1	+ 1)
+#define	CHM_SSLTLS_VER_TLSV1_3				(CHM_SSLTLS_VER_TLSV1_2	+ 1)
+#define	CHM_SSLTLS_VER_MAX					CHM_SSLTLS_VER_TLSV1_3
+
+#define	CHM_GET_STR_SSLTLS_VERSION(ver)	(	CHM_SSLTLS_VER_DEFAULT	== ver ? "(default)":			\
+											CHM_SSLTLS_VER_SSLV2	== ver ? "SSL v2"	:			\
+											CHM_SSLTLS_VER_SSLV3	== ver ? "SSL v3"	:			\
+											CHM_SSLTLS_VER_TLSV1_0	== ver ? "TLS v1.0"	:			\
+											CHM_SSLTLS_VER_TLSV1_1	== ver ? "TLS v1.1"	:			\
+											CHM_SSLTLS_VER_TLSV1_2	== ver ? "TLS v1.2"	:			\
+											CHM_SSLTLS_VER_TLSV1_3	== ver ? "TLS v1.3"	: "Unknown"	\
+										)
 
 //---------------------------------------------------------
 // Symbols & Macros
@@ -693,51 +730,65 @@ typedef struct client_proc_list{
 
 //---------------------------------
 // chmpx information
+//
+// [NOTE]
+// ssl_min_ver and nssdb_dir members should be a member of CHMPX structure, but these are
+// extended option for SSL/TLS, and there are too many changes to set these in the CHMPX
+// structure.
+// In particular, since the CHMPX structure is used for CHMPX interprocess communication
+// packets, there are many changes. In addition, ssl_min_ver and nssdb_dir are values that
+// can be restricted throughout the CHMPX process, then these are member of CHMINFO structure
+// as a setting value of the entire CHMPX process.
+//
 typedef struct chminfo{
+	char			chminfo_version[CHM_CHMINFO_VERSION_BUFLEN];	// version number for CHMINFO(old version does not have this member)
+	size_t			chminfo_size;									// CHMINFO structure size(old version does not have this member)
 	pid_t			pid;
 	time_t			start_time;
 	CHMPXMAN		chmpx_man;
-	int				evsock_thread_cnt;		// socket thread count
-	int				evmq_thread_cnt;		// MQ thread count
+	chmss_ver_t		ssl_min_ver;									// SSL/TLS minimum version(old version does not have this member, and see NOTE)
+	char			nssdb_dir[CHM_MAX_PATH_LEN];					// NSSDB directory path like "SSL_DIR" environment for NSS
+	int				evsock_thread_cnt;								// socket thread count
+	int				evmq_thread_cnt;								// MQ thread count
 	bool			is_random_deliver;
 	bool			is_auto_merge;
-	bool			is_auto_merge_suspend;	// suspend auto merging flag for that is_auto_merge is true
+	bool			is_auto_merge_suspend;							// suspend auto merging flag for that is_auto_merge is true
 	bool			is_do_merge;
-	long			max_mqueue;				// = max MQ count
-	long			chmpx_mqueue;			// = Chmpx MQ count
-	long			max_q_per_chmpxmq;		// = max queue per chmpx MQ
-	long			max_q_per_cltmq;		// = max queue per client MQ
-	long			max_mq_per_client;		// = MQ per client
-	long			mq_per_attach;			// = MQ per attach
-	bool			mq_ack;					// MQ ACK
-	int				max_sock_pool;			// max socket count per chmpx
-	time_t			sock_pool_timeout;		// timeout value till closing for unsed socket in pool
-	int				sock_retrycnt;			// retry count for socket
-	suseconds_t		timeout_wait_socket;	// wait timeout for read/write socket
-	suseconds_t		timeout_wait_connect;	// wait timeout for connect socket
-	int				mq_retrycnt;			// retry count for MQ
-	long			timeout_wait_mq;		// wait timeout for MQ
-	time_t			timeout_merge;			// wait timeout for merging
+	long			max_mqueue;										// = max MQ count
+	long			chmpx_mqueue;									// = Chmpx MQ count
+	long			max_q_per_chmpxmq;								// = max queue per chmpx MQ
+	long			max_q_per_cltmq;								// = max queue per client MQ
+	long			max_mq_per_client;								// = MQ per client
+	long			mq_per_attach;									// = MQ per attach
+	bool			mq_ack;											// MQ ACK
+	int				max_sock_pool;									// max socket count per chmpx
+	time_t			sock_pool_timeout;								// timeout value till closing for unsed socket in pool
+	int				sock_retrycnt;									// retry count for socket
+	suseconds_t		timeout_wait_socket;							// wait timeout for read/write socket
+	suseconds_t		timeout_wait_connect;							// wait timeout for connect socket
+	int				mq_retrycnt;									// retry count for MQ
+	long			timeout_wait_mq;								// wait timeout for MQ
+	time_t			timeout_merge;									// wait timeout for merging
 	msgid_t			base_msgid;
-	long			chmpx_msg_count;		// MQ count for chmpx process
-	PMQMSGHEADLIST	chmpx_msgs;				// MQ list for chmpx process
-	long			activated_msg_count;	// Activated MQ count for client process
-	PMQMSGHEADLIST	activated_msgs;			// Activated MQ list for client process
-	long			assigned_msg_count;		// Assigned(NOT activated) MQ count for client process
-	PMQMSGHEADLIST	assigned_msgs;			// Assigned(NOT activated) MQ list for client process
+	long			chmpx_msg_count;								// MQ count for chmpx process
+	PMQMSGHEADLIST	chmpx_msgs;										// MQ list for chmpx process
+	long			activated_msg_count;							// Activated MQ count for client process
+	PMQMSGHEADLIST	activated_msgs;									// Activated MQ list for client process
+	long			assigned_msg_count;								// Assigned(NOT activated) MQ count for client process
+	PMQMSGHEADLIST	assigned_msgs;									// Assigned(NOT activated) MQ list for client process
 	long			free_msg_count;
 	PMQMSGHEADLIST	free_msgs;
-	msgid_t			last_msgid_chmpx;		// last random msgid for chmpx process
-	msgid_t			last_msgid_activated;	// last random activated msgid for client process
-	msgid_t			last_msgid_assigned;	// last random assigned msgid for client process
-	PMQMSGHEADLIST	rel_chmpxmsgarea;		// same as in CHMSHM
-	PCLTPROCLIST	client_pids;			// Client process(pid) list
+	msgid_t			last_msgid_chmpx;								// last random msgid for chmpx process
+	msgid_t			last_msgid_activated;							// last random activated msgid for client process
+	msgid_t			last_msgid_assigned;							// last random assigned msgid for client process
+	PMQMSGHEADLIST	rel_chmpxmsgarea;								// same as in CHMSHM
+	PCLTPROCLIST	client_pids;									// Client process(pid) list
 	PCLTPROCLIST	free_pids;
 	bool			k2h_fullmap;
 	int				k2h_mask_bitcnt;
 	int				k2h_cmask_bitcnt;
 	int				k2h_max_element;
-	long			histlog_count;			// history log count
+	long			histlog_count;									// history log count
 }CHMINFO, *PCHMINFO;
 
 //---------------------------------
