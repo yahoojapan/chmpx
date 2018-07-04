@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -30,7 +30,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
 #include <string>
 
 #include "chmcommon.h"
@@ -44,12 +43,20 @@ using namespace	std;
 // Class valiables
 //---------------------------------------------------------
 const time_t	ChmNetDb::ALIVE_TIME;
-ChmNetDb		ChmNetDb::singleton;
 int				ChmNetDb::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
 
 //---------------------------------------------------------
 // Class methods
 //---------------------------------------------------------
+// [NOTE]
+// To avoid static object initialization order problem(SIOF)
+//
+ChmNetDb* ChmNetDb::Get(void)
+{
+	static ChmNetDb		netdb;				// singleton
+	return &netdb;
+}
+
 time_t ChmNetDb::SetTimeout(time_t value)
 {
 	time_t	old = ChmNetDb::Get()->timeout;
@@ -204,20 +211,16 @@ bool ChmNetDb::CvtV4MappedAddrInfo(struct sockaddr_storage* info, socklen_t& add
 //---------------------------------------------------------
 ChmNetDb::ChmNetDb() : timeout(ChmNetDb::ALIVE_TIME), fulllocalname(""), localname("")
 {
-	if(this == ChmNetDb::Get()){
-		InitializeLocalHostName();
-	}else{
-		assert(false);
+	static ChmNetDb*	pnetdb = NULL;		// for checking initializing
+	if(!pnetdb){
+		pnetdb = this;
+		InitializeLocalHostName();			// initializing
 	}
 }
 
 ChmNetDb::~ChmNetDb()
 {
-	if(this == ChmNetDb::Get()){
-		ClearEx();
-	}else{
-		assert(false);
-	}
+	ClearEx();
 }
 
 bool ChmNetDb::InitializeLocalHostName(void)

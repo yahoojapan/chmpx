@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -29,48 +29,77 @@
 #include "chmdbg.h"
 
 //---------------------------------------------------------
+// Global variable
+//---------------------------------------------------------
+ChmDbgMode	chm_debug_mode	= CHMDBG_SILENT;
+FILE*		chm_dbg_fp		= NULL;
+
+//---------------------------------------------------------
 // Class CHMDbgControl
 //---------------------------------------------------------
+// [NOTE]
+// To avoid static object initialization order problem(SIOF)
+//
 class CHMDbgControl
 {
 	protected:
 		static const char*		DBGENVNAME;
 		static const char*		DBGENVFILE;
-		static CHMDbgControl	singleton;
+
+		ChmDbgMode*				pchm_debug_mode;
+		FILE**					pchm_dbg_fp;
+
+	protected:
+		CHMDbgControl() : pchm_debug_mode(&chm_debug_mode), pchm_dbg_fp(&chm_dbg_fp)
+		{
+			*pchm_debug_mode	= CHMDBG_SILENT;
+			*pchm_dbg_fp		= NULL;
+			LoadDbgCntlEnv();
+		}
+
+		virtual ~CHMDbgControl()
+		{
+			UnsetChmDbgCntlFile();
+		}
+
+		bool LoadDbgCntlEnvName(void);
+		bool LoadDbgCntlEnvFile(void);
 
 	public:
-		static bool LoadEnv(void);
-		static bool LoadEnvName(void);
-		static bool LoadEnvFile(void);
+		bool LoadDbgCntlEnv(void);
 
-		CHMDbgControl();
-		virtual ~CHMDbgControl();
+		ChmDbgMode SetChmDbgCntlMode(ChmDbgMode mode);
+		ChmDbgMode BumpupChmDbgCntlMode(void);
+		ChmDbgMode GetChmDbgCntlMode(void);
+
+		bool SetChmDbgCntlFile(const char* filepath);
+		bool UnsetChmDbgCntlFile(void);
+
+		static CHMDbgControl& GetCHMDbgCntrl(void)
+		{
+			static CHMDbgControl	singleton;			// singleton
+			return singleton;
+		}
 };
 
+//
 // Class valiables
+//
 const char*		CHMDbgControl::DBGENVNAME = "CHMDBGMODE";
 const char*		CHMDbgControl::DBGENVFILE = "CHMDBGFILE";
-CHMDbgControl	CHMDbgControl::singleton;
 
-// Constructor / Destructor
-CHMDbgControl::CHMDbgControl()
+//
+// Methods
+//
+bool CHMDbgControl::LoadDbgCntlEnv(void)
 {
-	CHMDbgControl::LoadEnv();
-}
-CHMDbgControl::~CHMDbgControl()
-{
-}
-
-// Class Methods
-bool CHMDbgControl::LoadEnv(void)
-{
-	if(!CHMDbgControl::LoadEnvName() || !CHMDbgControl::LoadEnvFile()){
+	if(!LoadDbgCntlEnvName() || !LoadDbgCntlEnvFile()){
 		return false;
 	}
 	return true;
 }
 
-bool CHMDbgControl::LoadEnvName(void)
+bool CHMDbgControl::LoadDbgCntlEnvName(void)
 {
 	char*	pEnvVal;
 	if(NULL == (pEnvVal = getenv(CHMDbgControl::DBGENVNAME))){
@@ -78,15 +107,15 @@ bool CHMDbgControl::LoadEnvName(void)
 		return true;
 	}
 	if(0 == strcasecmp(pEnvVal, "SILENT")){
-		SetChmDbgMode(CHMDBG_SILENT);
+		SetChmDbgCntlMode(CHMDBG_SILENT);
 	}else if(0 == strcasecmp(pEnvVal, "ERR")){
-		SetChmDbgMode(CHMDBG_ERR);
+		SetChmDbgCntlMode(CHMDBG_ERR);
 	}else if(0 == strcasecmp(pEnvVal, "WAN")){
-		SetChmDbgMode(CHMDBG_WARN);
+		SetChmDbgCntlMode(CHMDBG_WARN);
 	}else if(0 == strcasecmp(pEnvVal, "INFO")){
-		SetChmDbgMode(CHMDBG_MSG);
+		SetChmDbgCntlMode(CHMDBG_MSG);
 	}else if(0 == strcasecmp(pEnvVal, "DUMP")){
-		SetChmDbgMode(CHMDBG_DUMP);
+		SetChmDbgCntlMode(CHMDBG_DUMP);
 	}else{
 		MSG_CHMPRN("%s ENV is not unknown string(%s).", CHMDbgControl::DBGENVNAME, pEnvVal);
 		return false;
@@ -94,36 +123,30 @@ bool CHMDbgControl::LoadEnvName(void)
 	return true;
 }
 
-bool CHMDbgControl::LoadEnvFile(void)
+bool CHMDbgControl::LoadDbgCntlEnvFile(void)
 {
 	char*	pEnvVal;
 	if(NULL == (pEnvVal = getenv(CHMDbgControl::DBGENVFILE))){
 		MSG_CHMPRN("%s ENV is not set.", CHMDbgControl::DBGENVFILE);
 		return true;
 	}
-	if(!SetChmDbgFile(pEnvVal)){
+	if(!SetChmDbgCntlFile(pEnvVal)){
 		MSG_CHMPRN("%s ENV is unsafe string(%s).", CHMDbgControl::DBGENVFILE, pEnvVal);
 		return false;
 	}
 	return true;
 }
 
-//---------------------------------------------------------
-// Global variable
-//---------------------------------------------------------
-ChmDbgMode	chm_debug_mode	= CHMDBG_SILENT;
-FILE*		chm_dbg_fp	= NULL;
-
-ChmDbgMode SetChmDbgMode(ChmDbgMode mode)
+ChmDbgMode CHMDbgControl::SetChmDbgCntlMode(ChmDbgMode mode)
 {
-	ChmDbgMode oldmode = chm_debug_mode;
-	chm_debug_mode = mode;
+	ChmDbgMode oldmode = *pchm_debug_mode;
+	*pchm_debug_mode = mode;
 	return oldmode;
 }
 
-ChmDbgMode BumpupChmDbgMode(void)
+ChmDbgMode CHMDbgControl::BumpupChmDbgCntlMode(void)
 {
-	ChmDbgMode	mode = GetChmDbgMode();
+	ChmDbgMode	mode = GetChmDbgCntlMode();
 
 	if(CHMDBG_SILENT == mode){
 		mode = CHMDBG_ERR;
@@ -136,26 +159,21 @@ ChmDbgMode BumpupChmDbgMode(void)
 	}else{	// CHMDBG_DUMP == mode
 		mode = CHMDBG_SILENT;
 	}
-	return ::SetChmDbgMode(mode);
+	return SetChmDbgCntlMode(mode);
 }
 
-ChmDbgMode GetChmDbgMode(void)
+ChmDbgMode CHMDbgControl::GetChmDbgCntlMode(void)
 {
-	return chm_debug_mode;
+	return *pchm_debug_mode;
 }
 
-bool LoadChmDbgEnv(void)
-{
-	return CHMDbgControl::LoadEnv();
-}
-
-bool SetChmDbgFile(const char* filepath)
+bool CHMDbgControl::SetChmDbgCntlFile(const char* filepath)
 {
 	if(CHMEMPTYSTR(filepath)){
 		ERR_CHMPRN("Parameter is wrong.");
 		return false;
 	}
-	if(!UnsetChmDbgFile()){
+	if(!UnsetChmDbgCntlFile()){
 		return false;
 	}
 	FILE*	newfp;
@@ -163,21 +181,54 @@ bool SetChmDbgFile(const char* filepath)
 		ERR_CHMPRN("Could not open debug file(%s). errno = %d", filepath, errno);
 		return false;
 	}
-	chm_dbg_fp = newfp;
+	*pchm_dbg_fp = newfp;
 	return true;
+}
+
+bool CHMDbgControl::UnsetChmDbgCntlFile(void)
+{
+	if(*pchm_dbg_fp){
+		if(0 != fclose(*pchm_dbg_fp)){
+			ERR_CHMPRN("Could not close debug file. errno = %d", errno);
+			*pchm_dbg_fp = NULL;		// On this case, chm_dbg_fp is not correct pointer after error...
+			return false;
+		}
+		*pchm_dbg_fp = NULL;
+	}
+	return true;
+}
+
+//---------------------------------------------------------
+// Global Functions
+//---------------------------------------------------------
+ChmDbgMode SetChmDbgMode(ChmDbgMode mode)
+{
+	return CHMDbgControl::GetCHMDbgCntrl().SetChmDbgCntlMode(mode);
+}
+
+ChmDbgMode BumpupChmDbgMode(void)
+{
+	return CHMDbgControl::GetCHMDbgCntrl().BumpupChmDbgCntlMode();
+}
+
+ChmDbgMode GetChmDbgMode(void)
+{
+	return CHMDbgControl::GetCHMDbgCntrl().GetChmDbgCntlMode();
+}
+
+bool LoadChmDbgEnv(void)
+{
+	return CHMDbgControl::GetCHMDbgCntrl().LoadDbgCntlEnv();
+}
+
+bool SetChmDbgFile(const char* filepath)
+{
+	return CHMDbgControl::GetCHMDbgCntrl().SetChmDbgCntlFile(filepath);
 }
 
 bool UnsetChmDbgFile(void)
 {
-	if(chm_dbg_fp){
-		if(0 != fclose(chm_dbg_fp)){
-			ERR_CHMPRN("Could not close debug file. errno = %d", errno);
-			chm_dbg_fp = NULL;		// On this case, chm_dbg_fp is not correct pointer after error...
-			return false;
-		}
-		chm_dbg_fp = NULL;
-	}
-	return true;
+	return CHMDbgControl::GetCHMDbgCntrl().UnsetChmDbgCntlFile();
 }
 
 /*

@@ -2210,8 +2210,7 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
-			ERR("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
-			is_error = true;
+			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
 		strInput = strInput.substr(strlen(DUMP_KEY_ARRAY_START));
@@ -2604,7 +2603,7 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
-			ERR("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
+			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
 		strInput = strInput.substr(strlen(DUMP_KEY_ARRAY_START));

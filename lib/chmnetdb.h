@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -47,7 +47,6 @@ class ChmNetDb
 {
 	protected:
 		static const time_t	ALIVE_TIME = 60;	// default 60s
-		static ChmNetDb		singleton;
 		static int			lockval;			// like mutex
 
 		chmndbmap_t			cachemap;
@@ -56,6 +55,9 @@ class ChmNetDb
 		std::string			localname;			// local hostname from getnameinfo, sometimes this name is without domain name if set in /etc/hosts.
 
 	protected:
+		ChmNetDb();
+		virtual ~ChmNetDb();
+
 		bool InitializeLocalHostName(void);
 		bool ClearEx(void);
 		bool CacheOutEx(void);
@@ -64,7 +66,7 @@ class ChmNetDb
 		bool Search(const char* target, CHMNDBCACHE& data, bool is_cvt_localhost);
 
 	public:
-		static ChmNetDb* Get(void) { return &ChmNetDb::singleton; }
+		static ChmNetDb* Get(void);
 		static time_t SetTimeout(time_t value);
 		static bool Clear(void);
 		static bool CacheOut(void);
@@ -74,9 +76,6 @@ class ChmNetDb
 		static bool CvtSockToLocalPort(int sock, short& port);
 		static bool CvtSockToPeerPort(int sock, short& port);
 		static bool CvtV4MappedAddrInfo(struct sockaddr_storage* info, socklen_t& addrlen);
-
-		ChmNetDb();
-		virtual ~ChmNetDb();
 
 		bool GetAddrInfo(const char* target, short port, struct addrinfo** ppaddrinfo, bool is_cvt_localhost);	// Must freeaddrinfo for *ppaddrinfo
 		bool GetHostname(const char* target, std::string& hostname, bool is_cvt_localhost);

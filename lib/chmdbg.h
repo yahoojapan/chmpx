@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -54,7 +54,8 @@ bool UnsetChmDbgFile(void);
 #define	ChmDbgMode_STR(mode)	CHMDBG_SILENT	== mode ? "SLT" : \
 								CHMDBG_ERR		== mode ? "ERR" : \
 								CHMDBG_WARN		== mode ? "WAN" : \
-								CHMDBG_MSG		== mode ? "MSG" : ""
+								CHMDBG_MSG		== mode ? "MSG" : \
+								CHMDBG_DUMP		== mode ? "DMP" : ""
 
 #define	LOW_CHMPRINT(mode, fmt, ...) \
 		fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "[CHMPX-%s] %s(%d) : " fmt "%s\n", ChmDbgMode_STR(mode), __func__, __LINE__, __VA_ARGS__);
@@ -68,6 +69,7 @@ bool UnsetChmDbgFile(void);
 #define	ERR_CHMPRN(...)			CHMPRINT(CHMDBG_ERR,	##__VA_ARGS__, "")
 #define	WAN_CHMPRN(...)			CHMPRINT(CHMDBG_WARN,	##__VA_ARGS__, "")
 #define	MSG_CHMPRN(...)			CHMPRINT(CHMDBG_MSG,	##__VA_ARGS__, "")
+#define	DMP_CHMPRN(...)			CHMPRINT(CHMDBG_DUMP,	##__VA_ARGS__, "")
 
 //
 // If using following macro, need to specify include time.h.

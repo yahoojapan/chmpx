@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -44,6 +44,7 @@
 #include "chmnetdb.h"
 #include "chmregex.h"
 #include "chmeventsock.h"
+#include "chmss.h"
 #include "chmdbg.h"
 
 using namespace	std;
@@ -94,6 +95,8 @@ using namespace	std;
 #define	INICFG_SOCKPOOLTIMEOUT_STR		"SOCKPOOLTIMEOUT"
 #define	INICFG_SSL_STR					"SSL"
 #define	INICFG_SSL_VERIFY_PEER_STR		"SSL_VERIFY_PEER"
+#define	INICFG_SSL_MIN_VER_STR			"SSL_MIN_VER"
+#define	INICFG_NSSDB_DIR_STR			"NSSDB_DIR"
 #define	INICFG_CAPATH_STR				"CAPATH"
 #define	INICFG_SERVER_CERT_STR			"SERVER_CERT"
 #define	INICFG_SERVER_PRIKEY_STR		"SERVER_PRIKEY"
@@ -124,6 +127,49 @@ using namespace	std;
 #define	INICFG_INSEC_SVRNODE			2
 #define	INICFG_INSEC_SLVNODE			3
 #define	INICFG_INSEC_UNKNOWN			1000
+
+//---------------------------------------------------------
+// Option string/version table for SSL/TLS minimum version
+//---------------------------------------------------------
+#define	INICFG_SSLTLS_VER_DEFAULT_STR	"DEFAULT"
+#define	INICFG_SSLTLS_VER_SSLV2_STR		"SSLV2"
+#define	INICFG_SSLTLS_VER_SSLV3_STR		"SSLV3"
+#define	INICFG_SSLTLS_VER_TLSV1_0_STR	"TLSV1.0"
+#define	INICFG_SSLTLS_VER_TLSV1_1_STR	"TLSV1.1"
+#define	INICFG_SSLTLS_VER_TLSV1_2_STR	"TLSV1.2"
+#define	INICFG_SSLTLS_VER_TLSV1_3_STR	"TLSV1.3"
+
+typedef struct _chm_ssltls_ver_entity{
+	const char*	stropt;
+	chmss_ver_t	version;
+}CHM_SSLTLS_VER_ENT, *PCHM_SSLTLS_VER_ENT;
+
+static const CHM_SSLTLS_VER_ENT	chm_ssltls_ver_table[] = {
+	{INICFG_SSLTLS_VER_DEFAULT_STR,		CHM_SSLTLS_VER_DEFAULT	},
+	{INICFG_SSLTLS_VER_SSLV2_STR,		CHM_SSLTLS_VER_SSLV2	},
+	{INICFG_SSLTLS_VER_SSLV3_STR,		CHM_SSLTLS_VER_SSLV3	},
+	{INICFG_SSLTLS_VER_TLSV1_0_STR,		CHM_SSLTLS_VER_TLSV1_0	},
+	{INICFG_SSLTLS_VER_TLSV1_1_STR,		CHM_SSLTLS_VER_TLSV1_1	},
+	{INICFG_SSLTLS_VER_TLSV1_2_STR,		CHM_SSLTLS_VER_TLSV1_2	},
+	{INICFG_SSLTLS_VER_TLSV1_3_STR,		CHM_SSLTLS_VER_TLSV1_3	}
+};
+
+static chmss_ver_t ChmCvtSSLTLS_VER(const char* poption)
+{
+	chmss_ver_t	result = CHM_SSLTLS_VER_ERROR;
+
+	if(CHMEMPTYSTR(poption)){
+		result = CHM_SSLTLS_VER_DEFAULT;
+	}else{
+		for(size_t cnt = 0; cnt < (sizeof(chm_ssltls_ver_table) / sizeof(CHM_SSLTLS_VER_ENT)); ++cnt){
+			if(0 == strcasecmp(poption, chm_ssltls_ver_table[cnt].stropt)){
+				result = chm_ssltls_ver_table[cnt].version;
+				break;
+			}
+		}
+	}
+	return result;
+}
 
 //---------------------------------------------------------
 // CHMConf Class Factory
@@ -1237,16 +1283,21 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// SSL_CAPATH
-	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_CAPATH_STR) || 0 == strcasecmp(chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_CAPATH_STR) || chmcfgraw.global[INICFG_CAPATH_STR].empty() || 0 == strcasecmp(chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
 		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_CAPATH_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
 		if(is_dir_exist(chmcfgraw.global[INICFG_CAPATH_STR].c_str())){
 			ccvals.is_ca_file = false;
 		}else{
-			if(is_file_safe_exist(chmcfgraw.global[INICFG_CAPATH_STR].c_str())){
-				ccvals.is_ca_file = true;
+			if(ChmSecureSock::IsCAPathAllowFile()){
+				if(is_file_safe_exist(chmcfgraw.global[INICFG_CAPATH_STR].c_str())){
+					ccvals.is_ca_file = true;
+				}else{
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+					return false;
+				}
 			}else{
-				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is allowed only directory.", cfgfile.c_str(), INICFG_CAPATH_STR, chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR);
 				return false;
 			}
 		}
@@ -1258,16 +1309,19 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// SSL_SERVER_CERT
-	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SERVER_CERT_STR) || 0 == strcasecmp(chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_STRING_NULL)){
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SERVER_CERT_STR) || chmcfgraw.global[INICFG_SERVER_CERT_STR].empty() || 0 == strcasecmp(chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_STRING_NULL)){
 		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
-		if(!is_file_safe_exist(chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str())){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR);
-			return false;
-		}
 		if(!ccvals.is_ssl){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but \"%s\" is OFF.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, INICFG_SSL_STR);
 			return false;
+		}else if(!ChmSecureSock::IsCertAllowName()){
+			if(!is_file_safe_exist(chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str())){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+				return false;
+			}
+		}else{
+			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SERVER_CERT_STR].length()){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].length());
@@ -1277,16 +1331,19 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// SSL_SERVER_PRIKEY
-	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SERVER_PRIKEY_STR) || 0 == strcasecmp(chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SERVER_PRIKEY_STR) || chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].empty() || 0 == strcasecmp(chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
 		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
-		if(!is_file_safe_exist(chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str())){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR);
-			return false;
-		}
 		if(!ccvals.is_ssl){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but \"%s\" is OFF.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, INICFG_SSL_STR);
 			return false;
+		}else if(!ChmSecureSock::IsCertAllowName()){
+			if(!is_file_safe_exist(chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str())){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+				return false;
+			}
+		}else{
+			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].length()){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].length());
@@ -1296,12 +1353,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// SSL_SLAVE_CERT
-	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SLAVE_CERT_STR) || 0 == strcasecmp(chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SLAVE_CERT_STR) || chmcfgraw.global[INICFG_SLAVE_CERT_STR].empty() || 0 == strcasecmp(chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
 		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
-		if(!is_file_safe_exist(chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str())){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR);
-			return false;
+		if(!ChmSecureSock::IsCertAllowName()){
+			if(!is_file_safe_exist(chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str())){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+				return false;
+			}
+		}else{
+			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SLAVE_CERT_STR].length()){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].length());
@@ -1311,18 +1372,59 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// SSL_SLAVE_PRIKEY
-	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SLAVE_PRIKEY_STR) || 0 == strcasecmp(chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SLAVE_PRIKEY_STR) || chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].empty() || 0 == strcasecmp(chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
 		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
-		if(!is_file_safe_exist(chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str())){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR);
-			return false;
+		if(!ChmSecureSock::IsCertAllowName()){
+			if(!is_file_safe_exist(chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str())){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+				return false;
+			}
+		}else{
+			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].length()){
 			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].length());
 			return false;
 		}
 		ccvals.slave_prikey = chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR];
+	}
+
+	// SSL_MIN_VER
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SSL_MIN_VER_STR)){
+		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SSL_MIN_VER_STR, INICFG_GLOBAL_SEC_STR);
+	}else{
+		chmss_ver_t	ssver;
+		if(CHM_SSLTLS_VER_ERROR != (ssver = ChmCvtSSLTLS_VER(chmcfgraw.global[INICFG_SSL_MIN_VER_STR].c_str()))){
+			if(CHM_SSLTLS_VER_DEFAULT != ssver && !ccvals.is_ssl){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but \"%s\" is OFF.", cfgfile.c_str(), INICFG_SSL_MIN_VER_STR, chmcfgraw.global[INICFG_SSL_MIN_VER_STR].c_str(), INICFG_GLOBAL_SEC_STR, INICFG_SSL_STR);
+				return false;
+			}
+			chmcfginfo.ssl_min_ver = ssver;
+		}else{
+			ERR_CHMPRN("configuration file(%s) have wrong \"%s\" value(%s) in %s section.", cfgfile.c_str(), INICFG_SSL_MIN_VER_STR, chmcfgraw.global[INICFG_SSL_MIN_VER_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+			return false;
+		}
+	}
+
+	// NSSDB_DIR
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_NSSDB_DIR_STR)){
+		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, INICFG_GLOBAL_SEC_STR);
+	}else{
+		if(is_dir_exist(chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str())){
+			if(!ccvals.is_ssl){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but \"%s\" is OFF.", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str(), INICFG_GLOBAL_SEC_STR, INICFG_SSL_STR);
+				return false;
+			}
+			if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_NSSDB_DIR_STR].length()){
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].length());
+				return false;
+			}
+			chmcfginfo.nssdb_dir = chmcfgraw.global[INICFG_NSSDB_DIR_STR];
+		}else{
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is allowed only directory.", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str(), INICFG_GLOBAL_SEC_STR);
+			return false;
+		}
 	}
 
 	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_K2HFULLMAP_STR)){
@@ -1446,17 +1548,22 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 			svrnode.is_ca_file	= ccvals.is_ca_file;
 			svrnode.capath		= ccvals.capath;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_CAPATH_STR].empty() || 0 == strcasecmp((*iter)[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
 				svrnode.is_ca_file	= false;
 				svrnode.capath		= "";
 			}else{
 				if(is_dir_exist((*iter)[INICFG_CAPATH_STR].c_str())){
 					svrnode.is_ca_file = false;
 				}else{
-					if(is_file_safe_exist((*iter)[INICFG_CAPATH_STR].c_str())){
-						svrnode.is_ca_file = true;
+					if(ChmSecureSock::IsCAPathAllowFile()){
+						if(is_file_safe_exist((*iter)[INICFG_CAPATH_STR].c_str())){
+							svrnode.is_ca_file = true;
+						}else{
+							ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+							return false;
+						}
 					}else{
-						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is allowed only directory.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
 						return false;
 					}
 				}
@@ -1473,12 +1580,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		if(iter->end() == iter->find(INICFG_SERVER_CERT_STR)){
 			svrnode.server_cert = ccvals.server_cert;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SERVER_CERT_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SERVER_CERT_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SERVER_CERT_STR].c_str(), INICFG_STRING_NULL)){
 				svrnode.server_cert = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SERVER_CERT_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, (*iter)[INICFG_SERVER_CERT_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
-					return false;
+				if(!ChmSecureSock::IsCertAllowName()){
+					if(!is_file_safe_exist((*iter)[INICFG_SERVER_CERT_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_CERT_STR, (*iter)[INICFG_SERVER_CERT_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SERVER_CERT_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, (*iter)[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_CERT_STR].length());
@@ -1494,12 +1605,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		if(iter->end() == iter->find(INICFG_SERVER_PRIKEY_STR)){
 			svrnode.server_prikey = ccvals.server_prikey;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SERVER_PRIKEY_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
 				svrnode.server_prikey = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SERVER_PRIKEY_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
-					return false;
+				if(!ChmSecureSock::IsCertAllowName()){
+					if(!is_file_safe_exist((*iter)[INICFG_SERVER_PRIKEY_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SERVER_PRIKEY_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].length());
@@ -1508,7 +1623,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 				svrnode.server_prikey = (*iter)[INICFG_SERVER_PRIKEY_STR].c_str();
 			}
 		}
-		if(svrnode.is_ssl == svrnode.server_prikey.empty()){
+		if((svrnode.is_ssl && !ChmSecureSock::IsCertAllowName() && svrnode.server_prikey.empty()) || (!svrnode.is_ssl && !svrnode.server_prikey.empty())){
 			ERR_CHMPRN("configuration file(%s) is \"%s\"=value(%s) in %s server node in %s section, but \"%s\" is %s.", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, svrnode.server_prikey.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR, INICFG_SSL_STR, (svrnode.is_ssl ? "ON" : "OFF"));
 			return false;
 		}
@@ -1520,12 +1635,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		if(iter->end() == iter->find(INICFG_SLAVE_CERT_STR)){
 			svrnode.slave_cert = ccvals.slave_cert;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SLAVE_CERT_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
 				svrnode.slave_cert = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SLAVE_CERT_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
-					return false;
+				if(!ChmSecureSock::IsCertAllowName()){
+					if(!is_file_safe_exist((*iter)[INICFG_SLAVE_CERT_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_CERT_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
@@ -1538,12 +1657,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		if(iter->end() == iter->find(INICFG_SLAVE_PRIKEY_STR)){
 			svrnode.slave_prikey = ccvals.slave_prikey;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SLAVE_PRIKEY_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
 				svrnode.slave_prikey = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
-					return false;
+				if(!ChmSecureSock::IsCertAllowName()){
+					if(!is_file_safe_exist((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_PRIKEY_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
@@ -1552,7 +1675,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 				svrnode.slave_prikey = (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str();
 			}
 		}
-		if(svrnode.slave_cert.empty() != svrnode.slave_prikey.empty()){
+		if((!svrnode.slave_cert.empty() && !ChmSecureSock::IsCertAllowName() && svrnode.slave_prikey.empty()) || (svrnode.slave_cert.empty() && !svrnode.slave_prikey.empty())){
 			// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must be set or not set.
 			ERR_CHMPRN("configuration file(%s) have \"%s\"=value(%s) and \"%s\"=value(%s) in %s server node in %s section.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, svrnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, svrnode.slave_prikey.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
 			return false;
@@ -1598,9 +1721,19 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		}else{
 			if(ccvals.found_ssl_verify_peer){
 				// If there are ssl servers with verify peer, all servers must have client cert and private key.
-				if(iter->slave_cert.empty() || iter->slave_prikey.empty()){
+				if(is_file_safe_exist_ex(iter->slave_cert.c_str(), false)){
+					// slave cert is file(not nickname), then private key must be file
+					if(!is_file_safe_exist(iter->slave_prikey.c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\"=value(%s) and \"%s\"=value(%s) in %s server node in %s section.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
+						return false;
+					}
+				}else if(!ChmSecureSock::IsCertAllowName()){
+					// slave cert is not file(nickname), but not allowed nickname.
 					ERR_CHMPRN("configuration file(%s) have \"%s\"=value(%s) and \"%s\"=value(%s) in %s server node in %s section.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
 					return false;
+				}else{
+					// slave cert is not file(nickname), then private key should be not file
+					// check private key in ssl class.
 				}
 			}else{
 				// If there are ssl servers without verify peer, any servers should not have client cert and private key.
@@ -1628,6 +1761,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 	for(strmaparr_t::iterator iter = chmcfgraw.slave_nodes.begin(); iter != chmcfgraw.slave_nodes.end(); ++iter){
 		CHMNODE_CFGINFO	slvnode;
+		bool			is_slave_cert_file = false;
 
 		if(iter->end() == iter->find(INICFG_NAME_STR)){
 			MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_NAME_STR, INICFG_SLVNODE_SEC_STR);
@@ -1649,7 +1783,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		}
 		slvnode.port		= CHM_INVALID_PORT;
 		slvnode.is_ssl		= false;
-		slvnode.verify_peer	= false;
+		slvnode.verify_peer	= ccvals.found_ssl_verify_peer;
 
 		// SSL_CAPATH
 		//
@@ -1657,17 +1791,22 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 			slvnode.is_ca_file	= ccvals.is_ca_file;
 			slvnode.capath		= ccvals.capath;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_CAPATH_STR].empty() || 0 == strcasecmp((*iter)[INICFG_CAPATH_STR].c_str(), INICFG_STRING_NULL)){
 				slvnode.is_ca_file	= false;
 				slvnode.capath		= "";
 			}else{
 				if(is_dir_exist((*iter)[INICFG_CAPATH_STR].c_str())){
 					slvnode.is_ca_file = false;
 				}else{
-					if(is_file_safe_exist((*iter)[INICFG_CAPATH_STR].c_str())){
-						slvnode.is_ca_file = true;
+					if(ChmSecureSock::IsCAPathAllowFile()){
+						if(is_file_safe_exist((*iter)[INICFG_CAPATH_STR].c_str())){
+							slvnode.is_ca_file = true;
+						}else{
+							ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+							return false;
+						}
 					}else{
-						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not directory or file.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is allowed only directory.", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
 						return false;
 					}
 				}
@@ -1689,12 +1828,16 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 		if(iter->end() == iter->find(INICFG_SLAVE_CERT_STR)){
 			slvnode.slave_cert = ccvals.slave_cert;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SLAVE_CERT_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_STRING_NULL)){
 				slvnode.slave_cert = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SLAVE_CERT_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
-					return false;
+				if(!ChmSecureSock::IsCertAllowName()){
+					if(!is_file_safe_exist((*iter)[INICFG_SLAVE_CERT_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_CERT_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
@@ -1703,15 +1846,27 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 				slvnode.slave_cert = (*iter)[INICFG_SLAVE_CERT_STR].c_str();
 			}
 		}
+		if(!slvnode.slave_cert.empty() && is_file_safe_exist_ex(slvnode.slave_cert.c_str(), false)){
+			is_slave_cert_file = true;
+		}else{
+			is_slave_cert_file = false;
+		}
+
 		if(iter->end() == iter->find(INICFG_SLAVE_PRIKEY_STR)){
 			slvnode.slave_prikey = ccvals.slave_prikey;
 		}else{
-			if(0 == strcasecmp((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
+			if((*iter)[INICFG_SLAVE_PRIKEY_STR].empty() || 0 == strcasecmp((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_STRING_NULL)){
 				slvnode.slave_prikey = "";
 			}else{
-				if(!is_file_safe_exist((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str())){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
-					return false;
+				if(is_slave_cert_file){
+					// slave cert is file(not nickname), then private key must be file
+					if(!is_file_safe_exist((*iter)[INICFG_SLAVE_PRIKEY_STR].c_str())){
+						ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s server node in %s section, but it is not safe file.", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+						return false;
+					}
+				}else{
+					// slave cert is not file(nickname), then private key should be not file
+					// check private key in ssl class.
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_PRIKEY_STR].length()){
 					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
@@ -1720,7 +1875,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 				slvnode.slave_prikey = (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str();
 			}
 		}
-		if(slvnode.slave_cert.empty() != slvnode.slave_prikey.empty()){
+		if(is_slave_cert_file && (slvnode.slave_cert.empty() || slvnode.slave_prikey.empty())){
 			// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must be set or not set.
 			ERR_CHMPRN("configuration file(%s) have \"%s\"=value(%s) and \"%s\"=value(%s) in %s server node in %s section.", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
 			return false;
@@ -1827,6 +1982,8 @@ static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO&
 	chmcfginfo.k2h_mask_bitcnt		= K2HShm::DEFAULT_MASK_BITCOUNT;
 	chmcfginfo.k2h_cmask_bitcnt		= K2HShm::DEFAULT_COLLISION_MASK_BITCOUNT;
 	chmcfginfo.k2h_max_element		= K2HShm::DEFAULT_MAX_ELEMENT_CNT;
+	chmcfginfo.ssl_min_ver			= CHM_SSLTLS_VER_DEFAULT;
+	chmcfginfo.nssdb_dir			= "";
 
 	// Clear default values
 	ccvals.port						= CHM_INVALID_PORT;
@@ -1873,9 +2030,9 @@ static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO&
 
 				}else if(0 == strcasecmp(INICFG_MODE_STR, key.c_str())){
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_MODE_SERVER_STR)){
-						chmcfginfo.is_server_mode = true;
+						chmcfginfo.is_server_mode	= true;
 					}else if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_MODE_SLAVE_STR)){
-						chmcfginfo.is_server_mode = false;
+						chmcfginfo.is_server_mode	= false;
 					}else{
 						ERR_CHMPRN("Found %s in %s section, but value %s does not defined.", INICFG_MODE_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 						result = false;
@@ -2090,14 +2247,19 @@ static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO&
 					}
 
 				}else if(0 == strcasecmp(INICFG_CAPATH_STR, key.c_str())){
-					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
+					if(!CHMEMPTYSTR(reinterpret_cast<const char*>(yevent.data.scalar.value)) && 0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
 						if(is_dir_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
 							ccvals.is_ca_file = false;
 						}else{
-							if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ccvals.is_ca_file = true;
+							if(ChmSecureSock::IsCAPathAllowFile()){
+								if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+									ccvals.is_ca_file = true;
+								}else{
+									ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+									result = false;
+								}
 							}else{
-								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is allowed only directory.", INICFG_CAPATH_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}
 						}
@@ -2111,71 +2273,114 @@ static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO&
 
 				}else if(0 == strcasecmp(INICFG_SERVER_CERT_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(!ccvals.is_ssl){
+							ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
 							result = false;
-						}else{
-							if(!ccvals.is_ssl){
-								ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
+						}else if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							result = false;
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
-								if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-									ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
-									result = false;
-								}else{
-									ccvals.server_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
-								}
+								ccvals.server_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							ccvals.server_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
 				}else if(0 == strcasecmp(INICFG_SERVER_PRIKEY_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(!ccvals.is_ssl){
+							ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
 							result = false;
-						}else{
-							if(!ccvals.is_ssl){
-								ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
+						}else if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							result = false;
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
-								if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-									ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
-									result = false;
-								}else{
-									ccvals.server_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
-								}
+								ccvals.server_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							ccvals.server_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
 				}else if(0 == strcasecmp(INICFG_SLAVE_CERT_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								ccvals.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							ccvals.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
 				}else if(0 == strcasecmp(INICFG_SLAVE_PRIKEY_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not safe file.", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								ccvals.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							ccvals.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
+						}
+					}
+
+				}else if(0 == strcasecmp(INICFG_SSL_MIN_VER_STR, key.c_str())){
+					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
+						chmss_ver_t	ssver;
+						if(CHM_SSLTLS_VER_ERROR != (ssver = ChmCvtSSLTLS_VER(reinterpret_cast<const char*>(yevent.data.scalar.value)))){
+							if(CHM_SSLTLS_VER_DEFAULT != ssver && !ccvals.is_ssl){
+								ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SSL_MIN_VER_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
+								result = false;
+							}else{
+								chmcfginfo.ssl_min_ver = ssver;
+							}
+						}else{
+							ERR_CHMPRN("Found %s in %s section, but value %s is wrong.", INICFG_SSL_MIN_VER_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+							result = false;
+						}
+					}
+
+				}else if(0 == strcasecmp(INICFG_NSSDB_DIR_STR, key.c_str())){
+					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_NSSDB_DIR_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							result = false;
+
+						}else if(is_dir_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							if(!ccvals.is_ssl){
+								ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_NSSDB_DIR_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
+								result = false;
+							}else{
+								chmcfginfo.nssdb_dir = reinterpret_cast<const char*>(yevent.data.scalar.value);
+							}
+						}else{
+							ERR_CHMPRN("Found %s in %s section, but value %s is wrong.", INICFG_NSSDB_DIR_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+							return false;
 						}
 					}
 
@@ -2318,14 +2523,41 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					ERR_CHMPRN("Found %s with value(%s) in %s section, but %s is %s.", INICFG_SERVER_CERT_STR, svrnode.server_cert.c_str(), CFG_SVRNODE_SEC_STR, INICFG_SSL_STR, (svrnode.is_ssl ? "ON" : "OFF"));
 					result = false;
 				}
-				if(svrnode.is_ssl == svrnode.server_prikey.empty()){
+				if(!svrnode.is_ssl && !svrnode.server_prikey.empty()){
 					ERR_CHMPRN("Found %s with value(%s) in %s section, but %s is %s.", INICFG_SERVER_PRIKEY_STR, svrnode.server_prikey.c_str(), CFG_SVRNODE_SEC_STR, INICFG_SSL_STR, (svrnode.is_ssl ? "ON" : "OFF"));
 					result = false;
 				}
-				if(svrnode.slave_cert.empty() != svrnode.slave_prikey.empty()){
-					// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must be set or not set.
-					ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, svrnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, svrnode.slave_prikey.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
-					result = false;
+				if(svrnode.is_ssl){
+					if(is_file_safe_exist_ex(svrnode.server_cert.c_str(), false)){
+						if(!is_file_safe_exist(svrnode.server_prikey.c_str())){
+							ERR_CHMPRN("Found %s with value(%s) in %s section, but it is not safe file.", INICFG_SERVER_PRIKEY_STR, svrnode.server_prikey.c_str(), CFG_SVRNODE_SEC_STR);
+							result = false;
+						}
+					}else if(!ChmSecureSock::IsCertAllowName()){
+						ERR_CHMPRN("Found %s with value(%s) in %s section, but it is not safe file.", INICFG_SERVER_CERT_STR, svrnode.server_cert.c_str(), CFG_SVRNODE_SEC_STR);
+						result = false;
+					}
+				}
+				if(svrnode.verify_peer){
+					if(svrnode.slave_cert.empty()){
+						// SSL_SLAVE_CERT must be set.
+						ERR_CHMPRN("Found %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, svrnode.slave_cert.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						result = false;
+					}else if(is_file_safe_exist_ex(svrnode.slave_cert.c_str(), false)){
+						if(!is_file_safe_exist(svrnode.slave_prikey.c_str())){
+							ERR_CHMPRN("Found %s with value(%s) in %s server node in %s section, but it is not safe file.", INICFG_SLAVE_PRIKEY_STR, svrnode.slave_prikey.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+							result = false;
+						}
+					}else if(!ChmSecureSock::IsCertAllowName()){
+						ERR_CHMPRN("Found %s with value(%s) in %s server node in %s section, but it is not safe file.", INICFG_SLAVE_CERT_STR, svrnode.slave_cert.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						result = false;
+					}
+				}else{
+					if(!svrnode.slave_cert.empty() || !svrnode.slave_prikey.empty()){
+						// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must not be set.
+						ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, svrnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, svrnode.slave_prikey.c_str(), svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+						result = false;
+					}
 				}
 
 				// Expand name(simple regex)
@@ -2409,10 +2641,15 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 						if(is_dir_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
 							svrnode.is_ca_file = false;
 						}else{
-							if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								svrnode.is_ca_file = true;
+							if(ChmSecureSock::IsCAPathAllowFile()){
+								if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+									svrnode.is_ca_file = true;
+								}else{
+									ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+									result = false;
+								}
 							}else{
-								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is allowed only directory.", INICFG_CAPATH_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}
 						}
@@ -2428,16 +2665,19 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						svrnode.server_cert = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								svrnode.server_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							svrnode.server_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
@@ -2445,16 +2685,19 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						svrnode.server_prikey = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								svrnode.server_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							svrnode.server_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
@@ -2462,16 +2705,19 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						svrnode.slave_cert = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								svrnode.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							svrnode.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
@@ -2479,16 +2725,19 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						svrnode.slave_prikey = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								svrnode.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							svrnode.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
@@ -2530,11 +2779,35 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 				}
 			}else{
 				if(ccvals.found_ssl_verify_peer){
-					// If there are ssl servers with verify peer, all servers must have client cert and private key.
-					if(iter->slave_cert.empty() || iter->slave_prikey.empty()){
-						ERR_CHMPRN("Found %s with value(%s) and %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
-						result = false;
-						break;
+					if(!ChmSecureSock::IsCertAllowName()){
+						// If there are ssl servers with verify peer, all servers must have client cert and private key.
+						if(iter->slave_cert.empty() || iter->slave_prikey.empty()){
+							// SSL_SLAVE_CERT and SSL_SLAVE_PRIKEY must be set.
+							ERR_CHMPRN("Found %s with value(%s) and %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
+							result = false;
+							break;
+						}else if(!is_file_safe_exist(iter->slave_cert.c_str()) || !is_file_safe_exist(iter->slave_prikey.c_str())){
+							// SSL_SLAVE_CERT and SSL_SLAVE_PRIKEY must be file.
+							ERR_CHMPRN("Found %s with value(%s) and %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
+							result = false;
+							break;
+						}
+					}else{
+						if(iter->slave_cert.empty()){
+							// SSL_SLAVE_CERT must be set.
+							ERR_CHMPRN("Found %s with value(%s) and %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
+							result = false;
+							break;
+						}else if(is_file_safe_exist_ex(iter->slave_cert.c_str(), false)){
+							if(!is_file_safe_exist(iter->slave_prikey.c_str())){
+								// SSL_SLAVE_CERT is file, thus SSL_SLAVE_PRIKEY must be file.
+								ERR_CHMPRN("Found %s with value(%s) and %s with value(%s) in %s server node in %s section.", INICFG_SLAVE_CERT_STR, iter->slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, iter->slave_prikey.c_str(), iter->name.c_str(), INICFG_SVRNODE_SEC_STR);
+								result = false;
+								break;
+							}
+						}else{
+							// allow any private key
+						}
 					}
 				}else{
 					// If there are ssl servers without verify peer, any servers should not have client cert and private key.
@@ -2543,7 +2816,6 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 						result = false;
 						break;
 					}
-
 				}
 			}
 		}
@@ -2610,7 +2882,7 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 				slvnode.port			= CHM_INVALID_PORT;
 				slvnode.ctlport			= ccvals.ctlport;
 				slvnode.is_ssl			= false;
-				slvnode.verify_peer		= false;
+				slvnode.verify_peer		= ccvals.found_ssl_verify_peer;
 				slvnode.is_ca_file		= ccvals.is_ca_file;
 				slvnode.capath			= ccvals.capath;
 				slvnode.slave_cert		= ccvals.slave_cert;
@@ -2636,15 +2908,30 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					ERR_CHMPRN("Found %s with value(%s) in %s slave node in %s section.", INICFG_CAPATH_STR, slvnode.capath.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
 					result = false;
 				}
-				if(slvnode.slave_cert.empty() != slvnode.slave_prikey.empty()){
-					// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must be set or not set.
-					ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
-					result = false;
-				}
-				if(ccvals.found_ssl_verify_peer == slvnode.slave_cert.empty()){
-					// If There is SSL_VERIFY_PEER, but client cert(and private key) must be set.(nor so on)
-					ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
-					result = false;
+				if(ccvals.found_ssl_verify_peer){
+					if(!ChmSecureSock::IsCertAllowName()){
+						if(slvnode.slave_cert.empty() || slvnode.slave_prikey.empty()){
+							// SSL_SLAVE_CERT / SSL_SLAVE_PRIKEY must be set.
+							ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+							result = false;
+						}else if(!is_file_safe_exist(slvnode.slave_cert.c_str()) || !is_file_safe_exist(slvnode.slave_prikey.c_str())){
+							// SSL_SLAVE_CERT / SSL_SLAVE_PRIKEY must be file
+							ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+							result = false;
+						}
+					}else{
+						if(slvnode.slave_cert.empty()){
+							// SSL_SLAVE_CERT must be set.
+							ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+							result = false;
+						}
+					}
+				}else{
+					if(!slvnode.slave_cert.empty() || !slvnode.slave_prikey.empty()){
+						// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must not be set.
+						ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+						result = false;
+					}
 				}
 
 				// set value
@@ -2689,10 +2976,15 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 						if(is_dir_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
 							slvnode.is_ca_file = false;
 						}else{
-							if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								slvnode.is_ca_file = true;
+							if(ChmSecureSock::IsCAPathAllowFile()){
+								if(is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+									slvnode.is_ca_file = true;
+								}else{
+									ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+									result = false;
+								}
 							}else{
-								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_CAPATH_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is allowed only directory.", INICFG_CAPATH_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}
 						}
@@ -2708,16 +3000,19 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						slvnode.slave_cert = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								slvnode.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							slvnode.slave_cert = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
@@ -2725,16 +3020,19 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
 						slvnode.slave_prikey = "";
 					}else{
-						if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
-						}else{
-							if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-								ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+						}else if(!ChmSecureSock::IsCertAllowName()){
+							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
+								ERR_CHMPRN("Found %s in %s section with value %s, but it is not directory or file.", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
 								result = false;
 							}else{
 								slvnode.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 							}
+						}else{
+							// allow any string
+							slvnode.slave_prikey = reinterpret_cast<const char*>(yevent.data.scalar.value);
 						}
 					}
 
