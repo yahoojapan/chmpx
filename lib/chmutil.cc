@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -309,17 +309,28 @@ bool is_file_exist(const char* file)
 
 bool is_file_safe_exist(const char* file)
 {
+	return is_file_safe_exist_ex(file, true);
+}
+
+bool is_file_safe_exist_ex(const char* file, bool is_msg)
+{
 	if(CHMEMPTYSTR(file)){
-		ERR_CHMPRN("Parameter is NULL.");
+		if(is_msg){
+			ERR_CHMPRN("Parameter is NULL.");
+		}
 		return false;
 	}
 	struct stat	st;
 	if(-1 == stat(file, &st)){
-		MSG_CHMPRN("Could not get stat for %s(errno:%d)", file, errno);
+		if(is_msg){
+			MSG_CHMPRN("Could not get stat for %s(errno:%d)", file, errno);
+		}
 		return false;
 	}
 	if(!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)){
-		MSG_CHMPRN("file %s is not regular nor symbolic file", file);
+		if(is_msg){
+			MSG_CHMPRN("file %s is not regular nor symbolic file", file);
+		}
 		return false;
 	}
 	return true;

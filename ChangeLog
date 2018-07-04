@@ -1,3 +1,30 @@
+chmpx (1.0.62) unstable; urgency=low
+
+  * avoid static object initialization order problem(SIOF)
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 02 Jul 2018 08:58:47 +0900
+
+chmpx (1.0.61) unstable; urgency=low
+
+  * Fixed bugs about implementation some functions, etc
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 26 Jun 2018 14:53:05 +0900
+
+chmpx (1.0.60) unstable; urgency=low
+
+  * Supports multiple SSL/TLS libraries and associated implementation
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 21 Jun 2018 19:26:58 +0900
+
+chmpx (1.0.59) unstable; urgency=low
+
+  * Cleanup credit comments in sources and Modified etc
+  * Changed build logic to new for rpm/debian packaging
+  * Fixed filename typo from make_valiables.sh to make_variables.sh
+  * Fixed build error with openssl 1.1.0
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 17 May 2018 09:25:41 +0900
+
 chmpx (1.0.58) unstable; urgency=low
 
   * Update dependency on k2hash v1.0.57

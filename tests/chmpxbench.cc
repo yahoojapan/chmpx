@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <stdarg.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/wait.h>

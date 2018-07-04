@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -33,11 +33,50 @@
 using namespace	std;
 
 //---------------------------------------------------------
-// Class variable
+// Typedefs
 //---------------------------------------------------------
-ChmSigCntrl		ChmSigCntrl::singleton;
-sigset_map_t	ChmSigCntrl::signalmap;
-int				ChmSigCntrl::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
+typedef std::map<int, bool>		sigset_map_t;
+
+//---------------------------------------------------------
+// Class ChmSigCntrlHelper
+//---------------------------------------------------------
+// [NOTE]
+// To avoid static object initialization order problem(SIOF)
+//
+class ChmSigCntrlHelper
+{
+	protected:
+		int				lockval;									// like mutex
+		sigset_map_t	signalmap;
+
+	public:
+		ChmSigCntrlHelper(void) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED) {}
+		virtual ~ChmSigCntrlHelper(void) {}
+
+		sigset_map_t& GetSigMap(void)
+		{
+			return signalmap;
+		}
+
+		void Lock(void)
+		{
+			while(!fullock::flck_trylock_noshared_mutex(&lockval));	// no call sched_yield()
+		}
+
+		void Unlock(void)
+		{
+			fullock::flck_unlock_noshared_mutex(&lockval);
+		}
+};
+
+//---------------------------------------------------------
+// Class Methods
+//---------------------------------------------------------
+ChmSigCntrlHelper& ChmSigCntrl::GetHelper(void)
+{
+	static ChmSigCntrlHelper	helper;
+	return helper;
+}
 
 //---------------------------------------------------------
 // Methods
@@ -48,40 +87,32 @@ ChmSigCntrl::ChmSigCntrl()
 
 ChmSigCntrl::~ChmSigCntrl()
 {
-	if(this == (&ChmSigCntrl::singleton)){
-		// Do not need to unset signal handler.
-		// There is a case that already ChmSigCntrl::signalmap object is deleted,
-		// so invalide access to ChmSigCntrl::signalmap address.
-		//
-		//ResetAllHandler();
-	}
 }
 
 bool ChmSigCntrl::Initialize(int* psignums, int count)
 {
-	while(!fullock::flck_trylock_noshared_mutex(&ChmSigCntrl::lockval));
-
-	ChmSigCntrl::signalmap.clear();
+	ChmSigCntrl::GetHelper().Lock();
 
 	// static signals
-	ChmSigCntrl::signalmap[SIGILL]	= false;
-	ChmSigCntrl::signalmap[SIGABRT]	= false;
-	ChmSigCntrl::signalmap[SIGFPE]	= false;
-	ChmSigCntrl::signalmap[SIGKILL]	= false;
-	ChmSigCntrl::signalmap[SIGSEGV]	= false;
-	ChmSigCntrl::signalmap[SIGBUS]	= false;
-	ChmSigCntrl::signalmap[SIGCONT]	= false;
-	ChmSigCntrl::signalmap[SIGSTOP]	= false;
-	ChmSigCntrl::signalmap[SIGTSTP]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap().clear();
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGILL]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGABRT]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGFPE]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGKILL]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGSEGV]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGBUS]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGCONT]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGSTOP]	= false;
+	ChmSigCntrl::GetHelper().GetSigMap()[SIGTSTP]	= false;
 
 	if(!psignums || 0 >= count){
-		fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+		ChmSigCntrl::GetHelper().Unlock();
 		return true;
 	}
 	for(int cnt = 0; cnt < count; cnt++){
-		signalmap[psignums[cnt]] = false;
+		ChmSigCntrl::GetHelper().GetSigMap()[psignums[cnt]] = false;
 	}
-	fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+	ChmSigCntrl::GetHelper().Unlock();
 
 	return true;
 }
@@ -93,16 +124,16 @@ bool ChmSigCntrl::GetSignalMask(sigset_t& sigset)
 		return false;
 	}
 
-	while(!fullock::flck_trylock_noshared_mutex(&ChmSigCntrl::lockval));
+	ChmSigCntrl::GetHelper().Lock();
 
-	for(sigset_map_t::const_iterator iter = ChmSigCntrl::signalmap.begin(); iter != ChmSigCntrl::signalmap.end(); ++iter){
+	for(sigset_map_t::const_iterator iter = ChmSigCntrl::GetHelper().GetSigMap().begin(); iter != ChmSigCntrl::GetHelper().GetSigMap().end(); ++iter){
 		if(0 != sigdelset(&sigset, iter->first)){
 			ERR_CHMPRN("Failed to unset signal(%d).", iter->first);
-			fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+			ChmSigCntrl::GetHelper().Unlock();
 			return false;
 		}
 	}
-	fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+	ChmSigCntrl::GetHelper().Unlock();
 
 	return true;
 }
@@ -124,16 +155,16 @@ bool ChmSigCntrl::SetSignalProcMask(void)
 bool ChmSigCntrl::FindSignalEx(int signum, bool is_locked)
 {
 	if(!is_locked){
-		while(!fullock::flck_trylock_noshared_mutex(&ChmSigCntrl::lockval));
+		ChmSigCntrl::GetHelper().Lock();
 	}
 
 	bool	result = true;
-	if(ChmSigCntrl::signalmap.end() == ChmSigCntrl::signalmap.find(signum)){
+	if(ChmSigCntrl::GetHelper().GetSigMap().end() == ChmSigCntrl::GetHelper().GetSigMap().find(signum)){
 		result = false;
 	}
 
 	if(!is_locked){
-		fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+		ChmSigCntrl::GetHelper().Unlock();
 	}
 	return result;
 }
@@ -147,13 +178,13 @@ bool ChmSigCntrl::SetHandlerEx(int signum, sighandler_t handler, bool is_locked)
 	bool	enable = (NULL != handler && SIG_DFL != handler && SIG_IGN != handler);		// Simplify
 
 	if(!is_locked){
-		while(!fullock::flck_trylock_noshared_mutex(&ChmSigCntrl::lockval));
+		ChmSigCntrl::GetHelper().Lock();
 	}
-	if(enable == ChmSigCntrl::signalmap[signum]){
+	if(enable == ChmSigCntrl::GetHelper().GetSigMap()[signum]){
 		MSG_CHMPRN("Signal(%d) handler is already %s.", signum, enable ? "set" : "unset");
 		if(!enable){
 			if(!is_locked){
-				fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+				ChmSigCntrl::GetHelper().Unlock();
 			}
 			return true;
 		}
@@ -170,23 +201,23 @@ bool ChmSigCntrl::SetHandlerEx(int signum, sighandler_t handler, bool is_locked)
 	if(0 > sigaction(signum, &sa, NULL)){
 		ERR_CHMPRN("Could not %s signal(%d) handler, errno=%d", enable ? "set" : "unset", signum, errno);
 		if(!is_locked){
-			fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+			ChmSigCntrl::GetHelper().Unlock();
 		}
 		return false;
 	}
-	ChmSigCntrl::signalmap[signum] = enable;
+	ChmSigCntrl::GetHelper().GetSigMap()[signum] = enable;
 
 	if(!is_locked){
-		fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+		ChmSigCntrl::GetHelper().Unlock();
 	}
 	return true;
 }
 
 bool ChmSigCntrl::ResetAllHandler(void)
 {
-	while(!fullock::flck_trylock_noshared_mutex(&ChmSigCntrl::lockval));
+	ChmSigCntrl::GetHelper().Lock();
 
-	for(sigset_map_t::iterator iter = ChmSigCntrl::signalmap.begin(); iter != ChmSigCntrl::signalmap.end(); ++iter){
+	for(sigset_map_t::iterator iter = ChmSigCntrl::GetHelper().GetSigMap().begin(); iter != ChmSigCntrl::GetHelper().GetSigMap().end(); ++iter){
 		if(iter->second){
 			if(!SetHandlerEx(iter->first, SIG_DFL, true)){
 				ERR_CHMPRN("Could not reset signal(%d) handler.", iter->first);
@@ -195,7 +226,7 @@ bool ChmSigCntrl::ResetAllHandler(void)
 			iter->second = false;
 		}
 	}
-	fullock::flck_unlock_noshared_mutex(&ChmSigCntrl::lockval);
+	ChmSigCntrl::GetHelper().Unlock();
 
 	return true;
 }

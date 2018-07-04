@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -113,6 +113,7 @@ class ChmIMData
 	public:
 		static void FreeDupAllChmInfo(PCHMINFOEX ptr);								// for free memory allocated by DupAllChmInfo()
 		static void FreeDupSelfChmpxInfo(PCHMPX ptr);								// for free memory allocated by DupSelfChmpxInfo()
+		static bool IsSafeCHMINFO(const PCHMINFO pchminfo);
 
 		ChmIMData(bool is_chmpx_proc = true);
 		virtual ~ChmIMData();
@@ -161,6 +162,8 @@ class ChmIMData
 		bool SuspendAutoMerge(void);
 		bool ResetAutoMerge(void);
 		bool GetAutoMergeMode(void) const;
+		chmss_ver_t GetSslMinVersion(void) const;
+		const char* GetNssdbDir(void) const;
 		int GetSocketThreadCount(void) const;
 		int GetMQThreadCount(void) const;
 		int GetMaxSockPool(void) const;

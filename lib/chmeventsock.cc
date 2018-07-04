@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -32,8 +32,6 @@
 #include <poll.h>
 #include <time.h>
 #include <assert.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 
 #include "chmcommon.h"
 #include "chmeventsock.h"
@@ -47,11 +45,6 @@
 #include "chmdbg.h"
 
 using namespace	std;
-
-//---------------------------------------------------------
-// Utility Macros
-//---------------------------------------------------------
-#define	CVT_ESTR_NULL(pstr)					(CHMEMPTYSTR(pstr) ? NULL : pstr)
 
 //---------------------------------------------------------
 // Symbols
@@ -131,16 +124,6 @@ using namespace	std;
 #define	CTL_RES_INT_ERROR					"INTERNAL ERROR: Something error is occured.\n"
 #define	CTL_RES_INT_ERROR_NOTGETCHMPX		"INTERNAL ERROR: Could not get chmpx servers information.\n"
 
-// SSL
-#define	CHMEVENTSOCK_SSL_VP_DEPTH			3
-#define	CHMEVENTSOCK_VCB_INDEX_STR			"verify_cb_data_index"
-
-// CheckResultSSL function type
-#define	CHKRESULTSSL_TYPE_CON				0						// SSL_accept / SSL_connect
-#define	CHKRESULTSSL_TYPE_RW				1						// SSL_read / SSL_write
-#define	CHKRESULTSSL_TYPE_SD				2						// SSL_shutdown
-#define	IS_SAFE_CHKRESULTSSL_TYPE(type)		(CHKRESULTSSL_TYPE_CON == type || CHKRESULTSSL_TYPE_RW == type || CHKRESULTSSL_TYPE_SD == type)
-
 //---------------------------------------------------------
 // Class valiable
 //---------------------------------------------------------
@@ -156,425 +139,20 @@ const int			ChmEventSock::DEFAULT_RETRYCNT;
 const int			ChmEventSock::DEFAULT_RETRYCNT_CONNECT;
 const suseconds_t	ChmEventSock::DEFAULT_WAIT_SOCKET;
 const suseconds_t	ChmEventSock::DEFAULT_WAIT_CONNECT;
-int					ChmEventSock::CHM_SSL_VERIFY_DEPTH		= CHMEVENTSOCK_SSL_VP_DEPTH;
-const char*			ChmEventSock::strVerifyCBDataIndex		= CHMEVENTSOCK_VCB_INDEX_STR;
-int					ChmEventSock::verify_cb_data_index		= -1;
-int					ChmEventSock::ssl_session_id			= static_cast<int>(getpid());
-bool				ChmEventSock::is_self_sigined			= false;
-
-//------------------------------------------------------
-// Class Method for SSL
-//------------------------------------------------------
-int ChmEventSock::VerifyCallBackSSL(int preverify_ok, X509_STORE_CTX* store_ctx)
-{
-	char			strerr[256];
-	X509*			err_cert	= X509_STORE_CTX_get_current_cert(store_ctx);
-	int				err_code	= X509_STORE_CTX_get_error(store_ctx);
-	int				depth		= X509_STORE_CTX_get_error_depth(store_ctx);
-	SSL*			ssl			= reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-	SSL_CTX*		ssl_ctx		= SSL_get_SSL_CTX(ssl);
-	const int*		pchm_depth	= reinterpret_cast<const int*>(SSL_CTX_get_ex_data(ssl_ctx, ChmEventSock::verify_cb_data_index));
-
-	// error string
-	X509_NAME_oneline(X509_get_subject_name(err_cert), strerr, sizeof(strerr));
-
-	// depth
-	if(!pchm_depth || *pchm_depth < depth){
-		// Force changing error code.
-		preverify_ok= 0;
-		err_code	= X509_V_ERR_CERT_CHAIN_TOO_LONG;
-		X509_STORE_CTX_set_error(store_ctx, err_code);
-	}
-
-	// Message
-	if(!preverify_ok){
-		ERR_CHMPRN("VERIFY ERROR: depth=%d, errnum=%d(%s), string=%s", depth, err_code, X509_verify_cert_error_string(err_code), strerr);
-	}else{
-		MSG_CHMPRN("VERIFY OK: depth=%d, string=%s", depth, strerr);
-	}
-
-	// check error code
-	switch(err_code){
-		case	X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT:
-			X509_NAME_oneline(X509_get_issuer_name(store_ctx->current_cert), strerr, 256);
-			ERR_CHMPRN("DETAIL: X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT: issuer=%s", strerr);
-			preverify_ok = 0;
-			break;
-
-		case	X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-			if(ChmEventSock::is_self_sigined){
-				// For DEBUG
-				WAN_CHMPRN("SKIP ERROR(DEBUG): X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT: self signed certificate is ERROR.");
-				preverify_ok = 1;
-			}else{
-				ERR_CHMPRN("DETAIL: X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT: self signed certificate is ERROR.");
-				preverify_ok = 0;
-			}
-			break;
-
-		case	X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-			X509_STORE_CTX_set_error(store_ctx, X509_V_OK);
-			WAN_CHMPRN("SKIP ERROR: X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN: Verified with no error in self signed certificate chain.");
-			preverify_ok = 1;
-			break;
-
-		case	X509_V_ERR_CERT_NOT_YET_VALID:
-			ERR_CHMPRN("DETAIL: X509_V_ERR_CERT_NOT_YET_VALID: certificate is not yet valid(date is after the current time).");
-			preverify_ok = 0;
-			break;
-
-		case	X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD:
-			ERR_CHMPRN("DETAIL: X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD: certificate not before field contains an invalid time.");
-			preverify_ok = 0;
-			break;
-
-		case	X509_V_ERR_CERT_HAS_EXPIRED:
-			ERR_CHMPRN("DETAIL: X509_V_ERR_CERT_HAS_EXPIRED: certificate has expired.");
-			preverify_ok = 0;
-			break;
-
-		case	X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD:
-			ERR_CHMPRN("DETAIL: X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD: certificate not after field contains an invalid time.");
-			preverify_ok = 0;
-			break;
-
-		default:
-			break;
-	}
-	return preverify_ok;
-}
-
-bool ChmEventSock::CheckResultSSL(int sock, SSL* ssl, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
-{
-	if(CHM_INVALID_SOCK == sock || !ssl || !IS_SAFE_CHKRESULTSSL_TYPE(type)){
-		ERR_CHMPRN("Parameters are wrong.");
-		is_retry = false;
-		return false;
-	}
-	if(CHMEVENTSOCK_RETRY_DEFAULT == retrycnt){
-		retrycnt = ChmEventSock::DEFAULT_RETRYCNT;
-		waittime = ChmEventSock::DEFAULT_WAIT_SOCKET;
-	}
-	is_retry = true;
-	is_close = false;
-
-	bool	result = true;
-	int		werr;
-	if(action_result <= 0){
-		int	ssl_result = SSL_get_error(ssl, action_result);
-		switch(ssl_result){
-			case	SSL_ERROR_NONE:
-				// Succeed.
-				MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), succeed.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-				break;
-
-			case	SSL_ERROR_SSL:
-				if(CHKRESULTSSL_TYPE_SD == type){
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry= false;
-					result	= false;
-				}else{
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so something error occured(errno=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
-					is_retry= false;
-					is_close= true;
-					result	= false;
-				}
-				break;
-
-			case	SSL_ERROR_WANT_WRITE:
-				// Wait for up
-				if(0 != (werr = ChmEventSock::WaitForReady(sock, WAIT_WRITE_FD, retrycnt, false, waittime))){		// not check SO_ERROR
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Failed to wait write.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry = false;
-					if(ETIMEDOUT != werr){
-						is_close= true;
-					}
-				}else{
-					//MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait write.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-				}
-				result = false;
-				break;
-
-			case	SSL_ERROR_WANT_READ:
-				// Wait for up
-				if(0 != (werr = ChmEventSock::WaitForReady(sock, WAIT_READ_FD, retrycnt, false, waittime))){		// not check SO_ERROR
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Failed to wait read.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry = false;
-					if(ETIMEDOUT != werr){
-						is_close= true;
-					}
-				}else{
-					//MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), and Succeed to wait read.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-				}
-				result = false;
-				break;
-
-			case	SSL_ERROR_SYSCALL:
-				if(action_result < 0){
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), errno(%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
-					is_retry= false;
-					result	= false;
-				}else{	// action_result == 0
-					if(CHKRESULTSSL_TYPE_CON == type){
-						MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so this case is received illigal EOF after calling connect/accept, but no error(no=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
-						result	= true;
-					}else if(CHKRESULTSSL_TYPE_SD == type){
-						WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-						is_retry= false;
-						result	= false;
-					}else{
-						ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s).", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-						is_retry= false;
-						is_close= true;
-						result	= false;
-					}
-				}
-				break;
-
-			case	SSL_ERROR_ZERO_RETURN:
-				if(CHKRESULTSSL_TYPE_SD == type){
-					MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s). so the peer is closed then not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry= false;
-					is_close= true;
-					result	= false;
-				}else{
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so the peer is closed.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry= false;
-					is_close= true;
-					result	= false;
-				}
-				break;
-
-			default:
-				if(CHKRESULTSSL_TYPE_SD == type){
-					WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry= false;
-					result	= false;
-				}else{
-					ERR_CHMPRN("SSL action result(%ld): ssl result(%d: %s).", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
-					is_retry= false;
-					result	= false;
-				}
-				break;
-		}
-	}else{
-		// Result is Success!
-		//MSG_CHMPRN("SSL action result(%ld): succeed.", action_result);
-	}
-	return result;
-}
-
-SSL_CTX* ChmEventSock::MakeSSLContext(const char* CApath, const char* CAfile, const char* server_cert, const char* server_prikey, const char* slave_cert, const char* slave_prikey, bool is_verify_peer)
-{
-	if(!CHMEMPTYSTR(CApath) && !CHMEMPTYSTR(CAfile)){
-		ERR_CHMPRN("Parameters are wrong.");
-		return NULL;
-	}
-	if((CHMEMPTYSTR(server_cert) || CHMEMPTYSTR(server_prikey)) && (is_verify_peer && (CHMEMPTYSTR(slave_cert) || CHMEMPTYSTR(slave_prikey)))){
-		ERR_CHMPRN("Parameters are wrong.");
-		return NULL;
-	}
-
-	// Make context data index
-	if(-1 == ChmEventSock::verify_cb_data_index){
-		// make new index
-		ChmEventSock::verify_cb_data_index = SSL_CTX_get_ex_new_index(0, const_cast<char*>(ChmEventSock::strVerifyCBDataIndex), NULL, NULL, NULL);
-	}
-
-	SSL_CTX*	ctx;
-
-	// Make context(without SSLv2)
-	if(NULL == (ctx = SSL_CTX_new(SSLv23_method()))){
-		ERR_CHMPRN("Could not make SSL Context.");
-		return NULL;
-	}
-	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
-
-	// Options/Modes
-	SSL_CTX_set_options(ctx, SSL_OP_ALL);
-	SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);			// Non blocking
-	SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);		// Non blocking
-
-	// Load CA cert
-	if((CHMEMPTYSTR(CAfile) && CHMEMPTYSTR(CApath)) || 1 != SSL_CTX_load_verify_locations(ctx, CAfile, CApath)){
-		if(!CHMEMPTYSTR(CAfile) || !CHMEMPTYSTR(CApath)){
-			// Failed loading -> try to default CA
-			WAN_CHMPRN("Failed to load CA certs, CApath=%s, CAfile=%s", CApath, CAfile);
-		}
-		// Load default CA
-		if(1 != SSL_CTX_set_default_verify_paths(ctx)){
-			ERR_CHMPRN("Failed to load default certs.");
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-	}
-
-	// Set cert
-	if(!CHMEMPTYSTR(server_cert) && !CHMEMPTYSTR(server_prikey)){
-		// Set server cert
-		if(1 != SSL_CTX_use_certificate_chain_file(ctx, server_cert)){
-			// Failed loading server cert
-			ERR_CHMPRN("Failed to set server cert(%s)", server_cert);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-		// Set server private keys(no pass)
-		if(1 != SSL_CTX_use_PrivateKey_file(ctx, server_prikey, SSL_FILETYPE_PEM)){		// **** Not use following functions for passwd and RSA ****
-			// Failed loading server private key
-			ERR_CHMPRN("Failed to load private key file(%s)", server_prikey);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-		// Verify cert
-		if(1 != SSL_CTX_check_private_key(ctx)){
-			// Not success to verify private key.
-			ERR_CHMPRN("Failed to verify server cert(%s) & server private key(%s)", server_cert, server_prikey);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-
-		// Set session id to context
-		SSL_CTX_set_session_id_context(ctx, reinterpret_cast<const unsigned char*>(&ChmEventSock::ssl_session_id), sizeof(ChmEventSock::ssl_session_id));
-
-		// Set CA list for client(slave)
-		if(!CHMEMPTYSTR(CAfile)){
-			STACK_OF(X509_NAME)*	cert_names;
-			if(NULL != (cert_names = SSL_load_client_CA_file(CAfile))){
-				SSL_CTX_set_client_CA_list(ctx, cert_names);
-			}else{
-				WAN_CHMPRN("Failed to load client(slave) CA certs(%s)", CAfile);
-			}
-		}
-
-	}else if(!CHMEMPTYSTR(slave_cert) && !CHMEMPTYSTR(slave_prikey)){
-		// Set slave cert
-		if(1 != SSL_CTX_use_certificate_chain_file(ctx, slave_cert)){
-			// Failed loading slave cert
-			ERR_CHMPRN("Failed to set slave cert(%s)", slave_cert);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-		// Set slave private keys(no pass)
-		if(1 != SSL_CTX_use_PrivateKey_file(ctx, slave_prikey, SSL_FILETYPE_PEM)){		// **** Not use following functions for passwd and RSA ****
-			// Failed loading slave private key
-			ERR_CHMPRN("Failed to load private key file(%s)", slave_prikey);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-		// Verify cert
-		if(1 != SSL_CTX_check_private_key(ctx)){
-			// Not success to verify private key.
-			ERR_CHMPRN("Failed to verify slave cert(%s) & slave private key(%s)", slave_cert, slave_prikey);
-			SSL_CTX_free(ctx);
-			return NULL;
-		}
-
-		// slave SSL context does not need verify flag.
-		is_verify_peer = false;
-	}
-
-	// Make verify peer mode
-	int	verify_mode = is_verify_peer ? (SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT | SSL_VERIFY_CLIENT_ONCE) : SSL_VERIFY_NONE;
-
-	// Set callback
-	SSL_CTX_set_verify(ctx, verify_mode, ChmEventSock::VerifyCallBackSSL);								// Set verify callback
-	SSL_CTX_set_verify_depth(ctx, ChmEventSock::CHM_SSL_VERIFY_DEPTH + 1);								// Verify depth
-	SSL_CTX_set_ex_data(ctx, ChmEventSock::verify_cb_data_index, &ChmEventSock::CHM_SSL_VERIFY_DEPTH);	// Set external data
-
-	return ctx;
-}
-
-SSL* ChmEventSock::HandshakeSSL(SSL_CTX* ctx, int sock, bool is_accept, int con_retrycnt, suseconds_t con_waittime)
-{
-	if(!ctx || CHM_INVALID_SOCK == sock){
-		ERR_CHMPRN("Parameters are wrong.");
-		return NULL;
-	}
-	if(CHMEVENTSOCK_RETRY_DEFAULT == con_retrycnt){
-		con_retrycnt = ChmEventSock::DEFAULT_RETRYCNT_CONNECT;
-		con_waittime = ChmEventSock::DEFAULT_WAIT_CONNECT;
-	}
-
-	// make SSL object
-	SSL*	ssl = SSL_new(ctx);
-	if(!ssl){
-		ERR_CHMPRN("Could not make SSL object from context.");
-		return NULL;
-	}
-	if(is_accept){
-		SSL_set_accept_state(ssl);
-	}else{
-	    SSL_set_connect_state(ssl);
-	}
-	SSL_set_fd(ssl, sock);
-
-	// accept/connect
-	bool	is_retry;
-	bool	is_close = false;	// Not used this value.
-	long	action_result;
-	for(int tmp_retrycnt = con_retrycnt; 0 < tmp_retrycnt; --tmp_retrycnt){
-		// accept
-		if(is_accept){
-			action_result = SSL_accept(ssl);
-		}else{
-			action_result = SSL_connect(ssl);
-		}
-
-		is_retry = true;
-		if(ChmEventSock::CheckResultSSL(sock, ssl, action_result, CHKRESULTSSL_TYPE_CON, is_retry, is_close, con_retrycnt, con_waittime)){
-			// success
-			return ssl;
-		}
-		if(!is_retry){
-			break;
-		}
-	}
-	ERR_CHMPRN("Failed to %s SSL.", (is_accept ? "accept" : "connect"));
-
-	// shutdown SSL
-	if(!ChmEventSock::ShutdownSSL(sock, ssl, con_retrycnt, con_waittime)){
-		ERR_CHMPRN("Failed to shutdown SSL, but continue...");
-	}
-	SSL_free(ssl);
-
-	return NULL;
-}
-
-bool ChmEventSock::ShutdownSSL(int sock, SSL* ssl, int con_retrycnt, suseconds_t con_waittime)
-{
-	if(CHM_INVALID_SOCK == sock || !ssl){
-		ERR_CHMPRN("Parameters are wrong.");
-		return false;
-	}
-	if(CHMEVENTSOCK_RETRY_DEFAULT == con_retrycnt){
-		con_retrycnt = ChmEventSock::DEFAULT_RETRYCNT_CONNECT;
-		con_waittime = ChmEventSock::DEFAULT_WAIT_CONNECT;
-	}
-
-	bool	is_retry;
-	long	action_result;
-	bool	is_close = false;		// Not used this value.
-	for(int tmp_retrycnt = con_retrycnt; 0 < tmp_retrycnt; --tmp_retrycnt){
-		// accept
-		action_result	= SSL_shutdown(ssl);
-		is_retry		= true;
-
-		if(ChmEventSock::CheckResultSSL(sock, ssl, action_result, CHKRESULTSSL_TYPE_SD, is_retry, is_close, con_retrycnt, con_waittime)){
-			// success
-			return true;
-		}
-		if(!is_retry){
-			break;
-		}
-	}
-	ERR_CHMPRN("Failed to shutdown SSL for sock(%d).", sock);
-
-	return false;
-}
 
 //---------------------------------------------------------
 // Class Methods
 //---------------------------------------------------------
+void ChmEventSock::AllowSelfSignedCert(void)
+{
+	ChmSecureSock::AllowSelfSignedCert();
+}
+
+void ChmEventSock::DenySelfSignedCert(void)
+{
+	ChmSecureSock::DenySelfSignedCert();
+}
+
 bool ChmEventSock::SetNonblocking(int sock)
 {
 	if(CHM_INVALID_SOCK == sock){
@@ -855,7 +433,7 @@ int ChmEventSock::Connect(const char* hostname, short port, bool is_blocking, in
 // In most case, pComPkt is allocated memory. But in case of large data it should
 // be able to allocate memory by shared memory.
 //
-bool ChmEventSock::RawSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool& is_closed, bool is_blocking, int retrycnt, suseconds_t waittime)
+bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool& is_closed, bool is_blocking, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !pComPkt){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -882,7 +460,7 @@ bool ChmEventSock::RawSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool& is_closed,
 	return ChmEventSock::RawSend(sock, ssl, pbydata, length, is_closed, is_blocking, retrycnt, waittime);
 }
 
-bool ChmEventSock::RawSend(int sock, SSL* ssl, const unsigned char* pbydata, size_t length, bool& is_closed, bool is_blocking, int retrycnt, suseconds_t waittime)
+bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, const unsigned char* pbydata, size_t length, bool& is_closed, bool is_blocking, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !pbydata || length <= 0L){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -898,8 +476,9 @@ bool ChmEventSock::RawSend(int sock, SSL* ssl, const unsigned char* pbydata, siz
 			// SSL
 			onesent				= 0;
 			is_retry 			= true;
-			long	write_result= SSL_write(ssl, &pbydata[totalsent], length - totalsent);
-			if(ChmEventSock::CheckResultSSL(sock, ssl, write_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
+			int	write_result	= ChmSecureSock::Write(ssl, &pbydata[totalsent], length - totalsent);
+
+			if(ChmSecureSock::CheckResultSSL(sock, ssl, write_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
 				// success
 				if(0 < write_result){
 					onesent = static_cast<ssize_t>(write_result);
@@ -955,7 +534,7 @@ bool ChmEventSock::RawSend(int sock, SSL* ssl, const unsigned char* pbydata, siz
 // [TODO]
 // For large data case, pbuff is shared memory instead of allocated memory.
 //
-bool ChmEventSock::RawReceiveByte(int sock, SSL* ssl, bool& is_closed, unsigned char* pbuff, size_t length, bool is_blocking, int retrycnt, suseconds_t waittime)
+bool ChmEventSock::RawReceiveByte(int sock, ChmSSSession ssl, bool& is_closed, unsigned char* pbuff, size_t length, bool is_blocking, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !pbuff || 0 == length){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -970,10 +549,11 @@ bool ChmEventSock::RawReceiveByte(int sock, SSL* ssl, bool& is_closed, unsigned 
 	for(totalrecv = 0; totalrecv < length; totalrecv += static_cast<size_t>(onerecv)){
 		if(ssl){
 			// SSL
-			onerecv				= 0;
-			is_retry 			= true;
-			long	read_result	= SSL_read(ssl, &pbuff[totalrecv], length - totalrecv);
-			if(ChmEventSock::CheckResultSSL(sock, ssl, read_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
+			onerecv			= 0;
+			is_retry 		= true;
+			int	read_result	= ChmSecureSock::Read(ssl, &pbuff[totalrecv], length - totalrecv);
+
+			if(ChmSecureSock::CheckResultSSL(sock, ssl, read_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
 				// success
 				if(0 < read_result){
 					onerecv = static_cast<ssize_t>(read_result);
@@ -985,6 +565,7 @@ bool ChmEventSock::RawReceiveByte(int sock, SSL* ssl, bool& is_closed, unsigned 
 					return false;
 				}
 			}
+
 		}else{
 			// Not SSL
 			if(!is_blocking){
@@ -1111,7 +692,7 @@ bool ChmEventSock::RawReceiveAny(int sock, bool& is_closed, unsigned char* pbuff
 // The other(not NULL), this function set received data into *ppComPkt. Then pktlength
 // means *ppComPkt buffer length.
 //
-bool ChmEventSock::RawReceive(int sock, SSL* ssl, bool& is_closed, PCOMPKT* ppComPkt, size_t pktlength, bool is_blocking, int retrycnt, suseconds_t waittime)
+bool ChmEventSock::RawReceive(int sock, ChmSSSession ssl, bool& is_closed, PCOMPKT* ppComPkt, size_t pktlength, bool is_blocking, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !ppComPkt){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -1979,15 +1560,14 @@ bool ChmEventSock::SslSockMapCallback(sock_ssl_map_t::iterator& iter, void* psoc
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
 	}
-	int		sock = iter->first;
-	SSL*	pssl = iter->second;
+	int				sock= iter->first;
+	ChmSSSession	ssl	= iter->second;
 
 	if(CHM_INVALID_SOCK != sock){
 		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK
 	}
-	if(pssl){
-		ChmEventSock::ShutdownSSL(sock, pssl, pSockObj->con_retry_count, pSockObj->con_wait_time);
-		SSL_free(pssl);
+	if(ssl){
+		ChmSecureSock::ShutdownSSL(sock, ssl, pSockObj->con_retry_count, pSockObj->con_wait_time);
 	}
 	return true;
 }
@@ -2008,15 +1588,15 @@ bool ChmEventSock::SendLockMapCallback(sendlockmap_t::iterator& iter, void* psoc
 //---------------------------------------------------------
 // Methods
 //---------------------------------------------------------
-ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl) : 
-	ChmEventBase(eventqfd, pcntrl),
+ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) : 
+	ChmEventBase(eventqfd, pcntrl), pSecureSock(NULL),
 	seversockmap(CHM_INVALID_CHMPXID, ChmEventSock::ServerSockMapCallback, this),
 	slavesockmap(CHM_INVALID_CHMPXID, ChmEventSock::SlaveSockMapCallback, this),
 	acceptingmap(string(""), ChmEventSock::AcceptMapCallback, this),
 	ctlsockmap(CHM_INVALID_CHMPXID, ChmEventSock::ControlSockMapCallback, this),
 	sslmap(NULL, ChmEventSock::SslSockMapCallback, this),
 	sendlockmap(NULL, ChmEventSock::SendLockMapCallback, this),
-	svr_sslctx(NULL), slv_sslctx(NULL), startup_servicein(true), is_run_merge(false),
+	startup_servicein(true), is_run_merge(false),
 	procthreads(CHMEVSOCK_SOCK_THREAD_NAME), mergethread(CHMEVSOCK_MERGE_THREAD_NAME),
 	sockfd_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), last_check_time(time(NULL)), dyna_sockfd_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED),
 	mergeidmap_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), is_server_mode(false), max_sock_pool(ChmEventSock::DEFAULT_MAX_SOCK_POOL),
@@ -2025,6 +1605,27 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl) :
 	con_wait_time(ChmEventSock::DEFAULT_WAIT_CONNECT)
 {
 	assert(pChmCntrl);
+
+	// SSL
+	if(is_ssl){
+		ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+		CHMPXSSL	ssldata;
+		if(!pImData->GetSelfSsl(ssldata)){
+			ERR_CHMPRN("Failed to get SSL structure from self chmpx, but continue...");
+		}else{
+			pSecureSock = new ChmSecureSock((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.verify_peer);
+
+			// Set SSL/TLS minimum version
+			if(!ChmSecureSock::SetSslMinVersion(pImData->GetSslMinVersion())){
+				ERR_CHMPRN("Failed to set SSL/TLS minimum version to ChmSecureSock class variable, but continue...");
+			}
+
+			// For only NSS now
+			if(pImData->GetNssdbDir() && !ChmSecureSock::SetExtValue(CHM_NSS_NSSDB_DIR_KEY, pImData->GetNssdbDir())){
+				ERR_CHMPRN("Failed to set %s to ChmSecureSock class variable, but continue...", CHM_NSS_NSSDB_DIR_KEY);
+			}
+		}
+	}
 
 	// first initialize cache value and threads
 	//
@@ -2076,14 +1677,10 @@ bool ChmEventSock::Clean(void)
 	CloseAllSSL();
 
 	// SSL contexts
-	if(svr_sslctx){
-		SSL_CTX_free(svr_sslctx);
-		svr_sslctx = NULL;
+	if(pSecureSock && !pSecureSock->Clean()){
+		ERR_CHMPRN("Failed to clean Contexts for Secure Socket etc, but continue...");
 	}
-	if(slv_sslctx){
-		SSL_CTX_free(slv_sslctx);
-		slv_sslctx = NULL;
-	}
+	CHM_Delete(pSecureSock);
 
 	// all socket lock are freed
 	sendlockmap.clear();		// sendlockmap does not have default cb function & not call cb here --> do nothing
@@ -2428,35 +2025,9 @@ bool ChmEventSock::IsEventQueueFd(int fd)
 }
 
 //------------------------------------------------------
-// SSL context
+// SSL/TLS
 //------------------------------------------------------
-SSL_CTX* ChmEventSock::GetSSLContext(const char* CApath, const char* CAfile, const char* server_cert, const char* server_prikey, const char* slave_cert, const char* slave_prikey, bool is_verify_peer)
-{
-	if(!CHMEMPTYSTR(CApath) && !CHMEMPTYSTR(CAfile)){
-		ERR_CHMPRN("Parameter is wrong.");
-		return NULL;
-	}
-
-	// Which ctx is needed?
-	SSL_CTX**	ppctx = NULL;
-	if(!CHMEMPTYSTR(server_cert) && !CHMEMPTYSTR(server_prikey)){
-		ppctx = &svr_sslctx;
-	}else{
-		ppctx = &slv_sslctx;
-	}
-
-	if(!*ppctx){
-		// Make context
-		if(NULL == (*ppctx = ChmEventSock::MakeSSLContext(CVT_ESTR_NULL(CApath), CVT_ESTR_NULL(CAfile), CVT_ESTR_NULL(server_cert), CVT_ESTR_NULL(server_prikey), CVT_ESTR_NULL(slave_cert), CVT_ESTR_NULL(slave_prikey), is_verify_peer))){
-			ERR_CHMPRN("Failed to make SSL context.");
-		}
-	}else{
-		// already has ctx.
-	}
-	return *ppctx;
-}
-
-SSL* ChmEventSock::GetSSL(int sock)
+ChmSSSession ChmEventSock::GetSSL(int sock)
 {
 	if(IsEmpty()){
 		return NULL;
@@ -2486,13 +2057,13 @@ bool ChmEventSock::IsSafeParamsForSSL(void)
 		return false;
 	}
 	if('\0' != ssldata.server_cert[0]){
-		if(NULL == ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.server_cert, ssldata.server_prikey, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer)){
+		if(!pSecureSock->IsSafeSSLContext(ssldata.server_cert, ssldata.server_prikey, ssldata.slave_cert, ssldata.slave_prikey)){
 			ERR_CHMPRN("Failed to make self SSL context for server socket.");
 			return false;
 		}
 	}
 	if('\0' != ssldata.slave_cert[0]){
-		if(NULL == ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), NULL, NULL, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer)){
+		if(!pSecureSock->IsSafeSSLContext(NULL, NULL, ssldata.slave_cert, ssldata.slave_prikey)){
 			ERR_CHMPRN("Failed to make self SSL context for slave socket.");
 			return false;
 		}
@@ -2573,7 +2144,7 @@ bool ChmEventSock::RawLockSendSock(int sock, bool is_lock, bool is_onece)
 //
 // Lapped RawSend method with LockSendSock
 //
-bool ChmEventSock::LockedSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool is_blocking)
+bool ChmEventSock::LockedSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool is_blocking)
 {
 	LockSendSock(sock);			// LOCK SOCKET
 
@@ -2596,7 +2167,7 @@ bool ChmEventSock::LockedSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool is_block
 //
 // Lapped RawSend method with LockSendSock
 //
-bool ChmEventSock::LockedSend(int sock, SSL* ssl, const unsigned char* pbydata, size_t length, bool is_blocking)
+bool ChmEventSock::LockedSend(int sock, ChmSSSession ssl, const unsigned char* pbydata, size_t length, bool is_blocking)
 {
 	LockSendSock(sock);			// LOCK SOCKET
 
@@ -3791,7 +3362,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 			return false;
 		}
 		// get SSL context
-		SSL_CTX*	ctx = ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), NULL, NULL, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer);
+		ChmSSCtx	ctx = pSecureSock->GetSSLContext(NULL, NULL, ssldata.slave_cert, ssldata.slave_prikey);
 		if(!ctx){
 			ERR_CHMPRN("Failed to get SSL context.");
 			CHM_CLOSESOCK(sock);
@@ -3799,7 +3370,8 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		}
 
 		// Accept SSL
-		SSL*	ssl = ChmEventSock::ConnectSSL(ctx, sock, con_retry_count, con_wait_time);
+		ChmSSSession	ssl = ChmSecureSock::ConnectSSL(ctx, sock, con_retry_count, con_wait_time);
+		pSecureSock->FreeSSLContext(ctx);
 		if(!ssl){
 			ERR_CHMPRN("Failed to connect SSL.");
 			CHM_CLOSESOCK(sock);
@@ -4373,7 +3945,7 @@ bool ChmEventSock::Accept(int sock)
 	}
 	if(ssldata.is_ssl){
 		// get SSL context
-		SSL_CTX*	ctx = ChmEventSock::GetSSLContext((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.server_cert, ssldata.server_prikey, ssldata.slave_cert, ssldata.slave_prikey, ssldata.verify_peer);
+		ChmSSCtx	ctx = pSecureSock->GetSSLContext(ssldata.server_cert, ssldata.server_prikey, ssldata.slave_cert, ssldata.slave_prikey);
 		if(!ctx){
 			ERR_CHMPRN("Failed to get SSL context.");
 			if(!NotifyHup(newsock)){
@@ -4383,7 +3955,8 @@ bool ChmEventSock::Accept(int sock)
 		}
 
 		// Accept SSL
-		SSL*	ssl = ChmEventSock::AcceptSSL(ctx, newsock, con_retry_count, con_wait_time);
+		ChmSSSession	ssl = ChmSecureSock::AcceptSSL(ctx, newsock, con_retry_count, con_wait_time);
+		pSecureSock->FreeSSLContext(ctx);
 		if(!ssl){
 			ERR_CHMPRN("Failed to accept SSL.");
 			if(!NotifyHup(newsock)){

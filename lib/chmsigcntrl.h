@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -30,21 +30,15 @@
 #include <fullock/flckbaselist.tcc>
 
 //---------------------------------------------------------
-// Typedefs
-//---------------------------------------------------------
-typedef std::map<int, bool>		sigset_map_t;
-
-//---------------------------------------------------------
 // ChmSigCntrl Class
 //---------------------------------------------------------
+class ChmSigCntrlHelper;
+
 class ChmSigCntrl
 {
 	protected:
-		static ChmSigCntrl	singleton;
-		static sigset_map_t	signalmap;
-		static int			lockval;			// like mutex
+		static ChmSigCntrlHelper& GetHelper(void);
 
-	protected:
 		bool SetHandlerEx(int signum, sighandler_t handler, bool is_locked);	// can set NULL/SIG_DFL/SIG_IGN
 		bool FindSignalEx(int signum, bool is_locked);
 		bool ResetAllHandler(void);
