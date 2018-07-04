@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -196,7 +196,7 @@ bool ChmIMData::DumpSelfChmpxSvr(stringstream& sstream) const
 	if(!GetSelfChmpxSvr(&chmpxsvr)){
 		return false;
 	}
-	sstream << "CHMPX HOSTNAME            = " << chmpxsvr.name								<< endl;
+	sstream << "CHMPX HOSTNAME            = " << string(chmpxsvr.name)						<< endl;
 	sstream << "MODE                      = " << (IsServerMode() ? "SERVER" : "SLAVE")		<< endl;
 	sstream << "PORT                      = " << chmpxsvr.port								<< endl;
 	sstream << "CONTROL PORT              = " << chmpxsvr.ctlport							<< endl;
@@ -267,6 +267,21 @@ void ChmIMData::FreeDupSelfChmpxInfo(PCHMPX ptr)
 		tmpchmpx.Free(ptr);
 		K2H_Free(ptr);
 	}
+}
+
+bool ChmIMData::IsSafeCHMINFO(const PCHMINFO pchminfo)
+{
+	if(!pchminfo){
+		return false;
+	}
+	// check prefix for version string
+	if(0 != strncmp(pchminfo->chminfo_version, CHM_CHMINFO_VERSION_PREFIX, strlen(CHM_CHMINFO_VERSION_PREFIX))){
+		return false;
+	}
+	// [NOTE]
+	// Now we do not check CHMINFO structure version.
+	//
+	return true;
 }
 
 //---------------------------------------------------------
@@ -773,6 +788,14 @@ bool ChmIMData::AttachShm(void)
 		return false;
 	}
 
+	// check CHMINFO structure version
+	PCHMSHM	pTmpChmShm = reinterpret_cast<PCHMSHM>(shmbase);
+	if(!ChmIMData::IsSafeCHMINFO(&(pTmpChmShm->info))){
+		ERR_CHMPRN("Unsafe CHMINFO file(%s), probably this is created by old CHMPX version", shmpath.c_str());
+		CHM_MUMMAP(fd, shmbase, total_shmsize);
+		return false;
+	}
+
 	// initialize data
 	ShmPath	= shmpath;
 	pChmShm = reinterpret_cast<PCHMSHM>(shmbase);
@@ -1203,6 +1226,32 @@ bool ChmIMData::GetAutoMergeMode(void) const
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
 	return tmpchminfo.GetAutoMergeMode();
+}
+
+chmss_ver_t ChmIMData::GetSslMinVersion(void) const
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	// This value is set only at initializing, so not need locking
+	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.GetSslMinVersion();
+}
+
+const char* ChmIMData::GetNssdbDir(void) const
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return NULL;
+	}
+	// This value is set only at initializing, so not need locking
+	//ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.GetNssdbDir();
 }
 
 int ChmIMData::GetSocketThreadCount(void) const

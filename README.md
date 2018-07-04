@@ -2,7 +2,7 @@ CHMPX
 --------
 [![Build Status](https://travis-ci.org/yahoojapan/chmpx.svg?branch=master)](https://travis-ci.org/yahoojapan/chmpx)
 
-CHMPX - Consistent Hashing Mq inProcess data eXchange by Yahoo! JAPAN
+CHMPX - Consistent Hashing Mq inProcess data eXchange
 
 ### Overview
 CHMPX is inprocess data exchange by MQ with consistent hashing system,

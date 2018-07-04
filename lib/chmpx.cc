@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -31,6 +31,7 @@
 #include "chmcntrl.h"
 #include "chmkvp.h"
 #include "chmpx.h"
+#include "chmss.h"
 
 using namespace	std;
 
@@ -491,9 +492,9 @@ void chmpx_print_version(FILE* stream)
 {
 	static const char format[] =
 		"\n"
-		"CHMPX Version %s (commit: %s)\n"
+		"CHMPX Version %s (commit: %s) with %s\n"
 		"\n"
-		"Copyright 2014 Yahoo! JAPAN corporation.\n"
+		"Copyright(C) 2014 Yahoo Japan Corporation.\n"
 		"\n"
 		"CHMPX is inprocess data exchange by MQ with consistent hashing.\n"
 		"CHMPX is made for the purpose of the construction of original\n"
@@ -503,7 +504,7 @@ void chmpx_print_version(FILE* stream)
 		"automatically layouted. As a result, it provides a high performance,\n"
 		"a high scalability.\n"
 		"\n";
-	fprintf(stream, format, VERSION, chmpx_commit_hash);
+	fprintf(stream, format, VERSION, chmpx_commit_hash, ChmSecureSock::LibraryName());
 }
 
 const char* chmpx_get_version(void)
@@ -511,7 +512,7 @@ const char* chmpx_get_version(void)
 	static char stc_version[256];
 	static bool	stc_init = false;
 	if(!stc_init){
-		sprintf(stc_version, "Version %s (commit: %s)", VERSION, chmpx_commit_hash);
+		sprintf(stc_version, "Version %s (commit: %s) with %s", VERSION, chmpx_commit_hash, ChmSecureSock::LibraryName());
 		stc_init = true;
 	}
 	return stc_version;

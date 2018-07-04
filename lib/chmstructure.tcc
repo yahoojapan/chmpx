@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -94,6 +94,14 @@ void CVT_SSL_STRUCTURE(T1& chmpx_ssl, const T2& chmnode_cfginfo)
 	strcpy(chmpx_ssl.slave_prikey,	chmnode_cfginfo.slave_prikey.c_str());
 }
 
+// [NOTE]
+// Comparison of SSL/TLS structure only compares SSL/TLS enable flag and
+// Verify Peer flag.
+// After CHMPX supports multiple SSL/TLS libraries, the SSL/TLS structure
+// comparison result will be an error because the description of CA/Host
+// certifications will be different for each library. Then we check only
+// is_ssl and verify_peer member.
+//
 template<typename T>
 bool CMP_CHMPXSSL(const T& src1, const T& src2)
 {
@@ -103,14 +111,11 @@ bool CMP_CHMPXSSL(const T& src1, const T& src2)
 	if(!src1.is_ssl){
 		return true;
 	}
-	if(	src1.verify_peer ==				src2.verify_peer	&&
-		src1.is_ca_file  ==				src2.is_ca_file		&&
-		0 == strcmp(src1.capath,		src2.capath)		&&
-		0 == strcmp(src1.server_cert,	src2.server_cert)	&&
-		0 == strcmp(src1.server_prikey,	src2.server_prikey)	&&
-		0 == strcmp(src1.slave_cert,	src2.slave_cert)	&&
-		0 == strcmp(src1.slave_prikey,	src2.slave_prikey)	)
-	{
+	// [NOTE]
+	// Old version compared is_ca_file, capath, server_cert, server_prikey, slave_cert, slave_prikey members with verify_peer.
+	// But it does not have mean now.
+	//
+	if(src1.verify_peer == src2.verify_peer){
 		return true;
 	}
 	return false;
@@ -143,7 +148,14 @@ void FREE_HNAMESSLMAP(T& info)
 #define	STATUS_UPDATE_TIME_HI_MASK		static_cast<time_t>(0xffffffffff000000)
 #define	STATUS_UPDATE_TIME_LOW_MASK		static_cast<time_t>(0x0000000000ffffff)
 
-static time_t	basis_update_time		= (((time(NULL) / (365 * 24 * 60 * 60)) * (365 * 24 * 60 * 60)) << 24) & STATUS_UPDATE_TIME_HI_MASK;
+static time_t get_basis_update_time(void)
+{
+	// [NOTE]
+	// To avoid static object initialization order problem(SIOF)
+	//
+	static time_t	basis_update_time = (((time(NULL) / (365 * 24 * 60 * 60)) * (365 * 24 * 60 * 60)) << 24) & STATUS_UPDATE_TIME_HI_MASK;
+	return basis_update_time;
+}
 
 inline time_t GetStatusLastUpdateTime(void)
 {
@@ -157,7 +169,7 @@ inline time_t GetStatusLastUpdateTime(void)
 
 inline time_t NormalizeStatusLastUpdateTime(time_t base)
 {
-	if(base >= basis_update_time){
+	if(base >= get_basis_update_time()){
 		return base;
 	}
 	return ((base << 24) & STATUS_UPDATE_TIME_HI_MASK);
@@ -168,7 +180,7 @@ inline time_t NormalizeStatusLastUpdateTime(time_t base)
 //			0	: src1 == src2
 //			1	: src1 > src2
 //
-inline bool CompareStatusUpdateTime(time_t src1, time_t src2)
+inline int CompareStatusUpdateTime(time_t src1, time_t src2)
 {
 	time_t	result = NormalizeStatusLastUpdateTime(src1) - NormalizeStatusLastUpdateTime(src2);
 	return ((result < 0) ? -1 : (0 < result) ? 1 : 0);
@@ -1490,7 +1502,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 	}
 
-	if(0 <= CompareStatusUpdateTime(basic_type::pAbsPtr->last_status_time, chmpxsvr->last_status_time)){
+	if(0 >= CompareStatusUpdateTime(basic_type::pAbsPtr->last_status_time, chmpxsvr->last_status_time)){
 		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status is changed from (0x%016" PRIx64 ":%s) to (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, basic_type::pAbsPtr->status, STR_CHMPXSTS_FULL(basic_type::pAbsPtr->status).c_str(), chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
 		basic_type::pAbsPtr->last_status_time	= chmpxsvr->last_status_time;
 		basic_type::pAbsPtr->status				= chmpxsvr->status;
@@ -6830,6 +6842,7 @@ class chminfo_lap : public structure_lap<T>
 
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
 		bool Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend);
+		bool IsSafeCurrentVersion(void) const;
 		bool ReloadConfigration(const CHMCFGINFO* pchmcfg);
 
 		msgid_t GetBaseMsgId(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->base_msgid : 0L ); }
@@ -6858,6 +6871,8 @@ class chminfo_lap : public structure_lap<T>
 		bool SuspendAutoMerge(void);
 		bool ResetAutoMerge(void);
 		bool GetAutoMergeMode(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->is_auto_merge_suspend : false); }
+		chmss_ver_t GetSslMinVersion(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->ssl_min_ver : CHM_SSLTLS_VER_DEFAULT); }
+		const char* GetNssdbDir(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->nssdb_dir : NULL); }
 		int GetSocketThreadCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->evsock_thread_cnt : 0); }
 		int GetMQThreadCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->evmq_thread_cnt : 0); }
 		long GetMaxMQCount(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->max_mqueue : -1); }
@@ -6955,12 +6970,18 @@ bool chminfo_lap<T>::Initialize(void)
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
+	memset(basic_type::pAbsPtr->chminfo_version, 0, CHM_CHMINFO_VERSION_BUFLEN);
+	strcpy(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_CUR_VERSION_STR);
+	memset(basic_type::pAbsPtr->nssdb_dir, 0, CHM_MAX_PATH_LEN);
+
+	basic_type::pAbsPtr->chminfo_size			= sizeof(CHMINFO);
 	basic_type::pAbsPtr->pid					= CHM_INVALID_PID;
 	basic_type::pAbsPtr->start_time				= 0;
 	basic_type::pAbsPtr->is_random_deliver		= false;
 	basic_type::pAbsPtr->is_auto_merge			= false;
 	basic_type::pAbsPtr->is_auto_merge_suspend	= false;
 	basic_type::pAbsPtr->is_do_merge			= false;
+	basic_type::pAbsPtr->ssl_min_ver			= CHM_SSLTLS_VER_DEFAULT;
 	basic_type::pAbsPtr->evsock_thread_cnt		= 0;
 	basic_type::pAbsPtr->evmq_thread_cnt		= 0;
 	basic_type::pAbsPtr->max_mqueue				= 0L;
@@ -7008,21 +7029,47 @@ bool chminfo_lap<T>::Initialize(void)
 }
 
 template<typename T>
+bool chminfo_lap<T>::IsSafeCurrentVersion(void) const
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	// check prefix for version string
+	if(0 != strncmp(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_VERSION_PREFIX, strlen(CHM_CHMINFO_VERSION_PREFIX))){
+		MSG_CHMPRN("CHMINFO structure meybe old version before CHMPX version 1.0.59.");
+		return false;
+	}
+	// [NOTE]
+	// Now we do not check CHMINFO structure version.
+	//
+
+	return true;
+}
+
+template<typename T>
 bool chminfo_lap<T>::Dump(std::stringstream& sstream, const char* spacer) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
+	if(!IsSafeCurrentVersion()){
+		return false;
+	}
 	std::string	tmpspacer = spacer ? spacer : "";
 	tmpspacer += "  ";
 
+	sstream << (spacer ? spacer : "") << "CHMINFO version      = " << basic_type::pAbsPtr->chminfo_version		<< std::endl;
+	sstream << (spacer ? spacer : "") << "CHMINFO size         = " << basic_type::pAbsPtr->chminfo_size			<< std::endl;
 	sstream << (spacer ? spacer : "") << "pid                  = " << basic_type::pAbsPtr->pid					<< std::endl;
 	sstream << (spacer ? spacer : "") << "start_time           = " << basic_type::pAbsPtr->start_time			<< std::endl;
 	sstream << (spacer ? spacer : "") << "is_random_deliver    = " << (basic_type::pAbsPtr->is_random_deliver		? "true" : "false")	<< std::endl;
 	sstream << (spacer ? spacer : "") << "automerge in conf    = " << (basic_type::pAbsPtr->is_auto_merge			? "yes" : "no")		<< std::endl;
 	sstream << (spacer ? spacer : "") << "suspend automerge    = " << (basic_type::pAbsPtr->is_auto_merge_suspend	? "yes" : "no")		<< std::endl;
 	sstream << (spacer ? spacer : "") << "domerge in conf      = " << (basic_type::pAbsPtr->is_do_merge				? "yes" : "no")		<< std::endl;
+	sstream << (spacer ? spacer : "") << "SSL/TLS min version  = " << CHM_GET_STR_SSLTLS_VERSION(basic_type::pAbsPtr->ssl_min_ver)		<< std::endl;
+	sstream << (spacer ? spacer : "") << "NSSDB dir path       = " << basic_type::pAbsPtr->nssdb_dir			<< std::endl;
 	sstream << (spacer ? spacer : "") << "socket thread count  = " << basic_type::pAbsPtr->evsock_thread_cnt	<< std::endl;
 	sstream << (spacer ? spacer : "") << "MQ thread count      = " << basic_type::pAbsPtr->evmq_thread_cnt		<< std::endl;
 	sstream << (spacer ? spacer : "") << "max_mqueue           = " << basic_type::pAbsPtr->max_mqueue			<< std::endl;
@@ -7109,6 +7156,9 @@ typename chminfo_lap<T>::st_ptr_type chminfo_lap<T>::Dup(void)
 		ERR_CHMPRN("PCLTPROCLIST does not set.");
 		return NULL;
 	}
+	if(!IsSafeCurrentVersion()){
+		return NULL;
+	}
 
 	// duplicate
 	st_ptr_type	pdst;
@@ -7116,14 +7166,20 @@ typename chminfo_lap<T>::st_ptr_type chminfo_lap<T>::Dup(void)
 		ERR_CHMPRN("Could not allocation memory.");
 		return NULL;
 	}
+	memset(pdst->chminfo_version, 0, CHM_CHMINFO_VERSION_BUFLEN);
+	strcpy(pdst->chminfo_version, basic_type::pAbsPtr->chminfo_version);
+	memcpy(pdst->nssdb_dir, basic_type::pAbsPtr->nssdb_dir, CHM_MAX_PATH_LEN);
+
+	pdst->chminfo_size			= basic_type::pAbsPtr->chminfo_size;
 	pdst->pid					= basic_type::pAbsPtr->pid;
 	pdst->start_time			= basic_type::pAbsPtr->start_time;
-	pdst->evsock_thread_cnt		= basic_type::pAbsPtr->evsock_thread_cnt;
-	pdst->evmq_thread_cnt		= basic_type::pAbsPtr->evmq_thread_cnt;
 	pdst->is_random_deliver		= basic_type::pAbsPtr->is_random_deliver;
 	pdst->is_auto_merge			= basic_type::pAbsPtr->is_auto_merge;
 	pdst->is_auto_merge_suspend	= basic_type::pAbsPtr->is_auto_merge_suspend;
 	pdst->is_do_merge			= basic_type::pAbsPtr->is_do_merge;
+	pdst->evsock_thread_cnt		= basic_type::pAbsPtr->evsock_thread_cnt;
+	pdst->evmq_thread_cnt		= basic_type::pAbsPtr->evmq_thread_cnt;
+	pdst->ssl_min_ver			= basic_type::pAbsPtr->ssl_min_ver;
 	pdst->max_mqueue			= basic_type::pAbsPtr->max_mqueue;
 	pdst->chmpx_mqueue			= basic_type::pAbsPtr->chmpx_mqueue;
 	pdst->max_q_per_chmpxmq		= basic_type::pAbsPtr->max_q_per_chmpxmq;
@@ -7222,12 +7278,18 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 		return false;
 	}
 
+	memset(basic_type::pAbsPtr->chminfo_version, 0, CHM_CHMINFO_VERSION_BUFLEN);
+	strcpy(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_CUR_VERSION_STR);
+	strcpy(basic_type::pAbsPtr->nssdb_dir, pchmcfg->nssdb_dir.c_str());
+
+	basic_type::pAbsPtr->chminfo_size			= sizeof(CHMINFO);
 	basic_type::pAbsPtr->pid					= getpid();
 	basic_type::pAbsPtr->start_time				= time(NULL);
 	basic_type::pAbsPtr->is_random_deliver		= pchmcfg->is_random_mode;
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
 	basic_type::pAbsPtr->is_auto_merge_suspend	= false;					// default at loading configuration
 	basic_type::pAbsPtr->is_do_merge			= pchmcfg->is_do_merge;
+	basic_type::pAbsPtr->ssl_min_ver			= pchmcfg->ssl_min_ver;
 	basic_type::pAbsPtr->evsock_thread_cnt		= pchmcfg->sock_thread_cnt;
 	basic_type::pAbsPtr->evmq_thread_cnt		= pchmcfg->mq_thread_cnt;
 	basic_type::pAbsPtr->max_mqueue				= pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt;
@@ -7307,9 +7369,11 @@ bool chminfo_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
 	// [NOTE]
 	// reset is_auto_merge_suspend flag at reloading configration.
 	//
+	strcpy(basic_type::pAbsPtr->nssdb_dir, pchmcfg->nssdb_dir.c_str());
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
 	basic_type::pAbsPtr->is_auto_merge_suspend	= false;
 	basic_type::pAbsPtr->is_do_merge			= pchmcfg->is_do_merge;
+	basic_type::pAbsPtr->ssl_min_ver			= pchmcfg->ssl_min_ver;
 	basic_type::pAbsPtr->evsock_thread_cnt		= pchmcfg->sock_thread_cnt;
 	basic_type::pAbsPtr->evmq_thread_cnt		= pchmcfg->mq_thread_cnt;
 	basic_type::pAbsPtr->max_mqueue				= pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt;

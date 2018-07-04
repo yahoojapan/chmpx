@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2016 Yahoo! JAPAN corporation.
+ * Copyright 2016 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Fri Sep 2 2016
@@ -22,6 +22,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "chmcommon.h"
 #include "chmstructure.h"
@@ -157,6 +158,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("process start time                           = %zu (unix time)",	pInfo->pchminfo->start_time);
 	PRN("chmpx shared memory file path                = %s",				pInfo->shmpath);
 	PRN("chmpx shared memory file size                = %zu (byte)",		pInfo->shmsize);
+	PRN("chmpx info structure version                 = %s",				pInfo->pchminfo->chminfo_version);
+	PRN("chmpx info structure size                    = %zu (byte)",		pInfo->pchminfo->chminfo_size);
 	PRN("k2hash file path                             = %s",				pInfo->k2hashpath);
 	PRN("k2hash full mapping                          = %s",				pInfo->pchminfo->k2h_fullmap ? "yes" : "no");
 	PRN("k2hash mask bit count                        = %d",				pInfo->pchminfo->k2h_mask_bitcnt);
@@ -167,6 +170,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("auto merge                                   = %s",				pInfo->pchminfo->is_auto_merge ? "yes" : "no");
 	PRN("suspend auto merge                           = %s",				pInfo->pchminfo->is_auto_merge_suspend ? "yes" : "no");
 	PRN("merge processing(do merge)                   = %s",				pInfo->pchminfo->is_do_merge ? "yes" :"no");
+	PRN("SSL/TLS minium version                       = %s",				CHM_GET_STR_SSLTLS_VERSION(pInfo->pchminfo->ssl_min_ver));
+	PRN("NSSDB directory path                         = %s",				pInfo->pchminfo->nssdb_dir);
 	PRN("timeout for merge                            = %zd (s)",			pInfo->pchminfo->timeout_merge);
 	PRN("thread count for socket                      = %d",				pInfo->pchminfo->evsock_thread_cnt);
 	PRN("thread count for MQ                          = %d",				pInfo->pchminfo->evmq_thread_cnt);

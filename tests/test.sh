@@ -2,7 +2,7 @@
 #
 # CHMPX
 #
-# Copyright 2015 Yahoo! JAPAN corporation.
+# Copyright 2015 Yahoo Japan Corporation.
 #
 # CHMPX is inprocess data exchange by MQ with consistent hashing.
 # CHMPX is made for the purpose of the construction of
@@ -14,7 +14,7 @@
 # provides a high performance, a high scalability.
 #
 # For the full copyright and license information, please view
-# the LICENSE file that was distributed with this source code.
+# the license file that was distributed with this source code.
 #
 # AUTHOR:   Takeshi Nakatani
 # CREATE:   Fri May 8 2015

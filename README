@@ -1,7 +1,7 @@
 CHMPX
 --------
 
-CHMPX - Consistent Hashing Mq inProcess data eXchange by Yahoo! JAPAN
+CHMPX - Consistent Hashing Mq inProcess data eXchange
 
 ### Overview
 CHMPX is inprocess data exchange by MQ with consistent hashing system,
@@ -37,6 +37,6 @@ scalability.
   - https://github.com/yahoojapan/chmpx/wiki
 
 ### License
-This software is released under the MIT License, see the LICENSE file.
+This software is released under the MIT License, see the license file.
 
-Copyright 2014 Yahoo! JAPAN corporation.
+Copyright(C) 2014 Yahoo Japan Corporation.

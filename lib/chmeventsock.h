@@ -1,7 +1,7 @@
 /*
  * CHMPX
  *
- * Copyright 2014 Yahoo! JAPAN corporation.
+ * Copyright 2014 Yahoo Japan Corporation.
  *
  * CHMPX is inprocess data exchange by MQ with consistent hashing.
  * CHMPX is made for the purpose of the construction of
@@ -13,7 +13,7 @@
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
- * the LICENSE file that was distributed with this source code.
+ * the license file that was distributed with this source code.
  *
  * AUTHOR:   Takeshi Nakatani
  * CREATE:   Tue July 1 2014
@@ -24,13 +24,33 @@
 #define	CHMEVENTSOCK_H
 
 #include <pthread.h>
-#include <openssl/ssl.h>
 #include <string>
 #include <map>
 
 #include "chmeventbase.h"
 #include "chmthread.h"
 #include "chmlockmap.tcc"
+
+//---------------------------------------------------------
+// Symbols (must be defined before chmss.h)
+//---------------------------------------------------------
+#define	PXCOMPKT_AUTO_LENGTH			(-1)
+
+#define	WAIT_READ_FD					1
+#define	WAIT_WRITE_FD					2
+#define	WAIT_BOTH_FD					(WAIT_READ_FD | WAIT_WRITE_FD)
+
+#define	ISSAFE_WAIT_FD(type)			(0 != (type & WAIT_BOTH_FD))
+#define	IS_WAIT_READ_FD(type)			(0 != (type & WAIT_READ_FD))
+#define	IS_WAIT_WRITE_FD(type)			(0 != (type & WAIT_WRITE_FD))
+
+#define	CHMEVENTSOCK_RETRY_DEFAULT		(-1)
+#define	CHMEVENTSOCK_TIMEOUT_DEFAULT	(0)
+
+//
+// Include SSL/TLS implement header
+//
+#include "chmss.h"
 
 //---------------------------------------------------------
 // Structure
@@ -46,24 +66,8 @@ typedef struct chm_send_sock_status{
 typedef std::map<chmpxid_t, reqidmapflag_t>	mergeidmap_t;
 typedef chm_lock_map<int, chmpxid_t>		sock_ids_map_t;
 typedef chm_lock_map<int, std::string>		sock_pending_map_t;
-typedef chm_lock_map<int, SSL*>				sock_ssl_map_t;
+typedef chm_lock_map<int, ChmSSSession>		sock_ssl_map_t;
 typedef chm_lock_map<int, PCHMSSSTAT>		sendlockmap_t;
-
-//---------------------------------------------------------
-// Symbols
-//---------------------------------------------------------
-#define	PXCOMPKT_AUTO_LENGTH			(-1)
-
-#define	WAIT_READ_FD					1
-#define	WAIT_WRITE_FD					2
-#define	WAIT_BOTH_FD					(WAIT_READ_FD | WAIT_WRITE_FD)
-
-#define	ISSAFE_WAIT_FD(type)			(0 != (type & WAIT_BOTH_FD))
-#define	IS_WAIT_READ_FD(type)			(0 != (type & WAIT_READ_FD))
-#define	IS_WAIT_WRITE_FD(type)			(0 != (type & WAIT_WRITE_FD))
-
-#define	CHMEVENTSOCK_RETRY_DEFAULT		(-1)
-#define	CHMEVENTSOCK_TIMEOUT_DEFAULT	(0)
 
 //---------------------------------------------------------
 // ChmEventSock Class
@@ -93,6 +97,14 @@ class ChmEventSock : public ChmEventBase
 		static const int			DEFAULT_MAX_SOCK_POOL		= 1;		// max socket count for each chmpx
 		static const time_t			DEFAULT_SOCK_POOL_TIMEOUT	= 60;		// timeout value till closing for unsed socket in pool
 		static const time_t			NO_SOCK_POOL_TIMEOUT		= 0;		// no timeout for socket pool
+		static const int			DEFAULT_KEEPIDLE			= 60;		// time until sending keep alive
+		static const int			DEFAULT_KEEPINTERVAL		= 10;		// interval for sending keep alive
+		static const int			DEFAULT_KEEPCOUNT			= 3;		// maximum count of sending keep alive
+		static const int			DEFAULT_LISTEN_BACKLOG		= 256;
+		static const int			DEFAULT_RETRYCNT			= 500;		// retry count for send and receive(total default wait = 200us * 500 = 100ms)
+		static const int			DEFAULT_RETRYCNT_CONNECT	= 2500;		// retry count for connect.( = (500 * 1000) / 200 )
+		static const suseconds_t	DEFAULT_WAIT_SOCKET			= 200;		// timeout/count for send and receive.(200us)
+		static const suseconds_t	DEFAULT_WAIT_CONNECT		= 500 * 1000;	// total timeout for connect.(500ms)
 
 	protected:
 		typedef enum chm_downsvr_merge_type{								// for ChangeDownSvrStatusBeforeMerge method
@@ -100,30 +112,14 @@ class ChmEventSock : public ChmEventBase
 			CHM_DOWNSVR_MERGE_COMPLETE,
 			CHM_DOWNSVR_MERGE_ABORT
 		}CHMDOWNSVRMERGE;
-																			// Disconnect Detection = (60 + 10 * 3) sec
-		static const int			DEFAULT_KEEPIDLE		= 60;			// time until sending keep alive
-		static const int			DEFAULT_KEEPINTERVAL	= 10;			// interval for sending keep alive
-		static const int			DEFAULT_KEEPCOUNT		= 3;			// maximum count of sending keep alive
-		static const int			DEFAULT_LISTEN_BACKLOG	= 256;
-		static const int			DEFAULT_RETRYCNT		= 500;			// retry count for send and receive(total default wait = 200us * 500 = 100ms)
-		static const int			DEFAULT_RETRYCNT_CONNECT= 2500;			// retry count for connect.( = (500 * 1000) / 200 )
-		static const suseconds_t	DEFAULT_WAIT_SOCKET		= 200;			// timeout/count for send and receive.(200us)
-		static const suseconds_t	DEFAULT_WAIT_CONNECT	= 500 * 1000;	// total timeout for connect.(500ms)
 
-		static int					CHM_SSL_VERIFY_DEPTH;					// SSL cert verify depth
-		static const char*			strVerifyCBDataIndex;					// string keyword for data index
-		static int					verify_cb_data_index;					// Data index for verify callback function
-		static int					ssl_session_id;							// Session ID
-		static bool					is_self_sigined;						// For DEBUG
-
+		ChmSecureSock*				pSecureSock;							// SSL/TLS Library wrapper object
 		sock_ids_map_t				seversockmap;							// to server sockets
 		sock_ids_map_t				slavesockmap;							// from slave sockets
 		sock_pending_map_t			acceptingmap;							// from slave sockets before accepting
 		sock_ids_map_t				ctlsockmap;								// from client sockets to ctlport
 		sock_ssl_map_t				sslmap;									// to server/from slave ssl object maping
 		sendlockmap_t				sendlockmap;							// lock socket map for sending
-		SSL_CTX*					svr_sslctx;								// SSL Context for server
-		SSL_CTX*					slv_sslctx;								// SSL Context for slave
 		bool						startup_servicein;						// SERVICE IN pending at start when automerge mode is true
 		volatile bool				is_run_merge;							// whichever run or abort in merging
 		ChmThread					procthreads;							// processing threads
@@ -142,25 +138,15 @@ class ChmEventSock : public ChmEventBase
 		suseconds_t					con_wait_time;							// cache value for total timeout for connect
 
 	protected:
-		// SSL
-		static int VerifyCallBackSSL(int preverify_ok, X509_STORE_CTX* store_ctx);
-		static bool CheckResultSSL(int sock, SSL* ssl, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static SSL_CTX* MakeSSLContext(const char* CApath, const char* CAfile, const char* server_cert, const char* server_prikey, const char* slave_cert, const char* slave_prikey, bool is_verify_peer);
-		static SSL* HandshakeSSL(SSL_CTX* ctx, int sock, bool is_accept, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static SSL* AcceptSSL(SSL_CTX* ctx, int sock, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT) { return ChmEventSock::HandshakeSSL(ctx, sock, true, con_retrycnt, con_waittime); }
-		static SSL* ConnectSSL(SSL_CTX* ctx, int sock, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT) { return ChmEventSock::HandshakeSSL(ctx, sock, false, con_retrycnt, con_waittime); }
-		static bool ShutdownSSL(int sock, SSL* ssl, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-
 		static bool SetNonblocking(int sock);
-		static int WaitForReady(int sock, int type, int retrycnt, bool is_check_so_error = false, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static int Listen(const char* hostname, short port);
 		static int RawListen(struct addrinfo* paddrinfo);
 		static int Connect(const char* hostname, short port, bool is_blocking = false, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static bool RawSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool& is_closed, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static bool RawSend(int sock, SSL* ssl, const unsigned char* pbydata, size_t length, bool& is_closed, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static bool RawReceiveByte(int sock, SSL* ssl, bool& is_closed, unsigned char* pbuff, size_t length, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
+		static bool RawSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool& is_closed, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
+		static bool RawSend(int sock, ChmSSSession ssl, const unsigned char* pbydata, size_t length, bool& is_closed, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
+		static bool RawReceiveByte(int sock, ChmSSSession ssl, bool& is_closed, unsigned char* pbuff, size_t length, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static bool RawReceiveAny(int sock, bool& is_closed, unsigned char* pbuff, size_t* plength, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
-		static bool RawReceive(int sock, SSL* ssl, bool& is_closed, PCOMPKT* ppComPkt, size_t pktlength = 0L, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
+		static bool RawReceive(int sock, ChmSSSession ssl, bool& is_closed, PCOMPKT* ppComPkt, size_t pktlength = 0L, bool is_blocking = false, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static bool RawSendCtlPort(const char* hostname, short ctlport, const unsigned char* pbydata, size_t length, std::string& strResult, volatile int& sockfd_lockval, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 
 		static bool hton(PCOMPKT pComPkt, size_t& length);
@@ -193,8 +179,7 @@ class ChmEventSock : public ChmEventBase
 		bool CloseSocketWithEpoll(int sock);
 
 		// SSL
-		SSL_CTX* GetSSLContext(const char* CApath, const char* CAfile, const char* server_cert, const char* server_prikey, const char* slave_cert, const char* slave_prikey, bool is_verify_peer);
-		SSL* GetSSL(int sock);
+		ChmSSSession GetSSL(int sock);
 		bool IsSafeParamsForSSL(void);
 
 		// Socket lock for sending
@@ -205,8 +190,8 @@ class ChmEventSock : public ChmEventBase
 		bool GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check_slave);
 
 		// Send with locking
-		bool LockedSend(int sock, SSL* ssl, PCOMPKT pComPkt, bool is_blocking = false);
-		bool LockedSend(int sock, SSL* ssl, const unsigned char* pbydata, size_t length, bool is_blocking = false);
+		bool LockedSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool is_blocking = false);
+		bool LockedSend(int sock, ChmSSSession ssl, const unsigned char* pbydata, size_t length, bool is_blocking = false);
 
 		// Utility
 		chmpxid_t GetAssociateChmpxid(int fd);
@@ -314,10 +299,11 @@ class ChmEventSock : public ChmEventBase
 		bool PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
 
 	public:
-		static void AllowSelfSignedCert(void) { ChmEventSock::is_self_sigined = true; }		// For only debugging
-		static void DenySelfSignedCert(void) { ChmEventSock::is_self_sigined = true; }
+		static void AllowSelfSignedCert(void);
+		static void DenySelfSignedCert(void);
+		static int WaitForReady(int sock, int type, int retrycnt, bool is_check_so_error = false, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 
-		ChmEventSock(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL);
+		ChmEventSock(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, bool is_ssl = false);
 		virtual ~ChmEventSock();
 
 		bool InitialAllServerStatus(void);
