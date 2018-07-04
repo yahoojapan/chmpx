@@ -226,7 +226,7 @@ AC_CONFIG_FILES([Makefile
 				buildutils/Makefile
 				buildutils/control
 				buildutils/copyright
-				buildutils/chmpx.spec)]
+				buildutils/chmpx.spec])
 
 AC_OUTPUT
 
