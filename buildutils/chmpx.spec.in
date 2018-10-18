@@ -52,8 +52,9 @@ License: @PKGLICENSE@
 Group: Applications/Databases
 URL: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@
 Source0: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@/archive/%{gittag}/%{name}-%{version}.tar.gz
+Requires: k2hash%{?_isa} >= 1.0.63, libfullock%{?_isa} >= 1.0.30
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
-BuildRequires: git-core gcc-c++ make libtool k2hash-devel%{?_isa} >= 1.0.61, libfullock-devel%{?_isa} >= 1.0.28
+BuildRequires: git-core gcc-c++ make libtool k2hash-devel%{?_isa} >= 1.0.63, libfullock-devel%{?_isa} >= 1.0.30
 Prefix: %{_prefix}
 
 %description
@@ -102,7 +103,7 @@ rm -rf %{buildroot}
 #
 %package devel
 Summary: @SHORTDESC@ (development)
-Requires: %{name}%{?_isa} = %{version}-%{release}, k2hash-devel%{?_isa} >= 1.0.61, libfullock-devel%{?_isa} >= 1.0.28
+Requires: %{name}%{?_isa} = %{version}-%{release}, k2hash-devel%{?_isa} >= 1.0.63, libfullock-devel%{?_isa} >= 1.0.30
 
 %description devel
 Development package for building with @PACKAGE_NAME@ shared library.
