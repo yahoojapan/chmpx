@@ -2,7 +2,7 @@ Source: @PACKAGE_NAME@
 Section: net
 Priority: extra
 Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
-Build-Depends: debhelper (>= 9), autotools-dev, k2hash-dev (>= 1.0.61), libfullock-dev (>= 1.0.28), libyaml-dev
+Build-Depends: debhelper (>= 9), autotools-dev, k2hash-dev (>= 1.0.63), libfullock-dev (>= 1.0.30), libyaml-dev
 Standards-Version: 3.9.5
 Homepage: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
 Vcs-Git: git://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@.git
@@ -13,7 +13,7 @@ Section: devel
 Architecture: amd64
 Conflicts: chmproxy-dev
 Replaces: chmproxy-dev
-Depends: @PACKAGE_NAME@ (= ${binary:Version}), k2hash-dev (>= 1.0.61), libfullock-dev (>= 1.0.28), libyaml-dev
+Depends: @PACKAGE_NAME@ (= ${binary:Version}), k2hash-dev (>= 1.0.63), libfullock-dev (>= 1.0.30), libyaml-dev
 Description: @SHORTDESC@ (development)
  Development package for building with @PACKAGE_NAME@ shared library.
   This package has header files and symbols for it.
@@ -23,6 +23,6 @@ Section: net
 Architecture: amd64
 Conflicts: chmproxy
 Replaces: chmproxy
-Depends: ${shlibs:Depends}, ${misc:Depends}, k2hash (>= 1.0.61), libfullock (>= 1.0.28)
+Depends: ${shlibs:Depends}, ${misc:Depends}, k2hash (>= 1.0.63), libfullock (>= 1.0.30)
 Description: @SHORTDESC@
 @DEBLONGDESC@
