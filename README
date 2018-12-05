@@ -13,7 +13,7 @@ based servers are dispersed by consistent hashing and are automatically
 layouted. As a result, it provides a high performance, a high
 scalability.
 
-### Feature
+### CHMPX is following specifications.
   - Build up cluster with uniq name by some servers.
   - Layouts servers in cluster by consistent hashing.
   - Supports interprocess communication across the servers.
@@ -33,8 +33,10 @@ scalability.
   - Supports data merging automatically
   - Supports scaling automatically
 
-### Doccuments
-  - https://github.com/yahoojapan/chmpx/wiki
+### Documents
+  - Github Pages - https://chmpx.antpick.ax/
+  - Github Wiki - https://github.com/yahoojapan/chmpx/wiki
+  - AntPickax - https://antpick.ax/
 
 ### License
 This software is released under the MIT License, see the license file.
