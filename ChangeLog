@@ -1,3 +1,10 @@
+chmpx (1.0.64) unstable; urgency=low
+
+  * Fixed some compile warnings and updated AUTHOR
+  * Changed to strict packaging and changed documents
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 05 Dec 2018 18:51:46 +0900
+
 chmpx (1.0.63) unstable; urgency=low
 
   * Fixed spec file and updated dependency

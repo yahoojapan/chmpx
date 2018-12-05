@@ -1,6 +1,12 @@
 CHMPX
 --------
 [![Build Status](https://travis-ci.org/yahoojapan/chmpx.svg?branch=master)](https://travis-ci.org/yahoojapan/chmpx)
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/yahoojapan/chmpx/master/COPYING)
+[![GitHub forks](https://img.shields.io/github/forks/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/network)
+[![GitHub stars](https://img.shields.io/github/stars/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/issues)
+[![debian packages](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
+[![RPM packages](https://img.shields.io/badge/rpm-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 
 CHMPX - Consistent Hashing Mq inProcess data eXchange
 
@@ -34,8 +40,14 @@ scalability.
   - Supports data merging automatically
   - Supports scaling automatically
 
-### Doccuments
-  - [WIKI](https://github.com/yahoojapan/chmpx/wiki)
+### Documents
+  - [Document top page](https://chmpx.antpick.ax/)
+  - [Github wiki page](https://github.com/yahoojapan/chmpx/wiki)
+  - [About AntPickax](https://antpick.ax/)
+
+### Packages
+  - [RPM packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
+  - [Debian packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
 
 ### License
 This software is released under the MIT License, see the license file.

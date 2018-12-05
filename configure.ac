@@ -25,7 +25,7 @@
 
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
-
+#
 AC_PREREQ([2.63])
 AC_INIT(chmpx, m4_esyscmd([tr -d '\n' < $(pwd)/RELEASE_VERSION]))
 AM_INIT_AUTOMAKE()
@@ -45,7 +45,6 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
-AC_PROG_LIBTOOL
 
 #
 # Checks for libraries.
@@ -104,6 +103,8 @@ AC_SUBST([LIB_VERSION_LINK], "`$(pwd)/buildutils/make_variables.sh -lib_version_
 AC_SUBST([LIB_MAJOR_NUMBER], "`$(pwd)/buildutils/make_variables.sh -major_number`")
 AC_SUBST([PKGLICENSE], "`grep License COPYING | sed 's/ License//g'`")
 AC_SUBST([DEBCOPYING], "`tail -n +5 COPYING | sed 's/^$/./g' | sed 's/^/ /g'`")
+AC_SUBST([DEBHELPER_DEP], "`$(pwd)/buildutils/make_variables.sh -debhelper_dep`")
+AC_SUBST([RPMPKG_GROUP], ["`$(pwd)/buildutils/make_variables.sh -rpmpkg_group | sed 's#NEEDRPMGROUP#Group: Applications/Communications#g'`"])
 AM_SUBST_NOTMAKE([CURRENTREV])
 AM_SUBST_NOTMAKE([RPMCHANGELOG])
 AM_SUBST_NOTMAKE([SHORTDESC])
@@ -111,6 +112,8 @@ AM_SUBST_NOTMAKE([LONGDESC])
 AM_SUBST_NOTMAKE([ESCLONGDESC])
 AM_SUBST_NOTMAKE([DEBLONGDESC])
 AM_SUBST_NOTMAKE([DEBCOPYING])
+AM_SUBST_NOTMAKE([DEBHELPER_DEP])
+AM_SUBST_NOTMAKE([RPMPKG_GROUP])
 
 #
 # pkg-config for old version
@@ -168,6 +171,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_OPENSSL, 1, [Defined for linking OpenSSL library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssopenssl.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssopenssl.h")
+		AC_SUBST([CONFIGREWITHOPT], "--with-openssl")
+		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
 		;;
 	nss)
 		AC_MSG_RESULT(NSS)
@@ -175,6 +180,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_NSS, 1, [Defined for linking NSS library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssnss.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssnss.h")
+		AC_SUBST([CONFIGREWITHOPT], "--with-nss")
+		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
 		;;
 	gnutls)
 		AC_MSG_RESULT(gnutls)
@@ -182,6 +189,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_GNUTLS, 1, [Defined for linking GnuTLS library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssgnutls.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssgnutls.h")
+		AC_SUBST([CONFIGREWITHOPT], "--with-gnutls")
+		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
 		;;
 	*)
 		AC_MSG_ERROR([unknown SSL/TLS library type.])
@@ -205,8 +214,8 @@ AC_ARG_ENABLE(check-depend-libs,
 	esac]
 )
 AS_IF([test ${check_depend_libs} = 1], [AC_MSG_RESULT(yes)], [AC_MSG_RESULT(no)])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.63], [], [AC_MSG_ERROR(not found k2hash package)])])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.30], [], [AC_MSG_ERROR(not found libfullock package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.67], [], [AC_MSG_ERROR(not found k2hash package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.32], [], [AC_MSG_ERROR(not found libfullock package)])])
 
 #
 # CFLAGS/CXXFLAGS
