@@ -73,7 +73,7 @@ static inline char* programname(char* prgpath)
 
 inline std::string PRN_TIMESPEC(const timespec& ts)
 {
-	char	szBuff[32];
+	char	szBuff[64];
 	string	strResult;
 
 	if(0 < ts.tv_sec){

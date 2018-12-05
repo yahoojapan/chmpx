@@ -277,7 +277,7 @@ static bool SetBenchOptions(ChmOpts& opts, BOPTS& benchopts)
 			exit(EXIT_FAILURE);
 		}
 	}
-	strncpy(benchopts.szConfig, config.c_str(), BENCH_CONF_LENGTH - 1);
+	strncpy(&benchopts.szConfig[0], config.c_str(), BENCH_CONF_LENGTH - 1);
 
 	// loop count
 	benchopts.LoopCnt = 1;
