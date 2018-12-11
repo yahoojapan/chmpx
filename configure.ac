@@ -171,8 +171,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_OPENSSL, 1, [Defined for linking OpenSSL library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssopenssl.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssopenssl.h")
-		AC_SUBST([CONFIGREWITHOPT], "--with-openssl")
-		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
+		AC_SUBST([CONFIGUREWITHOPT], "--with-openssl")
+		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
 		;;
 	nss)
 		AC_MSG_RESULT(NSS)
@@ -180,8 +180,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_NSS, 1, [Defined for linking NSS library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssnss.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssnss.h")
-		AC_SUBST([CONFIGREWITHOPT], "--with-nss")
-		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
+		AC_SUBST([CONFIGUREWITHOPT], "--with-nss")
+		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
 		;;
 	gnutls)
 		AC_MSG_RESULT(gnutls)
@@ -189,8 +189,8 @@ case "${ssl_lib}" in
 		AC_DEFINE(SSL_TLS_TYPE_GNUTLS, 1, [Defined for linking GnuTLS library])
 		AC_SUBST([SSL_TLS_LIB_CSOURCE], "chmssgnutls.cc")
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssgnutls.h")
-		AC_SUBST([CONFIGREWITHOPT], "--with-gnutls")
-		AM_SUBST_NOTMAKE([CONFIGREWITHOPT])
+		AC_SUBST([CONFIGUREWITHOPT], "--with-gnutls")
+		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
 		;;
 	*)
 		AC_MSG_ERROR([unknown SSL/TLS library type.])
@@ -214,8 +214,8 @@ AC_ARG_ENABLE(check-depend-libs,
 	esac]
 )
 AS_IF([test ${check_depend_libs} = 1], [AC_MSG_RESULT(yes)], [AC_MSG_RESULT(no)])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.67], [], [AC_MSG_ERROR(not found k2hash package)])])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.32], [], [AC_MSG_ERROR(not found libfullock package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.68], [], [AC_MSG_ERROR(not found k2hash package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.33], [], [AC_MSG_ERROR(not found libfullock package)])])
 
 #
 # CFLAGS/CXXFLAGS

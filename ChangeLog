@@ -1,3 +1,9 @@
+chmpx (1.0.65) unstable; urgency=low
+
+  * Updated common build tool files
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 11 Dec 2018 12:54:15 +0900
+
 chmpx (1.0.64) unstable; urgency=low
 
   * Fixed some compile warnings and updated AUTHOR
