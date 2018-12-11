@@ -53,6 +53,6 @@ scalability.
 This software is released under the MIT License, see the license file.
 
 ### AntPickax
-k2hash is one of [AntPickax](https://yahoojapan.github.io/AntPickax/) products.
+k2hash is one of [AntPickax](https://antpick.ax/) products.
 
 Copyright(C) 2014 Yahoo Japan corporation.
