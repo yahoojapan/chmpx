@@ -42,10 +42,10 @@ SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TL
 
 | SSL/TLS library | K2HASH configure options | CHMPX configure options |
 |:--|:--|:--|
-| [OpenSSL](https://www.openssl.org/) | ./configure --prefix=/usr --with-openssl | ./configure --prefix=/usr --with-openssl |
-| [GnuTLS](https://gnutls.org/) | ./configure --prefix=/usr --with-gcrypt | ./configure --prefix=/usr --with-gnutls |
-| [GnuTLS](https://gnutls.org/) | ./configure --prefix=/usr --with-nettle | ./configure --prefix=/usr --with-gnutls |
-| [Mozilla NSS](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS) | ./configure --prefix=/usr --with-nss | ./configure --prefix=/usr --with-nss |
+| [OpenSSL](https://www.openssl.org/) | ./configure \-\-prefix=/usr \-\-with-openssl | ./configure \-\-prefix=/usr \-\-with-openssl |
+| [GnuTLS](https://gnutls.org/) (gcrypt)| ./configure \-\-prefix=/usr \-\-with-gcrypt | ./configure \-\-prefix=/usr \-\-with-gnutls |
+| [GnuTLS](https://gnutls.org/) (nettle)| ./configure \-\-prefix=/usr \-\-with-nettle | ./configure \-\-prefix=/usr \-\-with-gnutls |
+| [Mozilla NSS](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS) | ./configure \-\-prefix=/usr \-\-with-nss | ./configure \-\-prefix=/usr \-\-with-nss |
 
 ### 1.2. packagecloud.ioから各依存ライブラリとヘッダファイルをインストールします。
 
