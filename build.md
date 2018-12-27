@@ -40,12 +40,12 @@ Read the following documents for details:
 
 Table1. possible configure option:
 
-| K2HASH configure options | CHMPX configure options | SSL/TLS library |
+| SSL/TLS library | K2HASH configure options | CHMPX configure options |
 |:--|:--|:--|
-| ./configure --prefix=/usr --with-openssl | ./configure --prefix=/usr --with-openssl | [OpenSSL](https://www.openssl.org/) |
-| ./configure --prefix=/usr --with-gcrypt | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |
-| ./configure --prefix=/usr --with-nettle | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |
-| ./configure --prefix=/usr --with-nss | ./configure --prefix=/usr --with-nss | [Mozilla NSS](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS) |
+| [OpenSSL](https://www.openssl.org/) | ./configure --prefix=/usr --with-openssl | ./configure --prefix=/usr --with-openssl |
+| [GnuTLS](https://gnutls.org/) | ./configure --prefix=/usr --with-gcrypt | ./configure --prefix=/usr --with-gnutls |
+| [GnuTLS](https://gnutls.org/) | ./configure --prefix=/usr --with-nettle | ./configure --prefix=/usr --with-gnutls |
+| [Mozilla NSS](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS) | ./configure --prefix=/usr --with-nss | ./configure --prefix=/usr --with-nss |
 
 ### 1.2. Install each dependent library and the header files from packagecloud.io
 
