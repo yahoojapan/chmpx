@@ -33,11 +33,10 @@ next_string: Developer
 
 詳細については以下の文書を読んでください。  
 * [fullock](https://fullock.antpick.ax/build.html)
-* [k2hash](https://k2hash.antpick.ax/build.html)
-
+* [k2hash](https://k2hash.antpick.ax/build.html)  
 SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TLSライブラリを使用します。[K2HASH](https://k2hash.antpick.ax/build.html)をビルドするときには、必然的に同じSSL/TLSライブラリーを選択するでしょう。[K2HASH](https://k2hash.antpick.ax/build.html)がサポートしているSSL/TLSライブラリは、[K2HASH](https://k2hash.antpick.ax/build.html)を参照してください。
 
-**注**: **CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH](https://k2hash.antpick.ax/build.html)ビルドオプションが**CHMPX**ビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
+**注**: 後段で説明していますが、**CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH](https://k2hash.antpick.ax/build.html)ビルドオプションが**CHMPX**ビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
 
 表1:
 | K2HASH  | CHMPX | description |

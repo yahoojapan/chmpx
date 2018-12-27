@@ -33,11 +33,10 @@ This chapter consists of three parts:
 
 Read the following documents for details:  
 * [fullock](https://fullock.antpick.ax/build.html)
-* [k2hash](https://k2hash.antpick.ax/build.html)
+* [k2hash](https://k2hash.antpick.ax/build.html)  
+  An application, which implements the SSL/TLS protocols, will use one SSL/TLS library. You will select the same SSL/TLS library when you build [K2HASH](https://k2hash.antpick.ax/build.html). See [K2HASH](https://k2hash.antpick.ax/build.html) what SSL/TLS libraries [K2HASH](https://k2hash.antpick.ax/build.html) supports.
 
-An application, which implements the SSL/TLS protocols, will use one SSL/TLS library. You will select the same SSL/TLS library when you build [K2HASH](https://k2hash.antpick.ax/build.html). See [K2HASH](https://k2hash.antpick.ax/build.html) what SSL/TLS libraries [K2HASH](https://k2hash.antpick.ax/build.html) supports.
-
-**Note**: You need consider **CHMPX** also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
+**Note**: You need consider **CHMPX**, I describe how to build it below, also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
 
 Table1:
 | K2HASH  | CHMPX | description |
@@ -53,7 +52,7 @@ This section instructs how to install each dependent library and the header file
 
 **Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/) in the previous section.
 
-***Note**: As I descripbed in the previous section, K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
+**Note**: As I descripbed in the previous section, [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
 
 For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
 ```bash
