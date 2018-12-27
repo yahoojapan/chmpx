@@ -39,8 +39,9 @@ Read the following documents for details:
 **Note**: You need consider **CHMPX**, I describe how to build it below, also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
 
 Table1:
-| K2HASH  | CHMPX | description |
-|:--|:--|:--| 
+
+| K2HASH configure options | CHMPX configure options | SSL/TLS library |
+|:--|:--|:--|
 | ./configure --prefix=/usr --with-openssl | ./configure --prefix=/usr --with-openssl | [OpenSSL](https://www.openssl.org/) |
 | ./configure --prefix=/usr --with-gcrypt | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |
 | ./configure --prefix=/usr --with-nettle | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |

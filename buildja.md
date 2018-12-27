@@ -39,8 +39,9 @@ SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TL
 **注**: 後段で説明していますが、**CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH](https://k2hash.antpick.ax/build.html)ビルドオプションが**CHMPX**ビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
 
 表1:
-| K2HASH  | CHMPX | description |
-|:--|:--|:--| 
+
+| K2HASH configure options | CHMPX configure options | SSL/TLS library |
+|:--|:--|:--|
 | ./configure --prefix=/usr --with-openssl | ./configure --prefix=/usr --with-openssl | [OpenSSL](https://www.openssl.org/) |
 | ./configure --prefix=/usr --with-gcrypt | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |
 | ./configure --prefix=/usr --with-nettle | ./configure --prefix=/usr --with-gnutls | [GnuTLS](https://gnutls.org/) |
