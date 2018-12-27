@@ -62,7 +62,7 @@ $ sudo apt-get install curl -y
 $ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.deb.sh \
     | sudo bash
 $ sudo apt-get install autoconf autotools-dev gcc g++ make gdb libtool pkg-config \
-    libyaml-dev libfullock-dev k2hash-dev chmpx-dev gnutls-dev -y
+    libyaml-dev libfullock-dev k2hash-dev gnutls-dev -y
 $ sudo apt-get install git -y
 ```
 
@@ -73,13 +73,13 @@ $ sudo yum install curl -y
 $ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.rpm.sh \
     | sudo bash
 $ sudo yum install autoconf automake gcc gcc-c++ gdb make libtool pkgconfig \
-    libyaml-devel libfullock-devel k2hash-devel chmpx-devel nss-devel -y
+    libyaml-devel libfullock-devel k2hash-devel nss-devel -y
 $ sudo yum install git -y
 ```
 
 ## 2. GitHubからソースコードを複製する
 
-GitHubから**mdtor**のソースコードをダウンロードしてください。
+GitHubから**CHMPX**のソースコードをダウンロードしてください。
 ```bash
 $ git clone https://github.com/yahoojapan/chmpx.git
 ```
