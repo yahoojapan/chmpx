@@ -38,7 +38,7 @@ Read the following documents for details:
 
 **Note**: You need consider **CHMPX**, I describe how to build it below, also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
 
-Table1:
+Table1. possible configure option:
 
 | K2HASH configure options | CHMPX configure options | SSL/TLS library |
 |:--|:--|:--|
@@ -53,7 +53,7 @@ This section instructs how to install each dependent library and the header file
 
 **Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/) in the previous section.
 
-**Note**: As I descripbed in the previous section, [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
+**Note**: As I descripbed in the previous section, [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
 
 For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
 ```bash
