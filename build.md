@@ -24,7 +24,7 @@ This chapter consists of three parts:
 
 **CHMPX** primarily depends on **fullock**, **k2hash**. Each dependent library and the header files are required to build **CHMPX**. We provide two ways to install them. You can select your favorite one.
 
-* Use [GitHub](https://github.com/)  
+* Use [GitHub](https://github.com/yahoojapan)  
   Install the source code of dependent libraries and the header files. You will **build** them and install them.
 * Use [packagecloud.io](https://packagecloud.io/)  
   Install packages of dependent libraries and the header files. You just install them. Libraries are already built.
@@ -34,7 +34,7 @@ This chapter consists of three parts:
 Read the following documents for details:  
 * [fullock](https://fullock.antpick.ax/build.html)
 * [k2hash](https://k2hash.antpick.ax/build.html)  
-  An application, which implements the SSL/TLS protocols, will use one SSL/TLS library. You will select the same SSL/TLS library when you build [K2HASH](https://k2hash.antpick.ax/build.html). See [K2HASH](https://k2hash.antpick.ax/build.html) what SSL/TLS libraries [K2HASH](https://k2hash.antpick.ax/build.html) supports.
+  An application, which implements the SSL/TLS protocols, will use one SSL/TLS library. You will select the same SSL/TLS library when you build [K2HASH](https://k2hash.antpick.ax/build.html). See [K2HASH Build](https://k2hash.antpick.ax/build.html) what SSL/TLS libraries [K2HASH](https://k2hash.antpick.ax/) supports.
 
 **Note**: You need consider **CHMPX**, I describe how to build it below, also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
 
@@ -49,11 +49,11 @@ Table1. possible configure option:
 
 ### 1.2. Install each dependent library and the header files from packagecloud.io
 
-This section instructs how to install each dependent library and the header files from [packagecloud.io](https://packagecloud.io/). 
+This section instructs how to install each dependent library and the header files from [packagecloud.io - AntPickax stable repository](https://packagecloud.io/antpickax/stable). 
 
-**Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/) in the previous section.
+**Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/yahoojapan) in the previous section.
 
-**Note**: As I descripbed in the previous section, [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
+**Note**: As I descripbed in the previous section, [K2HASH Build](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
 
 For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
 ```bash
@@ -79,7 +79,7 @@ $ sudo yum install git -y
 
 ## 2. Clone the source code from GitHub
 
-Download the **CHMPX**'s source code from [GitHub](https://github.com/).
+Download the **CHMPX**'s source code from [GitHub](https://github.com/yahoojapan/chmpx).
 ```bash
 $ git clone https://github.com/yahoojapan/chmpx.git
 ```

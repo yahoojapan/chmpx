@@ -20,23 +20,23 @@ next_string: Developer
 * ソースコードから**CHMPX**を構築する方法
 * **CHMPX**のインストール方法
 
-## 1. 前提条件をインストールする
+## 1. ビルド環境の構築
 
 **CHMPX**は主に、fullock、k2hashに依存します。それぞれの依存ライブラリとヘッダファイルは**CHMPX**をビルドするために必要です。それぞれの依存ライブラリとヘッダファイルをインストールする方法は2つあります。好きなものを選ぶことができます。
 
-* GitHubを使う  
+* [GitHub](https://github.com/yahoojapan)から依存ファイルをインストール
   依存ライブラリのソースコードとヘッダファイルをインストールします。あなたはそれぞれの依存ライブラリとヘッダファイルをビルドしてインストールします。
-* packagecloud.ioを使用する  
+* [packagecloud.io](https://packagecloud.io/)を使用する
   依存ライブラリのパッケージとヘッダファイルをインストールします。あなたはそれぞれの依存ライブラリとヘッダファイルをインストールするだけです。ライブラリはすでに構築されています。
 
-### 1.1. GitHubから各依存ライブラリとヘッダファイルをインストールします。
+### 1.1. GitHubから各依存ライブラリとヘッダファイルをインストール
 
 詳細については以下の文書を読んでください。  
-* [fullock](https://fullock.antpick.ax/build.html)
-* [k2hash](https://k2hash.antpick.ax/build.html)  
-SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TLSライブラリを使用します。[K2HASH](https://k2hash.antpick.ax/build.html)をビルドするときには、必然的に同じSSL/TLSライブラリーを選択するでしょう。[K2HASH](https://k2hash.antpick.ax/build.html)がサポートしているSSL/TLSライブラリは、[K2HASH](https://k2hash.antpick.ax/build.html)を参照してください。
+* [fullock](https://fullock.antpick.ax/buildja.html)
+* [k2hash](https://k2hash.antpick.ax/buildja.html)  
+SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TLSライブラリを使用する必要があります。[K2HASH](https://k2hash.antpick.ax/buildja.html)をビルドするときには、必然的にCHMPXで使用するSSL/TLSライブラリーを選択しなければなりません。[K2HASH](https://k2hash.antpick.ax/)がサポートしているSSL/TLSライブラリは、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)を参照してください。
 
-**注**: 後段で説明していますが、**CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH](https://k2hash.antpick.ax/build.html)ビルドオプションが**CHMPX**ビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
+**注**: 後段で説明していますが、**CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)のビルドオプションが**CHMPX**のビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
 
 表1. 可能な構成オプション:
 
@@ -47,13 +47,13 @@ SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TL
 | [GnuTLS](https://gnutls.org/) (nettle)| ./configure \-\-prefix=/usr \-\-with-nettle | ./configure \-\-prefix=/usr \-\-with-gnutls |
 | [Mozilla NSS](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS) | ./configure \-\-prefix=/usr \-\-with-nss | ./configure \-\-prefix=/usr \-\-with-nss |
 
-### 1.2. packagecloud.ioから各依存ライブラリとヘッダファイルをインストールします。
+### 1.2. packagecloud.ioから各依存ライブラリとヘッダファイルをインストール
 
-このセクションでは、packagecloud.ioから各依存ライブラリとヘッダーファイルをインストールする方法を説明します。
+このセクションでは、[packagecloud.io - AntPickax stable repository](https://packagecloud.io/antpickax/stable)から各依存ライブラリとヘッダーファイルをインストールする方法を説明します。
 
 **注**：前のセクションで各依存ライブラリとGitHubからのヘッダーファイルをインストールした場合は、このセクションを読み飛ばしてください。
 
-**注**：前のセクションで説明したように、[K2HASH](https://k2hash.antpick.ax/build.html)ビルドオプションは**CHMPX**ビルドオプションに影響します。 前のセクションの表1を参照してください。
+**注**：前のセクションで説明したように、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)のビルドオプションは**CHMPX**ビルドオプションに影響します。 前のセクションの表1を参照してください。
 
 DebianStretchまたはUbuntu（Bionic Beaver）をお使いの場合は、以下の手順に従ってください。
 ```bash
@@ -77,9 +77,10 @@ $ sudo yum install autoconf automake gcc gcc-c++ gdb make libtool pkgconfig \
 $ sudo yum install git -y
 ```
 
-## 2. GitHubからソースコードを複製する
+## 2. GitHubからソースコードを複製
 
-GitHubから**CHMPX**のソースコードをダウンロードしてください。
+GitHubから**CHMPX**の[ソースコード](https://github.com/yahoojapan/chmpx)をダウンロードしてください。
+
 ```bash
 $ git clone https://github.com/yahoojapan/chmpx.git
 ```

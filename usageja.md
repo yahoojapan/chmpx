@@ -40,7 +40,48 @@ CHMPXの利用するコンフィグレーションのサンプルを示します
 ## 簡単な動作確認
 CHMPXをビルドした後で、動作確認をしてみます。
 
-### 1. ビルド成功
+### 1. 利用環境構築
+
+**CHMPX** をご利用の環境にインストールするには、2つの方法があります。  
+ひとつは、[packagecloud.io](https://packagecloud.io/)から **CHMPX** のパッケージをダウンロードし、インストールする方法です。  
+もうひとつは、ご自身で **CHMPX** をソースコードからビルドし、インストールする方法です。  
+これらの方法について、以下に説明します。
+
+#### パッケージを使ったインストール
+**CHMPX** は、誰でも利用できるように[packagecloud.io - AntPickax stable repository](https://packagecloud.io/antpickax/stable/)で[パッケージ](https://packagecloud.io/app/antpickax/stable/search?q=chmpx)を公開しています。  
+**CHMPX** のパッケージは、Debianパッケージ、RPMパッケージの形式で公開しています。  
+お使いのOSによりインストール方法が異なりますので、以下の手順を確認してインストールしてください。  
+
+##### Debian(Stretch) / Ubuntu(Bionic Beaver)
+```
+$ sudo apt-get update -y
+$ sudo apt-get install curl -y
+$ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.deb.sh | sudo bash
+$ sudo apt-get install chmpx
+```
+開発者向けパッケージをインストールする場合は、以下のパッケージをインストールしてください。
+```
+$ sudo apt-get install chmpx-dev
+```
+
+##### Fedora28 / CentOS7.x(6.x)
+```
+$ sudo yum makecache
+$ sudo yum install curl -y
+$ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.rpm.sh | sudo bash
+$ sudo yum install chmpx
+```
+開発者向けパッケージをインストールする場合は、以下のパッケージをインストールしてください。
+```
+$ sudo yum install chmpx-devel
+```
+
+##### 上記以外のOS
+上述したOS以外をお使いの場合は、パッケージが準備されていないため、直接インストールすることはできません。  
+この場合には、後述の[ソースコード](https://github.com/yahoojapan/chmpx)からビルドし、インストールするようにしてください。
+
+#### ソースコードからビルド・インストール
+**CHMPX** を[ソースコード](https://github.com/yahoojapan/chmpx)からビルドし、インストールする方法は、[ビルド](https://chmpx.antpick.ax/buildja.html)を参照してください。
 
 ### 2. CHMPXサーバーノードを起動
 ```
