@@ -22,18 +22,18 @@ This chapter consists of three parts:
 
 ## 1. Install prerequisites
 
-**CHMPX** primarily depends on **fullock**, **k2hash**. Each dependent library and the header files are required to build **CHMPX**. We provide two ways to install them. You can select your favorite one.
+**CHMPX** primarily depends on [FULLOCK](https://fullock.antpick.ax/index.html), [K2HASH](https://k2hash.antpick.ax/index.html). Each dependent library and the header files are required to build **CHMPX**. We provide two ways to install them. You can select your favorite one.
 
 * Use [GitHub](https://github.com/yahoojapan)  
   Install the source code of dependent libraries and the header files. You will **build** them and install them.
-* Use [packagecloud.io](https://packagecloud.io/)  
+* Use [packagecloud.io](https://packagecloud.io/antpickax/stable)  
   Install packages of dependent libraries and the header files. You just install them. Libraries are already built.
 
 ### 1.1. Install each dependent library and the header files from GitHub
 
 Read the following documents for details:  
-* [fullock](https://fullock.antpick.ax/build.html)
-* [k2hash](https://k2hash.antpick.ax/build.html)  
+* [FULLOCK](https://fullock.antpick.ax/build.html)
+* [K2HASH](https://k2hash.antpick.ax/build.html)  
   An application, which implements the SSL/TLS protocols, will use one SSL/TLS library. You will select the same SSL/TLS library when you build [K2HASH](https://k2hash.antpick.ax/build.html). See [K2HASH Build](https://k2hash.antpick.ax/build.html) what SSL/TLS libraries [K2HASH](https://k2hash.antpick.ax/) supports.
 
 **Note**: You need consider **CHMPX**, I describe how to build it below, also requires one SSL/TLS library. This means the [K2HASH](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. Table1 shows possible configure options.
@@ -49,7 +49,7 @@ Table1. possible configure option:
 
 ### 1.2. Install each dependent library and the header files from packagecloud.io
 
-This section instructs how to install each dependent library and the header files from [packagecloud.io - AntPickax stable repository](https://packagecloud.io/antpickax/stable). 
+This section instructs how to install each dependent library and the header files from [packagecloud.io - AntPickax stable repository](https://packagecloud.io/antpickax/stable).
 
 **Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/yahoojapan) in the previous section.
 
@@ -106,7 +106,7 @@ $ make
 $ sudo make install
 ```
 
-After successfully installing **CHMPX**, you will see the CHMPX help text:
+After successfully installing **CHMPX**, you will see the **CHMPX** help text:
 ```bash
 $ chmpx -h
 [Usage]

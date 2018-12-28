@@ -22,11 +22,11 @@ next_string: Developer
 
 ## 1. ビルド環境の構築
 
-**CHMPX**は主に、fullock、k2hashに依存します。それぞれの依存ライブラリとヘッダファイルは**CHMPX**をビルドするために必要です。それぞれの依存ライブラリとヘッダファイルをインストールする方法は2つあります。好きなものを選ぶことができます。
+**CHMPX**は主に、[FULLOCK](https://fullock.antpick.ax/indexja.html)、[K2HASH](https://k2hash.antpick.ax/indexja.html)に依存します。それぞれの依存ライブラリとヘッダファイルは**CHMPX**をビルドするために必要です。それぞれの依存ライブラリとヘッダファイルをインストールする方法は2つあります。好きなものを選ぶことができます。
 
 * [GitHub](https://github.com/yahoojapan)から依存ファイルをインストール
   依存ライブラリのソースコードとヘッダファイルをインストールします。あなたはそれぞれの依存ライブラリとヘッダファイルをビルドしてインストールします。
-* [packagecloud.io](https://packagecloud.io/)を使用する
+* [packagecloud.io](https://packagecloud.io/antpickax/stable/)を使用する
   依存ライブラリのパッケージとヘッダファイルをインストールします。あなたはそれぞれの依存ライブラリとヘッダファイルをインストールするだけです。ライブラリはすでに構築されています。
 
 ### 1.1. GitHubから各依存ライブラリとヘッダファイルをインストール
@@ -34,7 +34,7 @@ next_string: Developer
 詳細については以下の文書を読んでください。  
 * [fullock](https://fullock.antpick.ax/buildja.html)
 * [k2hash](https://k2hash.antpick.ax/buildja.html)  
-SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TLSライブラリを使用する必要があります。[K2HASH](https://k2hash.antpick.ax/buildja.html)をビルドするときには、必然的にCHMPXで使用するSSL/TLSライブラリーを選択しなければなりません。[K2HASH](https://k2hash.antpick.ax/)がサポートしているSSL/TLSライブラリは、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)を参照してください。
+SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TLSライブラリを使用する必要があります。[K2HASH](https://k2hash.antpick.ax/buildja.html)をビルドするときには、必然的にCHMPXで使用するSSL/TLSライブラリーを選択しなければなりません。[K2HASH](https://k2hash.antpick.ax/indexja.html)がサポートしているSSL/TLSライブラリは、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)を参照してください。
 
 **注**: 後段で説明していますが、**CHMPX**も1つのSSL/TLSライブラリが必要であることを考慮する必要があります。これは、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)のビルドオプションが**CHMPX**のビルドオプションに影響することを意味します。 表1は、可能な構成オプションを示しています。
 
