@@ -110,7 +110,7 @@ basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, open_mo
 		return;
 	}
 	if(!init(pchmobj, opmode)){
-		WAN_CHMPRN("Parameter is sonmething wrong");
+		WAN_CHMPRN("Parameter is something wrong");
 		return;
 	}
 }
@@ -123,7 +123,7 @@ basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, chmhash
 		return;
 	}
 	if(!init(pchmobj, hash, opmode)){
-		WAN_CHMPRN("Parameter is sonmething wrong");
+		WAN_CHMPRN("Parameter is something wrong");
 		return;
 	}
 }
@@ -136,7 +136,7 @@ basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, const s
 		return;
 	}
 	if(!init(pchmobj, strkey, opmode)){
-		WAN_CHMPRN("Parameter is sonmething wrong");
+		WAN_CHMPRN("Parameter is something wrong");
 		return;
 	}
 }
@@ -153,8 +153,8 @@ bool basic_chmstreambuf<CharT, Traits>::reset(void)
 	// If there is no-flushed write buffer, flush it here.
 	//
 	if(pchmcntrl && streambuf_type::pbase() < streambuf_type::pptr()){
-		// If there are left data, thun send it.
-		// Be careful, if is_init_key is true, current posision must be over start os value data.
+		// If there are left data, send it.
+		// Be careful, if is_init_key is true, current position must be over start os value data.
 		//
 		if(!is_init_key || (reinterpret_cast<char_type*>(&output_buff[strlen(output_buff) + 1]) < streambuf_type::pptr())){
 			if(!send_sync()){
@@ -378,7 +378,7 @@ bool basic_chmstreambuf<CharT, Traits>::send_sync(void)
 		// check hash value(for only slave)
 		if(pchmcntrl->IsClientOnSlvType() && !is_init_hash){
 			if(output_buff == val_pos){
-				ERR_CHMPRN("Could not make hash value for sinding on slave because of empty key value.");
+				ERR_CHMPRN("Could not make hash value for sending on slave because of empty key value.");
 				init_output_buff();
 				return false;
 			}
@@ -519,7 +519,7 @@ bool basic_chmstreambuf<CharT, Traits>::receive_sync(void)
 // This stream only receives Manipulator(std::endl).
 // On server side:
 //   If this gets Manipulator, sends output buffer as soon as possible.
-//   But the object must start reciveing at first, so if the compkt pointer
+//   But the object must start receiving at first, so if the compkt pointer
 //   does not exist, fails to send(reply).
 //   If the object has not got key value, sends with key value empty.
 //
@@ -556,7 +556,7 @@ int basic_chmstreambuf<CharT, Traits>::sync(void)
 		}
 		*(streambuf_type::pptr()) = static_cast<char_type>('\0');
 
-		// check last charactor(LF)
+		// check last character(LF)
 		streambuf_type::pbump(-1);
 		if(traits_type::eq(static_cast<char_type>('\n'), *(streambuf_type::pptr()))){
 			*(streambuf_type::pptr()) = static_cast<char_type>('\0');
@@ -576,7 +576,7 @@ int basic_chmstreambuf<CharT, Traits>::sync(void)
 		return 0;
 	}
 
-	// check last charactor(LF)
+	// check last character(LF)
 	if(streambuf_type::pbase() < streambuf_type::pptr()){
 		*(streambuf_type::pptr()) = static_cast<char_type>('\0');
 
@@ -624,7 +624,7 @@ typename basic_chmstreambuf<CharT, Traits>::int_type basic_chmstreambuf<CharT, T
 		return traits_type::eof();
 	}
 
-	// for value posision
+	// for value position
 	off_type	val_offset = (reinterpret_cast<char_type*>(NULL) == output_val_pos || output_val_pos < output_buff) ? static_cast<off_type>(-1) : (output_val_pos - output_buff);
 
 	// expand buffer area
@@ -726,7 +726,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 				}
 			}else{
 				if(newcur < output_val_pos){
-					// This case is seek backward to over key value sepalator.
+					// This case is seek backward to over key value separator.
 					output_val_pos = reinterpret_cast<char_type*>(NULL);
 				}
 			}
@@ -761,7 +761,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 		if(reinterpret_cast<char_type*>(NULL) == input_buff){
 			// Now have not loaded yet, so try to receiving.
 			if(!receive_sync()){
-				WAN_CHMPRN("There is no reciving data, and failed to reciving, thus could not seek.");
+				WAN_CHMPRN("There is no receiving data, and failed to receiving, thus could not seek.");
 				return pos_type(off_type(-1));
 			}
 		}

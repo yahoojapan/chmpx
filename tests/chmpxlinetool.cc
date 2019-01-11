@@ -231,7 +231,7 @@ class ConsoleInput
 		strarr_t			history;
 		ssize_t				history_pos;
 		string				input;
-		size_t				input_pos;	// == cursole pos
+		size_t				input_pos;	// == cursor pos
 		struct termios		tty_backup;
 		bool				is_set_terminal;
 		int					last_errno;
@@ -362,13 +362,13 @@ void ConsoleInput::ClearInput(void)
 
 void ConsoleInput::ClearLine(void)
 {
-	for(size_t Count = 0; Count < input_pos; Count++){		// cursol to head
+	for(size_t Count = 0; Count < input_pos; Count++){		// cursor to head
 		putchar('\x08');
 	}
 	for(size_t Count = 0; Count < input.length(); Count++){	// clear by space
 		putchar(' ');
 	}
-	for(size_t Count = 0; Count < input.length(); Count++){	// rewind cursol to head
+	for(size_t Count = 0; Count < input.length(); Count++){	// rewind cursor to head
 		putchar('\x08');
 	}
 	fflush(stdout);
@@ -398,7 +398,7 @@ bool ConsoleInput::GetCommand(void)
 
 	char	input_char;
 	while(!IsBreakLoop){
-		// read one charactor
+		// read one character
 		if(!ReadByte(input_char)){
 			if(EINTR == last_errno){
 				last_errno = 0;
@@ -414,12 +414,12 @@ bool ConsoleInput::GetCommand(void)
 			break;
 
 		}else if('\x1b' == input_char){
-			// escape charactor --> next byte read
+			// escape character --> next byte read
 			if(!ReadByte(input_char)){
 				break;
 			}
 			if('\x5b' == input_char){
-				// read more charactor
+				// read more character
 				if(!ReadByte(input_char)){
 					break;
 				}
@@ -479,7 +479,7 @@ bool ConsoleInput::GetCommand(void)
 					}
 
 				}else if('\x31' == input_char){
-					// read more charactor
+					// read more character
 					if(!ReadByte(input_char)){
 						break;
 					}
@@ -493,7 +493,7 @@ bool ConsoleInput::GetCommand(void)
 					}
 
 				}else if('\x34' == input_char){
-					// read more charactor
+					// read more character
 					if(!ReadByte(input_char)){
 						break;
 					}
@@ -507,7 +507,7 @@ bool ConsoleInput::GetCommand(void)
 					}
 
 				}else if('\x33' == input_char){
-					// read more charactor
+					// read more character
 					if(!ReadByte(input_char)){
 						break;
 					}
@@ -581,7 +581,7 @@ bool ConsoleInput::GetCommand(void)
 			fflush(stdout);
 
 		}else if(isprint(input_char)){
-			// normal charactor
+			// normal character
 			input.insert(input_pos, 1, input_char);
 			for(size_t Count = input_pos; Count < input.length(); Count++){
 				putchar(input[Count]);
@@ -626,12 +626,12 @@ bool ConsoleInput::RemoveLastHistory(void)
 //---------------------------------------------------------
 // 
 // -help(h)                         help display
-// -conf <filename>                 chmpx configration file path(.ini .yaml .json) when run on chmpx node host
-// -json <string>                   chmpx configration by json string when run on chmpx node host
+// -conf <filename>                 chmpx configuration file path(.ini .yaml .json) when run on chmpx node host
+// -json <string>                   chmpx configuration by json string when run on chmpx node host
 // -host <hostname>                 hostname for chmpx node, if not specified, using localhost
 // -ctrlport <port>                 chmpx node control port, if host option is specified, this option must be specified.
-// -server                          chmpx node server type for hostanme specified
-// -slave                           chmpx node server type for hostanme specified(default)
+// -server                          chmpx node server type for hostname specified
+// -slave                           chmpx node server type for hostname specified(default)
 // -threadcnt <count>               thread count for DUMP command(default is 0)
 // -check <second>                  check and print all nodes status/hash/socket connection count after startup.
 // -status <second>                 print all nodes status by SELFSTATUS or ALLSTATUS after startup.
@@ -648,21 +648,21 @@ static void Help(const char* progname)
 	PRN("       %s -help", progname ? progname : "program");
 	PRN("Usage: set environment(%s or %s)", CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME);
 	PRN("       %s", progname ? progname : "program");
-	PRN("Usage: specify configration file path");
+	PRN("Usage: specify configuration file path");
 	PRN("       %s -conf <file> [-ctrlport <port>] [options...]", progname ? progname : "program");
-	PRN("Usage: specify json configration string");
+	PRN("Usage: specify json configuration string");
 	PRN("       %s -json <string> [-ctrlport <port>] [options...]", progname ? progname : "program");
 	PRN("Usage: specify hostname and port");
 	PRN("       %s [-host <hostname>] -ctrlport <port> {-server | -slave} [options...]", progname ? progname : "program");
 	PRN(NULL);
 	PRN("Options:");
 	PRN("       -help(h)           help display");
-	PRN("       -conf <filename>   chmpx configration file path(.ini .yaml .json) when run on chmpx node host");
-	PRN("       -json <string>     chmpx configration by json string when run on chmpx node host");
+	PRN("       -conf <filename>   chmpx configuration file path(.ini .yaml .json) when run on chmpx node host");
+	PRN("       -json <string>     chmpx configuration by json string when run on chmpx node host");
 	PRN("       -host <hostname>   hostname for chmpx node, if not specified, using localhost");
 	PRN("       -ctrlport <port>   chmpx node control port, if host option is specified, this option must be specified.");
-	PRN("       -server            chmpx node server type for hostanme specified");
-	PRN("       -slave             chmpx node server type for hostanme specified(default)");
+	PRN("       -server            chmpx node server type for hostname specified");
+	PRN("       -slave             chmpx node server type for hostname specified(default)");
 	PRN("       -threadcnt <count> thread count for DUMP command(default is 0)");
 	PRN("       -check <second>    check and print all nodes status/hash/socket connection count after startup.");
 	PRN("       -status <second>   print all nodes status by SELFSTATUS or ALLSTATUS after startup.");
@@ -673,8 +673,8 @@ static void Help(const char* progname)
 	PRN("       -his <count>       common option, set history count(default 500)");
 	PRN("       -run <file path>   common option, run command(history) file.");
 	PRN("Environments:");
-	PRN("       %s        can use configarion file path if -conf/-json/-host is not specified.", CHM_CONFFILE_ENV_NAME);
-	PRN("       %s        can use json configarion string  if -conf/-json/-host is not specified..", CHM_JSONCONF_ENV_NAME);
+	PRN("       %s        can use configuration file path if -conf/-json/-host is not specified.", CHM_CONFFILE_ENV_NAME);
+	PRN("       %s        can use json configuration string  if -conf/-json/-host is not specified..", CHM_JSONCONF_ENV_NAME);
 	PRN(NULL);
 }
 
@@ -725,7 +725,7 @@ static void Help(const char* progname)
 // loop [second] [loop limit count]     loop command input specified with interval second.
 //                                      enter a series of commands to be executed continuously after
 //                                      this command.
-//                                      to end the input, enter "." charactor on "CLT LOOP>" prompt.
+//                                      to end the input, enter "." character on "CLT LOOP>" prompt.
 //                                      after the sequence commands are complete, they are executed
 //                                      immediately.
 //                                      when a series of command execution is completed, it waits for
@@ -808,7 +808,7 @@ static void LineHelp(void)
 	PRN("loop [second] [loop limit count]");
 	PRN("               loop command input specified with interval second");
 	PRN("               enter a series of commands to be executed continuously");
-	PRN("               after this command. to end the input, enter \".\" charactor");
+	PRN("               after this command. to end the input, enter \".\" character");
 	PRN("               on \"CLT LOOP>\" prompt. after the sequence commands are");
 	PRN("               complete, they are executed immediately. when a series of");
 	PRN("               command execution is completed, it waits for the specified");
@@ -833,13 +833,13 @@ static void LineHelp(void)
 	PRN("load <file path>");
 	PRN("               load command from file and run those.");
 	PRN("shell          exit shell(same as \"!\" command).");
-	PRN("echo <string>  echo spscified string(after echo command).");
+	PRN("echo <string>  echo specified string(after echo command).");
 	PRN("sleep <second> sleep specified(decimal) seconds.");
 	PRN(NULL);
 }
 
 //---------------------------------------------------------
-// Utilities: Comamnd Parser
+// Utilities: Command Parser
 //---------------------------------------------------------
 const OPTTYPE ExecOptionTypes[] = {
 	{"-help",			"-help",			0,	0},
@@ -997,7 +997,7 @@ static bool BaseOptionParser(strarr_t& args, CPOPTTYPE pTypes, option_t& opts)
 		for(Count2 = 0; pTypes[Count2].option; Count2++){
 			if(0 == strcasecmp(args[Count].c_str(), pTypes[Count2].option)){
 				if(args.size() < ((Count + 1) + pTypes[Count2].min_param_cnt)){
-					ERR("Option(%s) needs %d paraemter.", args[Count].c_str(), pTypes[Count2].min_param_cnt);
+					ERR("Option(%s) needs %d parameter.", args[Count].c_str(), pTypes[Count2].min_param_cnt);
 					return false;
 				}
 
@@ -1056,10 +1056,10 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 
 	strarr_t	args;
 	string		strParameter;
-	bool		isMakeParamter	= false;
+	bool		isMakeParameter	= false;
 	bool		isQuart			= false;
 	for(const_pchar pPos = pCommand; '\0' != *pPos && '\n' != *pPos; ++pPos){
-		if(isMakeParamter){
+		if(isMakeParameter){
 			// keeping parameter
 			if(isQuart){
 				// pattern: "...."
@@ -1070,7 +1070,7 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 						return false;
 					}
 					// end of quart
-					isMakeParamter	= false;
+					isMakeParameter	= false;
 					isQuart			= false;
 
 				}else if('\\' == *pPos && '\"' == *(pPos + sizeof(char))){
@@ -1089,10 +1089,10 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 					}
 					strParameter += *pPos;
 				}else{
-					isMakeParamter = false;
+					isMakeParameter = false;
 				}
 			}
-			if(!isMakeParamter){
+			if(!isMakeParameter){
 				// end of one parameter
 				if(0 < strParameter.length()){
 					args.push_back(strParameter);
@@ -1103,7 +1103,7 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 			// not keeping parameter
 			if(0 == isspace(*pPos)){
 				strParameter.clear();
-				isMakeParamter	= true;
+				isMakeParameter	= true;
 				isQuart			= false;
 
 				if('\"' == *pPos){
@@ -1112,7 +1112,7 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 					isQuart		= false;
 
 					if('\\' == *pPos){
-						// found escape charactor
+						// found escape character
 						pPos++;
 						if('\0' == *pPos || '\n' == *pPos){
 							break;
@@ -1125,7 +1125,7 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 		}
 	}
 	// last check
-	if(isMakeParamter){
+	if(isMakeParameter){
 		if(isQuart){
 			ERR("Quart is not matching.");
 			return false;
@@ -1199,14 +1199,14 @@ struct node_ctrl_info_same
 
 static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strConfig, short port)
 {
-	// Check configration file(string) options without env
+	// Check configuration file(string) options without env
 	if(strConfig.empty()){
-		ERR("configration file or string is empty.");
+		ERR("configuration file or string is empty.");
 		return false;
 	}
 	CHMCONFTYPE	conftype = check_chmconf_type(strConfig.c_str());
 	if(CHMCONF_TYPE_UNKNOWN == conftype || CHMCONF_TYPE_NULL == conftype){
-		ERR("configration file or string is something wrong, you can check it by \"chmpxconftest\" tool.");
+		ERR("configuration file or string is something wrong, you can check it by \"chmpxconftest\" tool.");
 		return false;
 	}
 
@@ -1238,7 +1238,7 @@ static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strCon
 		PCHMPXLIST		pchmpxlist;
 
 		// first, get self node information.
-		// because if slave node is up withwout servers, we get node information only self structure.
+		// because if slave node is up without servers, we get node information only self structure.
 		//
 		if(pInfo->pchminfo->chmpx_man.chmpx_self){
 			newnode.hostname	= pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.name;
@@ -1268,7 +1268,7 @@ static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strCon
 		// Load configuration without env
 		CHMConf*	pConfObj;
 		if(NULL == (pConfObj = CHMConf::GetCHMConf(CHM_INVALID_HANDLE, NULL, strConfig.c_str(), port, false, NULL))){
-			ERR_CHMPRN("Failed to make configration object from configration(%s)", strConfig.c_str());
+			ERR_CHMPRN("Failed to make configuration object from configuration(%s)", strConfig.c_str());
 			PRN("You can see detail about error, execute this program with \"-d\"(\"-g\") option.");
 			return false;
 		}
@@ -1281,7 +1281,7 @@ static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strCon
 		}
 
 		//--------------------------------------
-		// extract node information from configration
+		// extract node information from configuration
 		//--------------------------------------
 		chmnode_cfginfos_t::const_iterator	iter;
 
@@ -1648,7 +1648,7 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 	while(true){
 		if(-1 == (onerecv = recv(sock, byReceive, RECEIVE_LENGTH, 0))){
 			if(EINTR == errno){
-				MSG("Interapted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
+				MSG("Interrupted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
 
 			}else if(EAGAIN == errno || EWOULDBLOCK == errno){
 				MSG("There are no received data on sock(%d), so not wait. errno=%d(EAGAIN or EWOULDBLOCK).", sock, errno);
@@ -1732,7 +1732,7 @@ static bool SendControlSocket(int sock, const char* pdata, bool& is_closed)
 
 		if(-1 == (onesent = send(sock, &pdata[totalsent], length - totalsent, 0))){
 			if(EINTR == errno){
-				MSG("Interapted signal during sending to sock(%d), errno=%d(EINTR).", sock, errno);
+				MSG("Interrupted signal during sending to sock(%d), errno=%d(EINTR).", sock, errno);
 
 			}else if(EAGAIN == errno || EWOULDBLOCK == errno){
 				MSG("sock(%d) does not ready for sending, errno=%d(EAGAIN or EWOULDBLOCK).", sock, errno);
@@ -2026,7 +2026,7 @@ typedef struct _node_check_result{
 typedef map<string, NODECHECKRESULT>		nodechkresults_t;
 
 //---------------------------------------------------------
-// Utilities: DUMP Comamnd with thread
+// Utilities: DUMP Command with thread
 //---------------------------------------------------------
 //
 // dump raw result
@@ -2049,7 +2049,7 @@ typedef std::list<PDUMPNODERES>	pdumpnodereslist_t;
 //
 typedef struct _thread_param{
 	pdumpnodereslist_t	presults;
-	pthread_t			pthreadid;			// pthead id(pthread_create)
+	pthread_t			pthreadid;			// pthread id(pthread_create)
 	volatile bool*		pis_run;
 
 	_thread_param() : pthreadid(0), pis_run(NULL) {}
@@ -2106,7 +2106,7 @@ static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 
 	// create thread parameters
 	volatile bool	is_run	= false;
-	PTHPARAM		pthparam= new THPARAM[0 == nThreadCount ? 1 : nThreadCount];	// [NOTE] If no thread mdoe, we make one param.
+	PTHPARAM		pthparam= new THPARAM[0 == nThreadCount ? 1 : nThreadCount];	// [NOTE] If no thread mode, we make one param.
 	int				pos		= 0;
 	for(dumpnodereslist_t::iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
 		pthparam[pos].presults.push_back(&(*iter));									// set node structure "pointer"
@@ -2154,7 +2154,7 @@ static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 //---------------------------------------------------------
 // Utilities : Parse chmpxs from Dump result string
 //---------------------------------------------------------
-static string CutSpaceCharactor(const string& strBase)
+static string CutSpaceCharacter(const string& strBase)
 {
 	string	strResult;
 	for(string::const_iterator iter = strBase.begin(); iter != strBase.end(); ++iter){
@@ -2302,8 +2302,8 @@ static bool AddNodesFromDumpResult(nodectrllist_t& nodes, string& strDump)
 	}
 	strParsed = strDump.substr(pos + strlen(DUMP_KEY_CHMPX_MAN));
 
-	// Cut space charactors
-	strParsed = CutSpaceCharactor(strParsed);
+	// Cut space characters
+	strParsed = CutSpaceCharacter(strParsed);
 
 	// "chmpx_servers=0xXXXXX\n"
 	if(string::npos == (pos = strParsed.find(DUMP_KEY_CHMPX_SERVERS))){
@@ -2658,8 +2658,8 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname
 	}
 	strParsed = strDump.substr(pos + strlen(DUMP_KEY_CHMPX_MAN));
 
-	// Cut space charactors
-	strParsed = CutSpaceCharactor(strParsed);
+	// Cut space characters
+	strParsed = CutSpaceCharacter(strParsed);
 
 	// "chmpx_self=0xXXXXX\n"
 	if(string::npos == (pos = strParsed.find(DUMP_KEY_CHMPX_SELF))){
@@ -2676,7 +2676,7 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname
 	// get self chmpx information
 	//
 	// we call this function with no except host/port, then it is always not found.
-	// the is_sock_from paramter is true as temporary, "fromsockcnt" should be 0.
+	// the is_sock_from parameter is true as temporary, "fromsockcnt" should be 0.
 	//
 	strParsed	= ParseUnitDataFromDumpResult(detail.self, string(""), 0, false, true, is_found_except, is_error, strParsed);
 	if(is_error){
@@ -2948,7 +2948,7 @@ static size_t MakeCheckNodeStatus(nodechkresults_t& results, const statusdetails
 			// node(A) is down
 
 			//
-			// search node(A) data from all noeds's servers/slaves
+			// search node(A) data from all node's servers/slaves
 			//
 			MakeNodesByHostportFromAll(iter_main->first, all, tgresult.all.servers, tgresult.all.slaves);
 
@@ -3238,7 +3238,7 @@ static inline string GetCheckResultString(const CHKRESULT_TYPE& type)
 	}else if(CHKRESULT_ERR == type){
 		strtype = "Error";
 	}else{
-		strtype = "Unkown";
+		strtype = "Unknown";
 	}
 	return strtype;
 }
@@ -3453,7 +3453,7 @@ static string CvtStatusStrings(const string& strBase)
 
 static string CvtAllStatusResult(const string& strResult, bool& is_error)
 {
-	string				strInput = CutSpaceCharactor(strResult);	// cut space
+	string				strInput = CutSpaceCharacter(strResult);	// cut space
 	string				strOutput;
 	string::size_type	pos;
 
@@ -3650,7 +3650,7 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 					// why?, but continue...
 				}
 			}else{
-				// old format, only unitxtime
+				// old format, only unixtime
 			}
 			// dec string -> time_t -> formatted time string
 			time_t	tmpUpdateTime	= static_cast<time_t>(atoll(strLastUpdate.c_str()));
@@ -4056,7 +4056,7 @@ static bool ReadLine(int fd, string& line)
 	line.erase();
 	while(true){
 		szBuff = '\0';
-		// read one charactor
+		// read one character
 		if(-1 == (readlength = read(fd, &szBuff, 1))){
 			line.erase();
 			return false;
@@ -4067,7 +4067,7 @@ static bool ReadLine(int fd, string& line)
 			return false;
 		}
 
-		// check charactor
+		// check character
 		if('\r' == szBuff || '\0' == szBuff){
 			// skip words
 
@@ -4190,7 +4190,7 @@ static bool StatusCommand(params_t& params)
 		}else{
 			// host or host:port
 			if(isOneHostTarget){
-				ERR("Found \"status\" command paramter for hostname(and control port). This tool is run with host option, then \"status\" command can not run with hostname parameter.");
+				ERR("Found \"status\" command parameter for hostname(and control port). This tool is run with host option, then \"status\" command can not run with hostname parameter.");
 				return true;
 			}
 			tghost = params[pos];
@@ -4205,13 +4205,13 @@ static bool StatusCommand(params_t& params)
 
 			// check hostname(:port) exists in initialized host list(conf)
 			if(!find_chmpx_node_by_hostname(InitialAllNodes, tghost, tgport)){
-				ERR("Not found %s in initial host list which is included from confiration file.", params[pos].c_str());
+				ERR("Not found %s in initial host list which is included from configuration file.", params[pos].c_str());
 				return true;
 			}
 		}
 	}
 	if(is_all && is_self){
-		ERR("both \"all\" and \"self\" paramters are specified.");
+		ERR("both \"all\" and \"self\" parameters are specified.");
 		return true;
 	}
 
@@ -4223,7 +4223,7 @@ static bool StatusCommand(params_t& params)
 			return true;
 		}
 
-		// set indent(insert 5 space charactor to line head)
+		// set indent(insert 5 space character to line head)
 		strResult = CutEmptyLine(strResult);
 		strResult = ReplaceString(strResult, string("\n"), string("\n     "));
 
@@ -4243,7 +4243,7 @@ static bool StatusCommand(params_t& params)
 		bool	is_error= false;
 		strResult		= CvtAllStatusResult(strResult, is_error);
 		if(is_error){
-			ERR("Something error occurred in parsing ALLSTATUS comamnd result for %s:%d", tghost.c_str(), tgport);
+			ERR("Something error occurred in parsing ALLSTATUS command result for %s:%d", tghost.c_str(), tgport);
 			return true;
 		}
 
@@ -4296,12 +4296,12 @@ static bool CheckCommand(params_t& params)
 	if(!is_all){
 		// check hostname(:port) exists in dynamic host list(conf)
 		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport)){
-			PRN("Not found %s(:%d) in dynamic host list which is included from confiration file.", tghost.c_str(), tgport);
+			PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 			return true;
 		}
 	}
 
-	// get all status deatail of nodes
+	// get all status detail of nodes
 	statusdetails_t		all;
 	if(0 == CreateAllStatusDetails(all)){
 		MSG("There is no status detail result of nodes.");
@@ -4367,7 +4367,7 @@ static bool StatusUpdateCommand(params_t& params)
 	if(!is_all){
 		// check hostname(:port) exists in dynamic host list(conf)
 		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport)){
-			PRN("Not found %s(:%d) in dynamic host list which is included from confiration file.", tghost.c_str(), tgport);
+			PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 			return true;
 		}
 	}
@@ -4379,7 +4379,7 @@ static bool StatusUpdateCommand(params_t& params)
 		}
 		if(!iter->is_server){
 			if(!is_all){
-				PRN("%s:%d host is slave node, thus could not send UPATESTATUS.", tghost.c_str(), tgport);
+				PRN("%s:%d host is slave node, thus could not send UPDATESTATUS.", tghost.c_str(), tgport);
 				return true;
 			}
 			continue;
@@ -4432,7 +4432,7 @@ static bool ServiceInCommand(params_t& params)
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
 	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport)){
-		PRN("Not found %s(:%d) in dynamic host list which is included from confiration file.", tghost.c_str(), tgport);
+		PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 		return true;
 	}
 
@@ -4445,7 +4445,7 @@ static bool ServiceInCommand(params_t& params)
 		if(string::npos != strResult.find("SUCCEED")){
 			PRN("Succeed to send SERVICEIN to %s:%d", tghost.c_str(), tgport);
 		}else{
-			PRN("Failed to send SERVCEIN to %s:%d, error is %s.", tghost.c_str(), tgport, strResult.c_str());
+			PRN("Failed to send SERVICEIN to %s:%d, error is %s.", tghost.c_str(), tgport, strResult.c_str());
 		}
 	}
 	return true;	// for continue.
@@ -4488,7 +4488,7 @@ static bool ServiceOutCommand(params_t& params)
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
 	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport)){
-		MSG("Not found %s(:%d) in dynamic host list which is included from confiration file.", tghost.c_str(), tgport);
+		MSG("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 	}
 	if(CHM_INVALID_PORT == tgport){
 		PRN("Target control port is not specified, you need to specify this.");
@@ -4502,14 +4502,14 @@ static bool ServiceOutCommand(params_t& params)
 	// send "SERVICEOUT" command to target host
 	string	strResult;
 	if(!SendCommandToControlPort(tghost.c_str(), tgport, strCommand.c_str(), strResult)){
-		WAN("Failed to send SERVICEOUT command to %s:%d, probabry the host is down. thus send another node.", tghost.c_str(), tgport);
+		WAN("Failed to send SERVICEOUT command to %s:%d, probably the host is down. thus send another node.", tghost.c_str(), tgport);
 	}else{
 		//MSG("Receive data : \n\n%s\n", strResult.c_str());
 		if(string::npos != strResult.find("SUCCEED")){
 			PRN("Succeed to send SERVICEOUT to %s:%d", tghost.c_str(), tgport);
 			return true;
 		}
-		WAN("Failed to send SERVCEOUT to %s:%d, error is \"%s\", but retry to send another node.", tghost.c_str(), tgport, strResult.c_str());
+		WAN("Failed to send SERVICEOUT to %s:%d, error is \"%s\", but retry to send another node.", tghost.c_str(), tgport, strResult.c_str());
 	}
 
 	// send "SERVICEOUT" command to all host
@@ -4676,7 +4676,7 @@ static bool DumpCommand(params_t& params)
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
 	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport)){
-		PRN("Not found %s(:%d) in dynamic host list which is included from confiration file.", tghost.c_str(), tgport);
+		PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 		return true;
 	}
 
@@ -5128,7 +5128,7 @@ static bool LoopCommand(ConsoleInput& InputIF, params_t& params, bool& is_exit)
 //
 static bool LoopCmdCommand(params_t& params)
 {
-	PRN("ERROR: \"loopcmd\" must be spcified in command file. This command could not be specified in command line.");
+	PRN("ERROR: \"loopcmd\" must be specified in command file. This command could not be specified in command line.");
 	return true;
 }
 
@@ -5306,7 +5306,7 @@ static bool CommandHandle(ConsoleInput& InputIF)
 	const string	strLine = InputIF.c_str();
 	bool			is_exit = false;
 	if(0 < strLine.length() && '!' == strLine[0]){
-		// special charactor("!") command
+		// special character("!") command
 		const char*	pSpecialCommand = strLine.c_str();
 		pSpecialCommand++;
 
@@ -5623,17 +5623,17 @@ int main(int argc, char** argv)
 		// any option is not specified, try to load environment
 		CHMCONFTYPE	conftype = check_chmconf_type_ex(NULL, CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME, &strInitialConfig);
 		if(CHMCONF_TYPE_UNKNOWN == conftype || CHMCONF_TYPE_NULL == conftype){
-			MSG("unknown configration type loaded from environment.");
+			MSG("unknown configuration type loaded from environment.");
 		}else{
 			if(strInitialConfig.empty()){
-				ERR("configration file or json is not specified.");
+				ERR("configuration file or json is not specified.");
 				exit(EXIT_FAILURE);
 			}
-			MSG("option \"-host\" and \"-conf\" and \"-json\" are not specified, then using envrironments(%s or %s).", CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME);
+			MSG("option \"-host\" and \"-conf\" and \"-json\" are not specified, then using environments(%s or %s).", CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME);
 			is_load_from_env = true;
 		}
 	}
-	// any configration and host is not found.
+	// any configuration and host is not found.
 	if(strInitialConfig.empty() && strInitialHostname.empty()){
 		// no option/environment is specified, then target is localhost
 		strInitialHostname = "localhost";
@@ -5730,18 +5730,18 @@ int main(int argc, char** argv)
 	//----------------------
 	if(!strInitialConfig.empty()){
 		if(!load_initial_chmpx_nodes(InitialAllNodes, strInitialConfig, nInitialCtrlPort)){
-			ERR("Could not load nodes information by configration/local SHM.");
+			ERR("Could not load nodes information by configuration/local SHM.");
 			exit(EXIT_FAILURE);
 		}
 		isOneHostTarget = false;
 	}else if(!strInitialHostname.empty()){
 		if(!add_chmpx_node(InitialAllNodes, strInitialHostname, nInitialCtrlPort, isInitialServerMode, true)){
-			ERR("Could not load nodes information by configration.");
+			ERR("Could not load nodes information by configuration.");
 			exit(EXIT_FAILURE);
 		}
 		isOneHostTarget = true;
 	}else{
-		ERR("both \"-host\" and \"-conf(or -json)\" option(environemnt) are not specified.");
+		ERR("both \"-host\" and \"-conf(or -json)\" option(environment) are not specified.");
 		exit(EXIT_FAILURE);
 	}
 
@@ -5788,11 +5788,11 @@ int main(int argc, char** argv)
 			PRN("CHMPX CONTROL TOOL");
 			PRN("-------------------------------------------------------");
 			PRN(" CHMPX library version          : %s",	VERSION);
-			PRN(" Debug level                    : %s",	(is_print_msg ? "Message(Infomration)" : is_print_wan ? "Warning" : is_print_err ? "Error" : "Silent"));
-			PRN(" Chmpx library debug level      : %s",	(is_chmpx_dbg ? (is_print_msg ? "Message(Infomration)" : is_print_wan ? "Warning" : is_print_err ? "Error" : "Silent") : "Silent"));
+			PRN(" Debug level                    : %s",	(is_print_msg ? "Message(Information)" : is_print_wan ? "Warning" : is_print_err ? "Error" : "Silent"));
+			PRN(" Chmpx library debug level      : %s",	(is_chmpx_dbg ? (is_print_msg ? "Message(Information)" : is_print_wan ? "Warning" : is_print_err ? "Error" : "Silent") : "Silent"));
 			PRN(" Print command lap time         : %s",	LapTime::IsEnable() ? "yes" : "no");
 			PRN(" Command line history count     : %zu",InputIF.GetMax());
-			PRN(" Chmpx nodes specified type     : %s", (!strInitialConfig.empty() ? (is_load_from_env ? "configration file/json from environment" : "confguration file/json") : !strInitialHostname.empty() ? "hostname" : "no"));
+			PRN(" Chmpx nodes specified type     : %s", (!strInitialConfig.empty() ? (is_load_from_env ? "configuration file/json from environment" : "configuration file/json") : !strInitialHostname.empty() ? "hostname" : "no"));
 			if(!strInitialConfig.empty()){
 				PRN("    Load Configuration          : %s",	strInitialConfig.c_str());
 				if(CHM_INVALID_PORT != nInitialCtrlPort){

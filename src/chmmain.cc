@@ -103,18 +103,18 @@ static void SigUsr1handler(int signum)
 // Functions
 //---------------------------------------------------------
 //	[Usage]
-//	prgname -conf <configration file path> [-d [slient|err|wan|msg]]
+//	prgname -conf <configuration file path> [-d [silent|err|wan|msg]]
 //
 static bool PrintUsage(const char* prgname)
 {
 	cout << "[Usage]" << endl;
-	cout << (prgname ? prgname : "prgname") << " [-conf <file> | -json <json>] [-ctlport <port>] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]" << endl;
+	cout << (prgname ? prgname : "prgname") << " [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]" << endl;
 	cout << (prgname ? prgname : "prgname") << " [ -h | -v ]" << endl;
 	cout << endl;
 	cout << "[option]" << endl;
-	cout << "  -conf <path>         specify the configration file(.ini .yaml .json) path" << endl;
-	cout << "  -json <json string>  specify the configration json string" << endl;
-	cout << "  -ctlport <port>      specify the self contrl port(*)" << endl;
+	cout << "  -conf <path>         specify the configuration file(.ini .yaml .json) path" << endl;
+	cout << "  -json <json string>  specify the configuration json string" << endl;
+	cout << "  -ctlport <port>      specify the self control port(*)" << endl;
 	cout << "  -d <param>           specify the debugging output mode:" << endl;
 	cout << "                        silent - no output" << endl;
 	cout << "                        err    - output error level" << endl;
@@ -133,7 +133,7 @@ static bool PrintUsage(const char* prgname)
 	cout << endl;
 	cout << "(*) if ctlport option is specified, chmpx searches same ctlport in configuration" << endl;
 	cout << "    file and ignores \"CTLPORT\" directive in \"GLOBAL\" section. and chmpx will" << endl;
-	cout << "    start in the mode indicated by the server entry that has beed detected." << endl;
+	cout << "    start in the mode indicated by the server entry that has been detected." << endl;
 	cout << endl;
 
 	return true;
@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 		exit(EXIT_SUCCESS);
 	}
 
-	// parameter - configration path
+	// parameter - configuration path
 	string	config;
 	if(!opts.Get(OPT_CONFPATH, config) && !opts.Get(OPT_CONFPATH2, config) && !opts.Get(OPT_JSONCONF, config)){
 		if(!have_env_chm_conf()){

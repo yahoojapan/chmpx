@@ -232,7 +232,7 @@ CHMCONFTYPE check_chmconf_type_ex(const char* config, const char* env_conf_name,
 			char*	base = basename(pTmp);
 			char*	pos;
 			if(CHMEMPTYSTR(base) || NULL == (pos = strrchr(base, '.'))){
-				WAN_CHMPRN("configuration file %s does not have file extention, thus type is set default(INI).", tmpconfig.c_str());
+				WAN_CHMPRN("configuration file %s does not have file extension, thus type is set default(INI).", tmpconfig.c_str());
 				result_type = CHMCONF_TYPE_INI_FILE;
 			}else{
 				++pos;
@@ -316,7 +316,7 @@ bool CHMYamlDataStack::add(const yaml_event_type_t& type)
 				return false;
 			}else{
 				if(CHMYAML_STACK_CEHCK_SYMMETRY_TYPE(type, CHMYAML_STACK_FIRST)){
-					ERR_CHMPRN("Yaml parser stack : there is no symmetory section for type.")
+					ERR_CHMPRN("Yaml parser stack : there is no symmetry section for type.")
 					return false;
 				}
 				stack.pop_back();

@@ -51,7 +51,7 @@ using namespace std;
 #define	CHMSHM_FILE_BASEDIR			"/tmp"
 
 //---------------------------------------------------------
-// Class Valiables
+// Class Variables
 //---------------------------------------------------------
 const int	ChmIMData::SYSPAGE_SIZE;
 
@@ -173,7 +173,7 @@ bool ChmIMData::Dump(stringstream& sstream) const
 	sstream << "Shared memory file size   = " << ShmSize	<< endl;
 	sstream << "Shared memory file fd     = " << ShmFd		<< endl;
 	sstream << "Shared memory file Object = " << pChmShm	<< endl;
-	sstream << "Configration object       = " << pConfObj	<< endl;
+	sstream << "Configuration object      = " << pConfObj	<< endl;
 	sstream << "K2HASH Object             = " << pK2hash->GetK2hashFilePath() << endl;
 	sstream << "==========================================================================" << endl;
 	sstream << "Shared memory file Object" << endl;
@@ -313,11 +313,11 @@ bool ChmIMData::CloseK2hash(void)
 bool ChmIMData::InitializeK2hash(void)
 {
 	if(IsAttachedK2hash()){
-		ERR_CHMPRN("Already attach K2hash, must dettach it before initializing K2hash.");
+		ERR_CHMPRN("Already attach K2hash, must detach it before initializing K2hash.");
 		return false;
 	}
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 
@@ -357,11 +357,11 @@ bool ChmIMData::InitializeK2hash(void)
 bool ChmIMData::AttachK2hash(void)
 {
 	if(IsAttachedK2hash()){
-		ERR_CHMPRN("Already attach K2hash, must dettach it before initializing K2hash.");
+		ERR_CHMPRN("Already attach K2hash, must detach it before initializing K2hash.");
 		return false;
 	}
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 
@@ -501,11 +501,11 @@ bool ChmIMData::CloseShm(void)
 bool ChmIMData::InitializeShm(void)
 {
 	if(IsAttachedShm()){
-		ERR_CHMPRN("Already attach SHM, must dettach it before initializing SHM.");
+		ERR_CHMPRN("Already attach SHM, must detach it before initializing SHM.");
 		return false;
 	}
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 
@@ -572,7 +572,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 							sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt) + 					// MQUEUE Area
 							sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach) +	// CLTPROCLIST Area
 							sizeof(CHMLOGRAW) * pchmcfg->max_histlog_count +														// LOG Area
-							sizeof(CHMSOCKLIST) * pchmcfg->max_chmpx_count * pchmcfg->max_sock_pool * 2;							// SOCK array Area([NOTICE] twice for mergin)
+							sizeof(CHMSOCKLIST) * pchmcfg->max_chmpx_count * pchmcfg->max_sock_pool * 2;							// SOCK array Area([NOTICE] twice for margin)
 
 	// truncate with filling zero
 	if(!truncate_filling_zero(fd, total_shmsize, ChmIMData::SYSPAGE_SIZE)){
@@ -618,7 +618,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 		rel_pchmpxarr_base						= rel_pchmpxarrarea;
 		rel_pchmpxarr_pend						= CHM_OFFSET(rel_pchmpxarrarea, static_cast<off_t>(sizeof(PCHMPX) * pchmcfg->max_chmpx_count), PCHMPX*);
 
-		// initializing each erea
+		// initializing each area
 		{
 			PCHMPXLIST	chmpxlist = CHM_ABS(shmbase, rel_chmpxarea, PCHMPXLIST);
 			for(long cnt = 0L; cnt < pchmcfg->max_chmpx_count; cnt++){
@@ -732,11 +732,11 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 bool ChmIMData::AttachShm(void)
 {
 	if(IsAttachedShm()){
-		ERR_CHMPRN("Already attach SHM, must dettach it before initializing SHM.");
+		ERR_CHMPRN("Already attach SHM, must detach it before initializing SHM.");
 		return false;
 	}
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 
@@ -811,7 +811,7 @@ bool ChmIMData::AttachShm(void)
 bool ChmIMData::InitializeOther(void)
 {
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
@@ -819,20 +819,20 @@ bool ChmIMData::InitializeOther(void)
 		ERR_CHMPRN("Could not get configuration information structure pointer.");
 		return false;
 	}
-	// clear hostanme:ctlport cache
+	// clear hostname:ctlport cache
 	FREE_HNAMESSLMAP(hnamesslmap);
 
 	return true;
 }
 
-bool ChmIMData::ReloadConfigration(void)
+bool ChmIMData::ReloadConfiguration(void)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
 		return false;
 	}
 	if(!pConfObj){
-		ERR_CHMPRN("Configration object is not loaded.");
+		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
 	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
@@ -843,7 +843,7 @@ bool ChmIMData::ReloadConfigration(void)
 
 	// reload
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	if(!tmpchminfo.ReloadConfigration(pchmcfg)){
+	if(!tmpchminfo.ReloadConfiguration(pchmcfg)){
 		ERR_CHMPRN("Failed to reload configuration file.");
 		return false;
 	}
@@ -892,7 +892,7 @@ bool ChmIMData::FreeMsg(msgid_t msgid)
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
 	if(!tmpchminfo.FreeMsg(msgid)){
-		ERR_CHMPRN("Failed to retrive msgid(0x%016" PRIx64 ").", msgid);
+		ERR_CHMPRN("Failed to retrieve msgid(0x%016" PRIx64 ").", msgid);
 		return false;
 	}
 	return true;
@@ -1122,7 +1122,7 @@ bool ChmIMData::MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, 
 
 	// merge
 	//
-	// Lock in following methos.
+	// Lock in following method.
 	//
 	if(!MergeChmpxSvrs(pchmpxsvrs, count, false, false, eqfd)){
 		ERR_CHMPRN("Failed to merge chmpx server information, try to recover...");
@@ -1940,7 +1940,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 				}
 			}
 			if(!found){
-				ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
+				ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probably down or suspend.", hash);
 				return -1L;
 			}
 		}
@@ -1974,7 +1974,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 
 		// get target chmpxids
 		if(!GetServerChmpxIdByHashs(hash, chmpxids)){					// with pending(for DELETE), without down and suspend
-			ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because all target chmpxid is probabry down or suspend.", hash);
+			ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because all target chmpxid is probably down or suspend.", hash);
 			return -1L;
 		}
 		for(chmpxidlist_t::iterator iter = chmpxids.begin(); iter != chmpxids.end(); ){
@@ -2024,7 +2024,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 					// from hash --> terminal chmpxid is some
 					chmpxidlist_t	tmpchmpxids;
 					if(!GetServerChmpxIdByHashs(hash, tmpchmpxids)){	// with pending(for DELETE), without down and suspend
-						ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
+						ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probably down or suspend.", hash);
 						return -1L;
 					}
 
@@ -2050,7 +2050,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 			}
 		}
 		if(CHM_INVALID_CHMPXID == tmpchmpxid){
-			ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probabry down or suspend.", hash);
+			ERR_CHMPRN("Could not get chmpxid by hash(0x%016" PRIx64 ") because target chmpxid is probably down or suspend.", hash);
 			return -1L;
 		}
 		// one chmpxid is set
@@ -2527,7 +2527,7 @@ bool ChmIMData::RawLockClientPidList(FLRwlRcsv& lockobj, bool is_read) const
 	return lockobj.Lock(ShmFd, offset, 1L, is_read);
 }
 
-bool ChmIMData::RetriveClientPid(pid_t pid)
+bool ChmIMData::RetrieveClientPid(pid_t pid)
 {
 	if(CHM_INVALID_PID == pid){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -2543,7 +2543,7 @@ bool ChmIMData::RetriveClientPid(pid_t pid)
 		return false;
 	}
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.RetriveClientPid(pid);
+	return tmpchminfo.RetrieveClientPid(pid);
 }
 
 bool ChmIMData::AddClientPid(pid_t pid)
@@ -2675,14 +2675,14 @@ bool ChmIMData::IsChmpxProcessRunning(pid_t& pid) const
 	return true;
 }
 
-bool ChmIMData::IsNeedDettach(void) const
+bool ChmIMData::IsNeedDetach(void) const
 {
 	pid_t	pid = CHM_INVALID_PID;
 	if(IsChmpxProcessRunning(pid) && ChmpxPid == pid){
-		//MSG_CHMPRN("Not need to dettach chmshm.");
+		//MSG_CHMPRN("Not need to detach chmshm.");
 		return false;
 	}
-	MSG_CHMPRN("Need to dettach chmshm.");
+	MSG_CHMPRN("Need to detach chmshm.");
 	return true;
 }
 
@@ -2736,10 +2736,10 @@ bool ChmIMData::IsAllowHostname(const char* hostname, const short* pport, PCHMPX
 	}
 	FREE_HNAMESSLMAP(info);
 
-	// check name in configration server/slave list.
+	// check name in configuration server/slave list.
 	//
 	// [NOTE]
-	// At first using hostname in list(means useing cache), next check DNS for server name if the first checking failed.
+	// At first using hostname in list(means using cache), next check DNS for server name if the first checking failed.
 	//
 	CHMNODE_CFGINFO	nodeinfo;
 	if(pConfObj->GetNodeInfo(hostname, pport ? *pport : CHM_INVALID_PORT, nodeinfo, false, false) || pConfObj->GetNodeInfo(hostname, pport ? *pport : CHM_INVALID_PORT, nodeinfo, false, true)){

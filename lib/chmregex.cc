@@ -66,7 +66,7 @@ using namespace	std;
 // 
 // The chmpx makes RING by consistent hashing, they need to
 // make order for servers, so that the server chmpx must have
-// FQDN. But the slave chmpx dows not have FQDN, only need
+// FQDN. But the slave chmpx does not have FQDN, only need
 // to list in configuration file.
 // 
 // Then following functions are for simple regex.
@@ -94,7 +94,7 @@ static bool expand_simple_regex_string(const string& str_part_regex, strlst_t& e
 		}
 	}
 
-	// parse '-' in comma sepalated array
+	// parse '-' in comma separated array
 	for(strlst_t::const_iterator iter = sep_commma_lst.begin(); iter != sep_commma_lst.end(); ++iter){
 		if(string::npos == (pos = iter->find("-"))){
 			expand_lst.push_back(*iter);
@@ -105,11 +105,11 @@ static bool expand_simple_regex_string(const string& str_part_regex, strlst_t& e
 			tmp1 = trim(tmp1);
 			tmp2 = trim(tmp2);
 			if(0 == tmp1.length() || 0 == tmp2.length()){
-				MSG_CHMPRN("Area strings sepalated are empty.");
+				MSG_CHMPRN("Area strings separated are empty.");
 				return false;
 			}
 			if(string::npos != tmp2.find("-")){
-				MSG_CHMPRN("Found many area sepalator.");
+				MSG_CHMPRN("Found many area separator.");
 				return false;
 			}
 
@@ -127,17 +127,17 @@ static bool expand_simple_regex_string(const string& str_part_regex, strlst_t& e
 			}else{
 				// Alpha
 				if(1 != tmp1.length() || 1 != tmp2.length()){
-					MSG_CHMPRN("Charactor range must be specified by one charactor.");
+					MSG_CHMPRN("Character range must be specified by one character.");
 					return false;
 				}
 				char	cTmp1 = tmp1[0];
 				char	cTmp2 = tmp2[0];
 				if(!(('A' <= cTmp1 && cTmp1 <= 'Z') || ('a' <= cTmp1 && cTmp1 <= 'z')) || !(('A' <= cTmp2 && cTmp2 <= 'Z') || ('a' <= cTmp2 && cTmp2 <= 'z'))){
-					MSG_CHMPRN("Charactor range must be specified by a-z or A-Z.");
+					MSG_CHMPRN("Character range must be specified by a-z or A-Z.");
 					return false;
 				}
 				if(cTmp2 < cTmp1 || !(('a' <= cTmp1 && 'a' <= cTmp2) || (cTmp1 <= 'Z' && cTmp2 <= 'Z'))){
-					MSG_CHMPRN("Both charactor word does not same range.");
+					MSG_CHMPRN("Both character word does not same range.");
 					return false;
 				}
 				for(; cTmp1 <= cTmp2; cTmp1++){
@@ -163,7 +163,7 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 
 		if(string::npos == (pos = one_simple_regex.find("["))){
 			if(string::npos != pos2){
-				MSG_CHMPRN("Found \']\' seplator word without \'[\' word.");
+				MSG_CHMPRN("Found \']\' separator word without \'[\' word.");
 				return false;
 			}
 			expand_lst.push_back(one_simple_regex);
@@ -174,12 +174,12 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 			one_simple_regex	= one_simple_regex.substr(pos + 1);
 
 			if(string::npos != pos2 && pos2 < pos){
-				MSG_CHMPRN("Found \']\' seplator word without \'[\' word.");
+				MSG_CHMPRN("Found \']\' separator word without \'[\' word.");
 				return false;
 			}
 
 			if(string::npos == (pos = one_simple_regex.find("]"))){
-				MSG_CHMPRN("Not found \']\' seplator word.");
+				MSG_CHMPRN("Not found \']\' separator word.");
 				return false;
 			}
 			string	str_part_regex 	= one_simple_regex.substr(0, pos);
@@ -192,7 +192,7 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 			}
 
 			if(string::npos != str_part_regex.find("[")){
-				MSG_CHMPRN("Found many \'[\' seplator word.");
+				MSG_CHMPRN("Found many \'[\' separator word.");
 				return false;
 			}
 
@@ -223,9 +223,9 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 //
 // This function expands hostname list from hostname which
 // has simple regex rule.
-// If is_cvt_fqdn is ture, all hostname is checked by NetDB.
+// If is_cvt_fqdn is true, all hostname is checked by NetDB.
 // The other does not check.
-// If is_cvt_localhost is true, hostanme which is "localhost"
+// If is_cvt_localhost is true, hostname which is "localhost"
 // or "127.0.0.1" or "::1" is changed FQDN.
 //
 bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool is_cvt_localhost, bool is_cvt_fqdn, bool is_strict)
@@ -250,7 +250,7 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 			string	fqdn;
 			if(!ChmNetDb::Get()->GetHostname(iter->c_str(), fqdn, is_cvt_localhost)){
 				if(is_strict){
-					ERR_CHMPRN("Failed to convert FQDN from %s, so break because this function stric mode", iter->c_str());
+					ERR_CHMPRN("Failed to convert FQDN from %s, so break because this function strict mode", iter->c_str());
 					return false;
 				}else{
 					//MSG_CHMPRN("Failed to convert FQDN from %s, but skip it and continue...", iter->c_str());
@@ -265,7 +265,7 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 
 // For server hostname
 //
-// This function is checking hostanme in expanded hostname list
+// This function is checking hostname in expanded hostname list
 // for server list. The hostname_lst should be expanded by 
 // ExpandSimpleRegxHostname() with is_cvt_localhost = true and 
 // is_cvt_fqdn = true.
@@ -294,7 +294,7 @@ bool IsInHostnameList(const char* hostname, strlst_t& hostname_lst, string& matc
 
 // For slave hostname
 //
-// This function is checking hostanme in hostname array which 
+// This function is checking hostname in hostname array which 
 // are wrote regex.
 // If the hostname matches in array, matchhostname is set as
 // matched hostname(FQDN or localhost or IP address).

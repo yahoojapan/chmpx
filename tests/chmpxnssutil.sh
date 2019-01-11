@@ -35,7 +35,7 @@ func_usage()
 	echo "         $1 import -pem <dir> [-nssdir <dir>] [-notrusted]"
 	echo "         $1 import -pkcs12 <file> [-pass <pass phrase>] [-nssdir <dir>]"
 	echo ""
-	echo "Modes:   init                 initialize nss db files(be caareful)"
+	echo "Modes:   init                 initialize nss db files(be careful)"
 	echo "         pkcs12               convert pem file and private key file to PKCS#12 file"
 	echo "         import               import PKCS#12 certs or PEM CA certs to nssdb"
 	echo ""
@@ -176,7 +176,7 @@ while [ $# -ne 0 ]; do
 
 	elif [ "X$1" = "X-nssdir" ]; then
 		if [ "X${NSSDB_DIR}" != "X" ]; then
-			echo "ERROR: already specified NSSDB dicrectory path." 1>&2
+			echo "ERROR: already specified NSSDB directory path." 1>&2
 			exit 1
 		fi
 		shift

@@ -306,8 +306,8 @@ class chmsocklist_lap : public structure_lap<T>
 		bool ToNext(void);
 		long Count(void);
 		bool Insert(st_ptr_type ptr, bool is_abs);
-		st_ptr_type Retrive(int sock);
-		st_ptr_type Retrive(void);
+		st_ptr_type Retrieve(int sock);
+		st_ptr_type Retrieve(void);
 		st_ptr_type Find(int sock, bool is_abs);
 
 		bool GetAllSocks(socklist_t& list);
@@ -548,7 +548,7 @@ bool chmsocklist_lap<T>::Insert(st_ptr_type ptr, bool is_abs)
 // And this method is very slow, should use Retrieve(void)
 //
 template<typename T>
-typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrive(int sock)
+typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrieve(int sock)
 {
 	if(CHM_INVALID_SOCK == sock){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -569,7 +569,7 @@ typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrive(int sock)
 				// basic_type::pAbsPtr is first object in list.
 				if(basic_type::pAbsPtr->next){
 					basic_type::pAbsPtr			= CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->next, st_ptr_type);
-					basic_type::pAbsPtr->prev	= NULL;		// for safty
+					basic_type::pAbsPtr->prev	= NULL;		// for safety
 				}else{
 					basic_type::pAbsPtr			= NULL;
 				}
@@ -597,7 +597,7 @@ typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrive(int sock)
 // After calling this method, be careful for pAbsPtr is NULL.
 //
 template<typename T>
-typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrive(void)
+typename chmsocklist_lap<T>::st_ptr_type chmsocklist_lap<T>::Retrieve(void)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMSOCKLIST does not set.");
@@ -922,7 +922,7 @@ bool chmpx_lap<T>::Close(int eqfd)
 		chmsocklistlap	socklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 		chmsocklistlap	freesocklist(*abs_sock_frees, basic_type::pShmBase, false);				// From Relative
 
-		for(PCHMSOCKLIST psocklist = socklist.Retrive(); psocklist; psocklist = (socklist.GetFirstPtr(false) ? socklist.Retrive() : NULL)){
+		for(PCHMSOCKLIST psocklist = socklist.Retrieve(); psocklist; psocklist = (socklist.GetFirstPtr(false) ? socklist.Retrieve() : NULL)){
 			if(CHM_INVALID_SOCK != psocklist->sock){
 				if(CHM_INVALID_HANDLE != eqfd){
 					epoll_ctl(eqfd, EPOLL_CTL_DEL, psocklist->sock, NULL);
@@ -1036,14 +1036,14 @@ bool chmpx_lap<T>::Set(int sock, int ctlsock, int selfsock, int selfctlsock, int
 			// get one sock list
 			chmsocklistlap	freesocklist(*abs_sock_frees, basic_type::pShmBase, false);				// From Relative
 			PCHMSOCKLIST	pnewsocklist;
-			if(NULL == (pnewsocklist = freesocklist.Retrive())){
+			if(NULL == (pnewsocklist = freesocklist.Retrieve())){
 				ERR_CHMPRN("Could not get free sock list.");
 				return false;
 			}
 			--(*abs_sock_free_cnt);
 			*abs_sock_frees = freesocklist.GetFirstPtr(false);
 
-			// set(next/prev members are set null in Retrive method)
+			// set(next/prev members are set null in Retrieve method)
 			pnewsocklist->sock = sock;
 
 			// set socklist
@@ -1141,16 +1141,16 @@ bool chmpx_lap<T>::Remove(int sock)
 		return true;
 	}
 
-	// retrive
+	// retrieve
 	chmsocklistlap	socklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 	PCHMSOCKLIST	prmsocklist;
-	if(NULL == (prmsocklist = socklist.Retrive(sock))){
+	if(NULL == (prmsocklist = socklist.Retrieve(sock))){
 		WAN_CHMPRN("Could not find sock(%d) in socklist, already remove it.", sock);
 		return true;
 	}
 	basic_type::pAbsPtr->socklist = socklist.GetFirstPtr(false);
 
-	// set(next/prev members are set null in Retrive method)
+	// set(next/prev members are set null in Retrieve method)
 	prmsocklist->sock = CHM_INVALID_SOCK;
 
 	// add free
@@ -1397,7 +1397,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 				chmsocklistlap	socklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 				chmsocklistlap	freesocklist(*abs_sock_frees, basic_type::pShmBase, false);				// From Relative
 
-				for(PCHMSOCKLIST psocklist = socklist.Retrive(); psocklist; psocklist = (socklist.GetFirstPtr(false) ? socklist.Retrive() : NULL)){
+				for(PCHMSOCKLIST psocklist = socklist.Retrieve(); psocklist; psocklist = (socklist.GetFirstPtr(false) ? socklist.Retrieve() : NULL)){
 					if(CHM_INVALID_SOCK != psocklist->sock){
 						WAN_CHMPRN("port(%d) is opened(sock:%d), so it is closed.", basic_type::pAbsPtr->port, psocklist->sock);
 						if(CHM_INVALID_HANDLE != eqfd){
@@ -1568,7 +1568,7 @@ class chmpxlist_lap : public structure_lap<T>
 
 	protected:
 		bool SaveChmpxIdMap(st_ptr_type ptr, bool is_abs);
-		bool RetriveChmpxIdMap(st_ptr_type ptr, bool is_abs);
+		bool RetrieveChmpxIdMap(st_ptr_type ptr, bool is_abs);
 		st_ptr_type SearchChmpxid(chmpxid_t chmpxid);
 
 	public:
@@ -1587,7 +1587,7 @@ class chmpxlist_lap : public structure_lap<T>
 
 		bool Initialize(st_ptr_type prev, st_ptr_type next, bool is_abs = true);
 		bool SaveChmpxIdMap(void) { return SaveChmpxIdMap(basic_type::pAbsPtr, true); }
-		bool RetriveChmpxIdMap(void) { return RetriveChmpxIdMap(basic_type::pAbsPtr, true); }
+		bool RetrieveChmpxIdMap(void) { return RetrieveChmpxIdMap(basic_type::pAbsPtr, true); }
 
 		st_ptr_type GetFirstPtr(bool is_abs = true);
 		bool ToFirst(void);
@@ -1616,8 +1616,8 @@ class chmpxlist_lap : public structure_lap<T>
 		chmpxid_t FindByStatus(chmpxsts_t status, bool part_match = false, bool is_to_first = false);
 		chmpxid_t GetRandomChmpxId(bool is_up_servers = false);
 		chmpxid_t GetChmpxIdByHash(chmhash_t hash);
-		st_ptr_type Retrive(PCHMPX ptr, bool is_abs);
-		st_ptr_type Retrive(void);
+		st_ptr_type Retrieve(PCHMPX ptr, bool is_abs);
+		st_ptr_type Retrieve(void);
 };
 
 template<typename T>
@@ -1789,7 +1789,7 @@ bool chmpxlist_lap<T>::Clear(int eqfd)
 		ERR_CHMPRN("PCHMPCLIST does not set.");
 		return false;
 	}
-	RetriveChmpxIdMap();				// basic_type::pAbsPtr->same
+	RetrieveChmpxIdMap();				// basic_type::pAbsPtr->same
 	basic_type::pAbsPtr->prev = NULL;
 	basic_type::pAbsPtr->next = NULL;
 
@@ -1851,7 +1851,7 @@ bool chmpxlist_lap<T>::SaveChmpxIdMap(st_ptr_type ptr, bool is_abs)
 }
 
 template<typename T>
-bool chmpxlist_lap<T>::RetriveChmpxIdMap(st_ptr_type ptr, bool is_abs)
+bool chmpxlist_lap<T>::RetrieveChmpxIdMap(st_ptr_type ptr, bool is_abs)
 {
 	if(!ptr){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -2388,7 +2388,7 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::PopFront(void)
 
 //
 // [NOTICE]
-// This method retrives current chmpxlist object if it is not first of list object.
+// This method retrieves current chmpxlist object if it is not first of list object.
 //
 template<typename T>
 typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::PopAny(void)
@@ -2659,7 +2659,7 @@ chmpxid_t chmpxlist_lap<T>::FindByStatus(chmpxsts_t status, bool part_match, boo
 }
 
 //
-// This method is not used now.(don't use this beacuse not good performance)
+// This method is not used now.(don't use this because not good performance)
 //
 // This method calls BaseHashCount(), then it is not good performance.
 // And rand() function is not good.
@@ -2701,7 +2701,7 @@ chmpxid_t chmpxlist_lap<T>::GetRandomChmpxId(bool is_up_servers)
 }
 
 //
-// This method is not used now.(don't use this beacuse not good performance)
+// This method is not used now.(don't use this because not good performance)
 //
 // This method calls BaseHashCount(), then it is not good performance.
 // Should use chmpxman_lap<T>::GetServerChmpxIdByHash() instead of this.
@@ -2735,13 +2735,13 @@ chmpxid_t chmpxlist_lap<T>::GetChmpxIdByHash(chmhash_t hash)
 }
 
 //
-// This method is not used now.(don't use this beacuse not good performance)
+// This method is not used now.(don't use this because not good performance)
 //
 // [CAREFUL]
 // After calling this method, be careful for pAbsPtr is NULL.
 //
 template<typename T>
-typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrive(PCHMPX ptr, bool is_abs)
+typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrieve(PCHMPX ptr, bool is_abs)
 {
 	if(!ptr){
 		ERR_CHMPRN("ptr is null.");
@@ -2778,7 +2778,7 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrive(PCHMPX ptr, boo
 			cur->next = NULL;
 			cur->prev = NULL;
 
-			RetriveChmpxIdMap(cur, true);		// basic_type::pAbsPtr->same
+			RetrieveChmpxIdMap(cur, true);		// basic_type::pAbsPtr->same
 			return cur;
 		}
 	}
@@ -2787,7 +2787,7 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrive(PCHMPX ptr, boo
 }
 
 template<typename T>
-typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrive(void)
+typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrieve(void)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXLIST does not set.");
@@ -2815,7 +2815,7 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrive(void)
 	current->prev = NULL;
 
 	if(basic_type::pAbsPtr){
-		RetriveChmpxIdMap(current, true);		// basic_type::pAbsPtr->same
+		RetrieveChmpxIdMap(current, true);		// basic_type::pAbsPtr->same
 	}
 	return current;
 }
@@ -3132,7 +3132,7 @@ bool mqmsghead_lap<T>::SetMqFlagStatus(bool is_assigned, bool is_activated)
 
 	if(IS_MQFLAG_CHMPXPROC(basic_type::pAbsPtr->flag)){
 		if(is_assigned && !is_activated){
-			WAN_CHMPRN("msgid(0x%016" PRIx64 ") is used by chmpx process, but specified assinged and disactivated, so force activated.", basic_type::pAbsPtr->msgid);
+			WAN_CHMPRN("msgid(0x%016" PRIx64 ") is used by chmpx process, but specified assigned and disactivated, so force activated.", basic_type::pAbsPtr->msgid);
 			is_activated = true;
 		}
 	}else if(!IS_MQFLAG_CLIENTPROC(basic_type::pAbsPtr->flag)){
@@ -3142,7 +3142,7 @@ bool mqmsghead_lap<T>::SetMqFlagStatus(bool is_assigned, bool is_activated)
 
 	if(!is_assigned){
 		if(is_activated){
-			WAN_CHMPRN("Specified actived & not assigned, so parameter is wrong, force set not assigned(disactivated).");
+			WAN_CHMPRN("Specified activated & not assigned, so parameter is wrong, force set not assigned(disactivated).");
 		}
 
 		if(IS_MQFLAG_NOTASSIGNED(basic_type::pAbsPtr->flag) && IS_MQFLAG_DISACTIVATED(basic_type::pAbsPtr->flag)){
@@ -3272,8 +3272,8 @@ class mqmsgheadlist_lap : public structure_lap<T>
 		bool Push(st_ptr_type ptr, bool is_abs, bool is_to_first = false);
 		bool PushBack(st_ptr_type ptr, bool is_abs);
 		st_ptr_type PopFront(void);
-		st_ptr_type Retrive(msgid_t msgid);
-		st_ptr_type Retrive(void);
+		st_ptr_type Retrieve(msgid_t msgid);
+		st_ptr_type Retrieve(void);
 
 		PMQMSGHEAD Find(msgid_t msgid, bool is_abs = true, bool is_to_first = false);
 		msgid_t GetRandomMsgId(void);
@@ -3597,7 +3597,7 @@ typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::PopFront(void)
 // And this method is very slow, should use Retrieve(void)
 //
 template<typename T>
-typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::Retrive(msgid_t msgid)
+typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::Retrieve(msgid_t msgid)
 {
 	if(CHM_INVALID_MSGID == msgid){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -3644,7 +3644,7 @@ typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::Retrive(msgid_t
 // After calling this method, be careful for pAbsPtr is NULL.
 //
 template<typename T>
-typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::Retrive(void)
+typename mqmsgheadlist_lap<T>::st_ptr_type mqmsgheadlist_lap<T>::Retrieve(void)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PMQMSGHEADLIST does not set.");
@@ -3714,7 +3714,7 @@ msgid_t mqmsgheadlist_lap<T>::GetRandomMsgId(void)
 
 	// for random position.
 	// using rand() which calls random() for linux, so thread-safe.(maybe)
-	// If thread unsafe, but we dont care for it.:-p
+	// If thread unsafe, but we don't care for it.:-p
 	//
 	long	msgidcnt = Count();
 	if(0L >= msgidcnt){
@@ -4120,7 +4120,7 @@ bool chmlog_lap<T>::Add(logtype_t logtype, size_t length, const struct timespec&
 		return false;
 	}
 	if(!IsEnable()){
-		//MSG_CHMPRN("Now history logging is desabled.");
+		//MSG_CHMPRN("Now history logging is disabled.");
 		return true;
 	}
 	if(!basic_type::pAbsPtr->start_log_rel_area || 0L == basic_type::pAbsPtr->max_log_count){
@@ -4232,8 +4232,8 @@ class cltproclist_lap : public structure_lap<T>
 		bool ToNext(void);
 		long Count(void);
 		bool Insert(st_ptr_type ptr, bool is_abs);
-		st_ptr_type Retrive(pid_t pid);
-		st_ptr_type Retrive(void);
+		st_ptr_type Retrieve(pid_t pid);
+		st_ptr_type Retrieve(void);
 		st_ptr_type Find(pid_t pid, bool is_abs);
 
 		bool GetAllPids(pidlist_t& list);
@@ -4487,7 +4487,7 @@ bool cltproclist_lap<T>::Insert(st_ptr_type ptr, bool is_abs)
 // And this method is very slow, should use Retrieve(void)
 //
 template<typename T>
-typename cltproclist_lap<T>::st_ptr_type cltproclist_lap<T>::Retrive(pid_t pid)
+typename cltproclist_lap<T>::st_ptr_type cltproclist_lap<T>::Retrieve(pid_t pid)
 {
 	if(CHM_INVALID_PID == pid){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -4535,7 +4535,7 @@ typename cltproclist_lap<T>::st_ptr_type cltproclist_lap<T>::Retrive(pid_t pid)
 // After calling this method, be careful for pAbsPtr is NULL.
 //
 template<typename T>
-typename cltproclist_lap<T>::st_ptr_type cltproclist_lap<T>::Retrive(void)
+typename cltproclist_lap<T>::st_ptr_type cltproclist_lap<T>::Retrieve(void)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCLTPROCLIST does not set.");
@@ -4640,7 +4640,7 @@ class chmpxman_lap : public structure_lap<T>
 
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
 		bool Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend);
-		bool ReloadConfigration(const CHMCFGINFO* pchmcfg);
+		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
 
 		bool GetSelfChmpxSvr(PCHMPXSVR chmpxsvr) const;
 		bool GetChmpxSvr(chmpxid_t chmpxid, PCHMPXSVR chmpxsvr) const;
@@ -4999,7 +4999,7 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 		CHMPXSSL		ssl;
 		CVT_SSL_STRUCTURE(ssl, *pselfnode);
 
-		// Inilitalize self PCHMPX for server in self list
+		// Initialize self PCHMPX for server in self list
 		if(pchmcfg->is_server_mode){
 			selfchmpx.InitializeServer(pselfnode->name.c_str(), pchmcfg->groupname.c_str(), pselfnode->port, pselfnode->ctlport, ssl);
 			basic_type::pAbsPtr->chmpx_servers		= selfchmpxlist.GetRelPtr();	// Set Self chmpxlist into servers
@@ -5072,7 +5072,7 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 }
 
 template<typename T>
-bool chmpxman_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
+bool chmpxman_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
 {
 	if(!pchmcfg){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -5362,7 +5362,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 
 			// Not found chmpxid -> remove this chmpxlist
 			PCHMPXLIST	retrivelist;
-			if(NULL == (retrivelist = svrchmpxlist.Retrive())){
+			if(NULL == (retrivelist = svrchmpxlist.Retrieve())){
 				// Failed to remove it, continue next.
 				WAN_CHMPRN("Failed to remove CHMPX(0x%016" PRIx64 ") from CHMPXSVR, but continue...", chmpxid);
 				is_error= true;
@@ -5370,7 +5370,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 				continue;
 			}
 			// [NOTICE]
-			// If Retrive() is succeed, list current in list is set next point(or end of list)
+			// If Retrieve() is succeed, list current in list is set next point(or end of list)
 			//
 			result = true;
 
@@ -5379,7 +5379,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 			{
 				// For debug message
 				chmpxlap	retrivechmpx(retrivechmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);						// Get CHMPX from Absolute
-				MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") with status(0x%016" PRIx64 ":%s) is retrived.", retrivechmpx.GetChmpxId(), retrivechmpx.GetStatus(), STR_CHMPXSTS_FULL(retrivechmpx.GetStatus()).c_str());
+				MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") with status(0x%016" PRIx64 ":%s) is retrieved.", retrivechmpx.GetChmpxId(), retrivechmpx.GetStatus(), STR_CHMPXSTS_FULL(retrivechmpx.GetStatus()).c_str());
 			}
 			retrivechmpxlist.Clear(eqfd);
 
@@ -5391,7 +5391,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 				basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
 			}
 			// [NOTICE]
-			// decreament here, but setting pointer is after this loop.
+			// decrement here, but setting pointer is after this loop.
 			//
 			if(0L < basic_type::pAbsPtr->chmpx_server_count){
 				basic_type::pAbsPtr->chmpx_server_count--;
@@ -5414,7 +5414,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 	// Thus we must recalculate here to keep the proper hash value.
 	//
 	if(!UpdateHash(HASHTG_BOTH)){
-		ERR_CHMPRN("Failed recalcurating base/pending hash values after merging chmpx data(above processing is %s).", is_error ? "failed" : "succeed");
+		ERR_CHMPRN("Failed recalculating base/pending hash values after merging chmpx data(above processing is %s).", is_error ? "failed" : "succeed");
 		is_error = true;
 	}
 
@@ -5478,7 +5478,7 @@ bool chmpxman_lap<T>::IsServerMode(chmpxid_t chmpxid) const
 	}else{
 		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);// From rel
 		if(svrchmpxlist.Find(chmpxid)){
-			// foud in server list
+			// found in server list
 			return true;
 		}
 	}
@@ -5500,7 +5500,7 @@ bool chmpxman_lap<T>::IsSlaveMode(chmpxid_t chmpxid) const
 	}else{
 		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_slaves, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 		if(svrchmpxlist.Find(chmpxid)){
-			// foud in slave list
+			// found in slave list
 			return true;
 		}
 	}
@@ -5671,7 +5671,7 @@ bool chmpxman_lap<T>::GetAllServerName(hnamesslmap_t& info) const
 			continue;
 		}
 		if(info.end() == info.find(name)){
-			info[name] = NULL;				// "hostanme" = NULL
+			info[name] = NULL;				// "hostname" = NULL
 		}
 		name += ":";
 		name += to_string(ctlport);
@@ -5826,7 +5826,7 @@ chmpxid_t chmpxman_lap<T>::GetServerChmpxIdByHash(chmhash_t hash) const
 	if(abs_base_arr[base_hash]){
 		svrchmpx.Reset(abs_base_arr[base_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 	}else{
-		// Somthing wrong, but try to search liner.(not good performace)
+		// Something wrong, but try to search liner.(not good performance)
 		WAN_CHMPRN("There is no chmpxid in base hashed array for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, base_hash);
 
 		chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
@@ -5845,9 +5845,9 @@ chmpxid_t chmpxman_lap<T>::GetServerChmpxIdByHash(chmhash_t hash) const
 //
 // Return		true / false(no target)
 // chmpxids		Set all chmpxid( for replication )
-//				If operating and with_pending is ture, this value includes other chmpxid by pending hash.
+//				If operating and with_pending is true, this value includes other chmpxid by pending hash.
 // basehashs	Set all chmhash( for replication by manual )
-//				If operating and with_pending is ture, this value includes other chmpx's chmhash.
+//				If operating and with_pending is true, this value includes other chmpx's chmhash.
 //
 template<typename T>
 bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, chmhashlist_t& basehashs, bool with_pending, bool without_down, bool without_suspend)
@@ -5897,7 +5897,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 			if(abs_base_arr[target_repl_hash]){
 				svrchmpx.Reset(abs_base_arr[target_repl_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 			}else{
-				// Somthing wrong, but try to search liner.(not good performace)
+				// Something wrong, but try to search liner.(not good performance)
 				WAN_CHMPRN("There is no chmpxid in base hashed array for hash(0x%016" PRIx64 ") - base hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_repl_hash);
 
 				svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
@@ -5962,7 +5962,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 				if(abs_pend_arr[target_repl_hash]){
 					svrchmpx.Reset(abs_pend_arr[target_repl_hash], abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 				}else{
-					// Somthing wrong, but try to search liner.(not good performace)
+					// Something wrong, but try to search liner.(not good performance)
 					WAN_CHMPRN("There is no chmpxid in pending hashed array for hash(0x%016" PRIx64 ") - pending hash(0x%016" PRIx64 "), but retry to do by liner searching.", hash, target_repl_hash);
 
 					svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, abs_base_arr, abs_pend_arr, AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
@@ -6018,7 +6018,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 //
 // Return		true / false(no target)
 // basehashs	Set all chmhash( for replication by manual )
-//				If operating and with_pending is ture, this value includes other chmpx's chmhash.
+//				If operating and with_pending is true, this value includes other chmpx's chmhash.
 //
 template<typename T>
 bool chmpxman_lap<T>::GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending, bool without_down, bool without_suspend)
@@ -6030,7 +6030,7 @@ bool chmpxman_lap<T>::GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& ba
 //
 // Return		true / false(no target)
 // chmpxids		Set all chmpxid( for replication )
-//				If operating and with_pending is ture, this value includes other chmpxid by pending hash.
+//				If operating and with_pending is true, this value includes other chmpxid by pending hash.
 //
 template<typename T>
 bool chmpxman_lap<T>::GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, bool with_pending, bool without_down, bool without_suspend)
@@ -6488,7 +6488,7 @@ bool chmpxman_lap<T>::IsOperating(void)
 //
 // Calculate and Update all server pending hash. Servers which are set pending hash must be
 // SERVICE ON/OUT on RING. Thus the server which is DOWN and SERVICE OUT is not a target for 
-// calicurating hash.
+// calculating hash.
 //
 template<typename T>
 bool chmpxman_lap<T>::UpdateHash(int type, bool is_allow_operating, bool is_allow_slave_mode)
@@ -6502,7 +6502,7 @@ bool chmpxman_lap<T>::UpdateHash(int type, bool is_allow_operating, bool is_allo
 		return false;
 	}
 	if(!is_allow_operating && basic_type::pAbsPtr->is_operating){
-		ERR_CHMPRN("Failed to request updateing hash, but blocks it because of operating now.");
+		ERR_CHMPRN("Failed to request updating hash, but blocks it because of operating now.");
 		return false;
 	}
 	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
@@ -6703,7 +6703,7 @@ bool chmpxman_lap<T>::RemoveSlave(chmpxid_t chmpxid, int eqfd)
 
 	// Remove from slave list
 	PCHMPXLIST	retrivelist;
-	if(NULL == (retrivelist = slvchmpxlist.Retrive())){
+	if(NULL == (retrivelist = slvchmpxlist.Retrieve())){
 		// Failed to remove it
 		ERR_CHMPRN("Failed to remove CHMPX(0x%016" PRIx64 ") from CHMPXSLV.", chmpxid);
 		return false;
@@ -6711,7 +6711,7 @@ bool chmpxman_lap<T>::RemoveSlave(chmpxid_t chmpxid, int eqfd)
 
 	// Rechain slave list
 	//
-	// Be careful about slvchmpxlist after Retrive().
+	// Be careful about slvchmpxlist after Retrieve().
 	// If there is no object in list, this list is invalid.
 	//
 	if(slvchmpxlist.GetAbsPtr()){
@@ -6843,7 +6843,7 @@ class chminfo_lap : public structure_lap<T>
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
 		bool Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend);
 		bool IsSafeCurrentVersion(void) const;
-		bool ReloadConfigration(const CHMCFGINFO* pchmcfg);
+		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
 
 		msgid_t GetBaseMsgId(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->base_msgid : 0L ); }
 		msgid_t GetRandomMsgId(bool is_chmpx, bool is_activated = true);						// get msgid from assigned list
@@ -6949,7 +6949,7 @@ class chminfo_lap : public structure_lap<T>
 		bool AddStat(chmpxid_t chmpxid, bool is_sent, size_t length, const struct timespec& elapsed_time);
 		bool GetStat(PCHMSTAT pserver, PCHMSTAT pslave) const;
 
-		bool RetriveClientPid(pid_t pid);
+		bool RetrieveClientPid(pid_t pid);
 		bool AddClientPid(pid_t pid);
 		bool GetAllPids(pidlist_t& list);
 		bool IsClientPids(void) const;
@@ -7037,7 +7037,7 @@ bool chminfo_lap<T>::IsSafeCurrentVersion(void) const
 	}
 	// check prefix for version string
 	if(0 != strncmp(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_VERSION_PREFIX, strlen(CHM_CHMINFO_VERSION_PREFIX))){
-		MSG_CHMPRN("CHMINFO structure meybe old version before CHMPX version 1.0.59.");
+		MSG_CHMPRN("CHMINFO structure maybe old version before CHMPX version 1.0.59.");
 		return false;
 	}
 	// [NOTE]
@@ -7200,12 +7200,12 @@ typename chminfo_lap<T>::st_ptr_type chminfo_lap<T>::Dup(void)
 	pdst->activated_msg_count	= basic_type::pAbsPtr->activated_msg_count;
 	pdst->assigned_msg_count	= basic_type::pAbsPtr->assigned_msg_count;
 	pdst->free_msg_count		= basic_type::pAbsPtr->free_msg_count;
-	pdst->free_msgs				= NULL;										// Allways NULL
+	pdst->free_msgs				= NULL;										// Always NULL
 	pdst->last_msgid_chmpx		= basic_type::pAbsPtr->last_msgid_chmpx;
 	pdst->last_msgid_activated	= basic_type::pAbsPtr->last_msgid_activated;
 	pdst->last_msgid_assigned	= basic_type::pAbsPtr->last_msgid_assigned;
-	pdst->rel_chmpxmsgarea		= NULL;										// Allways NULL
-	pdst->free_pids				= NULL;										// Allways NULL
+	pdst->rel_chmpxmsgarea		= NULL;										// Always NULL
+	pdst->free_pids				= NULL;										// Always NULL
 	pdst->k2h_fullmap			= basic_type::pAbsPtr->k2h_fullmap;
 	pdst->k2h_mask_bitcnt		= basic_type::pAbsPtr->k2h_mask_bitcnt;
 	pdst->k2h_cmask_bitcnt		= basic_type::pAbsPtr->k2h_cmask_bitcnt;
@@ -7344,7 +7344,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 }
 
 template<typename T>
-bool chminfo_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
+bool chminfo_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
 {
 	if(!pchmcfg){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -7367,7 +7367,7 @@ bool chminfo_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
 	// reset
 	//
 	// [NOTE]
-	// reset is_auto_merge_suspend flag at reloading configration.
+	// reset is_auto_merge_suspend flag at reloading configuration.
 	//
 	strcpy(basic_type::pAbsPtr->nssdb_dir, pchmcfg->nssdb_dir.c_str());
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
@@ -7394,7 +7394,7 @@ bool chminfo_lap<T>::ReloadConfigration(const CHMCFGINFO* pchmcfg)
 	basic_type::pAbsPtr->histlog_count			= pchmcfg->max_histlog_count;
 
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	if(!tmpchmpxman.ReloadConfigration(pchmcfg)){
+	if(!tmpchmpxman.ReloadConfiguration(pchmcfg)){
 		ERR_CHMPRN("Failed to initialize CHMPXMAN.");
 		return false;
 	}
@@ -7439,15 +7439,15 @@ bool chminfo_lap<T>::FreeMsg(msgid_t msgid)
 
 	// Find
 	mqmsgheadarrlap	msgheadarr(basic_type::pAbsPtr->rel_chmpxmsgarea, basic_type::pShmBase, basic_type::pAbsPtr->max_mqueue, false);	// From Relative
-	PMQMSGHEADLIST	retrived_list_ptr = msgheadarr.Find(msgid, true);									// To abs
-	if(!retrived_list_ptr){
+	PMQMSGHEADLIST	retrieved_list_ptr = msgheadarr.Find(msgid, true);									// To abs
+	if(!retrieved_list_ptr){
 		ERR_CHMPRN("Could not find msgid(0x%016" PRIx64 ").", msgid);
 		return false;
 	}
 
 	// build list
-	mqmsgheadlistlap	retrived_list(retrived_list_ptr, basic_type::pShmBase, true);					// From abs
-	mqmsgheadlap		retrieved_msghead(retrived_list.GetAbsMqMsgHeadPtr(), basic_type::pShmBase);	// From abs
+	mqmsgheadlistlap	retrieved_list(retrieved_list_ptr, basic_type::pShmBase, true);					// From abs
+	mqmsgheadlap		retrieved_msghead(retrieved_list.GetAbsMqMsgHeadPtr(), basic_type::pShmBase);	// From abs
 
 	// check flag
 	if(retrieved_msghead.IsNotAssigned()){
@@ -7455,41 +7455,41 @@ bool chminfo_lap<T>::FreeMsg(msgid_t msgid)
 		return true;
 	}
 
-	// Retrive
+	// Retrieve
 	if(retrieved_msghead.IsChmpxProc()){
-		if(NULL == (retrived_list_ptr = retrived_list.Retrive())){
+		if(NULL == (retrieved_list_ptr = retrieved_list.Retrieve())){
 			ERR_CHMPRN("Failed to remove msgid(0x%016" PRIx64 ") from chmpxlist.", msgid);
 			return false;
 		}
 		if(0 < basic_type::pAbsPtr->chmpx_msg_count){
 			basic_type::pAbsPtr->chmpx_msg_count--;
 		}
-		basic_type::pAbsPtr->chmpx_msgs = retrived_list.GetFirstPtr(false);
+		basic_type::pAbsPtr->chmpx_msgs = retrieved_list.GetFirstPtr(false);
 
 	}else if(retrieved_msghead.IsClientProc()){
 		if(retrieved_msghead.IsAssigned() && !retrieved_msghead.IsActivated()){
-			if(NULL == (retrived_list_ptr = retrived_list.Retrive())){
+			if(NULL == (retrieved_list_ptr = retrieved_list.Retrieve())){
 				ERR_CHMPRN("Failed to remove msgid(0x%016" PRIx64 ") from client assigned list.", msgid);
 				return false;
 			}
 			if(0 < basic_type::pAbsPtr->assigned_msg_count){
 				basic_type::pAbsPtr->assigned_msg_count--;
 			}
-			basic_type::pAbsPtr->assigned_msgs = retrived_list.GetFirstPtr(false);
+			basic_type::pAbsPtr->assigned_msgs = retrieved_list.GetFirstPtr(false);
 
 
 		}else if(retrieved_msghead.IsAssigned() && retrieved_msghead.IsActivated()){
-			if(NULL == (retrived_list_ptr = retrived_list.Retrive())){
+			if(NULL == (retrieved_list_ptr = retrieved_list.Retrieve())){
 				ERR_CHMPRN("Failed to remove msgid(0x%016" PRIx64 ") from client activated list.", msgid);
 				return false;
 			}
 			if(0 < basic_type::pAbsPtr->activated_msg_count){
 				basic_type::pAbsPtr->activated_msg_count--;
 			}
-			basic_type::pAbsPtr->activated_msgs = retrived_list.GetFirstPtr(false);
+			basic_type::pAbsPtr->activated_msgs = retrieved_list.GetFirstPtr(false);
 
 		}else{
-			ERR_CHMPRN("msgid(0x%016" PRIx64 ") status is soemthing wrong.", msgid);
+			ERR_CHMPRN("msgid(0x%016" PRIx64 ") status is something wrong.", msgid);
 			return false;
 		}
 	}else{
@@ -7498,14 +7498,14 @@ bool chminfo_lap<T>::FreeMsg(msgid_t msgid)
 	}
 
 	// Add freemsglist
-	retrived_list.Reset(retrived_list_ptr, basic_type::pShmBase, true);					// From abs
-	retrieved_msghead.Reset(retrived_list.GetAbsMqMsgHeadPtr(), basic_type::pShmBase);	// From abs
+	retrieved_list.Reset(retrieved_list_ptr, basic_type::pShmBase, true);				// From abs
+	retrieved_msghead.Reset(retrieved_list.GetAbsMqMsgHeadPtr(), basic_type::pShmBase);	// From abs
 
 	retrieved_msghead.NotAccountMqFlag();
 
 	mqmsgheadlistlap	freed_msgs(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);	// From rel(allow NULL)
-	if(!freed_msgs.Push(retrived_list_ptr, true)){
-		ERR_CHMPRN("Failed to add freed PMQMSGHEADLIST %p.", retrived_list_ptr);
+	if(!freed_msgs.Push(retrieved_list_ptr, true)){
+		ERR_CHMPRN("Failed to add freed PMQMSGHEADLIST %p.", retrieved_list_ptr);
 		return false;
 	}
 	basic_type::pAbsPtr->free_msg_count++;
@@ -7761,8 +7761,8 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 				return false;
 			}
 
-			// retrive msg from now(activated) list.
-			if(NULL == (msg_list_ptr = msg_list.Retrive())){
+			// retrieve msg from now(activated) list.
+			if(NULL == (msg_list_ptr = msg_list.Retrieve())){
 				WAN_CHMPRN("Failed to remove msgid(0x%016" PRIx64 ") from activated list.", msgid);
 				return false;
 			}
@@ -7778,7 +7778,7 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 			// add msg to assigned list
 			msg_list.Reset(basic_type::pAbsPtr->assigned_msgs, basic_type::pShmBase, false);	// From Relative(allow NULL)
 			if(!msg_list.Push(msg_list_ptr, true)){
-				ERR_CHMPRN("Failed to add msgid(0x%016" PRIx64 ") asigned msgs.", msgid);
+				ERR_CHMPRN("Failed to add msgid(0x%016" PRIx64 ") assigned msgs.", msgid);
 				return false;
 			}
 			basic_type::pAbsPtr->assigned_msg_count++;
@@ -7797,8 +7797,8 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 				return false;
 			}
 
-			// retrive msg from now(assigned) list.
-			if(NULL == (msg_list_ptr = msg_list.Retrive())){
+			// retrieve msg from now(assigned) list.
+			if(NULL == (msg_list_ptr = msg_list.Retrieve())){
 				WAN_CHMPRN("Failed to remove msgid(0x%016" PRIx64 ") from assigned list.", msgid);
 				return false;
 			}
@@ -7814,7 +7814,7 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 			// add msg to activated list
 			msg_list.Reset(basic_type::pAbsPtr->activated_msgs, basic_type::pShmBase, false);	// From Relative(allow NULL)
 			if(!msg_list.Push(msg_list_ptr, true)){
-				ERR_CHMPRN("Failed to add msgid(0x%016" PRIx64 ") asigned msgs.", msgid);
+				ERR_CHMPRN("Failed to add msgid(0x%016" PRIx64 ") assigned msgs.", msgid);
 				return false;
 			}
 			basic_type::pAbsPtr->activated_msg_count++;
@@ -8589,7 +8589,7 @@ bool chminfo_lap<T>::GetStat(PCHMSTAT pserver, PCHMSTAT pslave) const
 }
 
 template<typename T>
-bool chminfo_lap<T>::RetriveClientPid(pid_t pid)
+bool chminfo_lap<T>::RetrieveClientPid(pid_t pid)
 {
 	if(CHM_INVALID_PID == pid){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -8604,10 +8604,10 @@ bool chminfo_lap<T>::RetriveClientPid(pid_t pid)
 		return false;
 	}
 
-	// Retrive
+	// Retrieve
 	cltproclistlap	cltproc_pids(basic_type::pAbsPtr->client_pids, basic_type::pShmBase, false);	// From Relative
 	PCLTPROCLIST	ptgcltproc;
-	if(NULL == (ptgcltproc = cltproc_pids.Retrive(pid))){
+	if(NULL == (ptgcltproc = cltproc_pids.Retrieve(pid))){
 		ERR_CHMPRN("Could not free pid(%d), maybe not found it.", pid);
 		return false;
 	}
@@ -8655,7 +8655,7 @@ bool chminfo_lap<T>::AddClientPid(pid_t pid)
 		return false;
 	}
 	cltproclistlap	free_pids(basic_type::pAbsPtr->free_pids, basic_type::pShmBase, false);			// From Relative
-	ptgcltproc = free_pids.Retrive();
+	ptgcltproc = free_pids.Retrieve();
 	basic_type::pAbsPtr->free_pids = free_pids.GetFirstPtr(false);									// To Rel
 
 	// initialize
