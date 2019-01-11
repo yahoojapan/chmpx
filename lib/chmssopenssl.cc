@@ -200,7 +200,7 @@ bool ChmSecureSock::SetMinVersion(SSL_CTX* ctx)
 			return true;
 
 		default:
-			ERR_CHMPRN("SSL/TLS minimum version value(%s) is somehing wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
+			ERR_CHMPRN("SSL/TLS minimum version value(%s) is something wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
 			options |= SSL_OP_NO_SSLv3;
 			options |= SSL_OP_NO_SSLv2;
 			break;
@@ -380,7 +380,7 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 					result	= false;
 				}else{	// action_result == 0
 					if(CHKRESULTSSL_TYPE_CON == type){
-						MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so this case is received illigal EOF after calling connect/accept, but no error(no=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
+						MSG_CHMPRN("SSL action result(%ld): ssl result(%d: %s), so this case is received illegal EOF after calling connect/accept, but no error(no=%d).", action_result, ssl_result, ERR_error_string(ssl_result, NULL), errno);
 						result	= true;
 					}else if(CHKRESULTSSL_TYPE_SD == type){
 						WAN_CHMPRN("SSL action result(%ld): ssl result(%d: %s). not retry to shutdown.", action_result, ssl_result, ERR_error_string(ssl_result, NULL));
@@ -695,7 +695,7 @@ ChmSecureSock::ChmSecureSock(const char* CApath, const char* CAfile, bool is_ver
 ChmSecureSock::~ChmSecureSock(void)
 {
 	if(!ChmSecureSock::FreeLibrary()){
-		ERR_CHMPRN("Something error occurred in descructor.");
+		ERR_CHMPRN("Something error occurred in destructor.");
 	}
 }
 

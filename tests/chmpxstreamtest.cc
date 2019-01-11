@@ -644,11 +644,11 @@ int main(int argc, char** argv)
 	PRN("    Test chmstream class");
 	PRN("-------------------------------------------------------");
 	PRN(" *** NOTICE ***");
-	PRN(" You MUST set REPLICA as 0 in all server configration file.");
+	PRN(" You MUST set REPLICA as 0 in all server configuration file.");
 	PRN("");
 	PRN("-------------------------------------------------------");
 	PRN("Test process run on:                    %s",		is_server_side ? "server side" : "slave side");
-	PRN("Configration file or json:              %s",	config.c_str());
+	PRN("Configuration file or json:             %s",	config.c_str());
 	PRN("-------------------------------------------------------");
 
 	// Initialize

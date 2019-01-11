@@ -55,7 +55,7 @@ using namespace	std;
 #define	CHMEVMQ_MERGE_THREAD_NAME		"ChmEventMq-Merge"
 
 //---------------------------------------------------------
-// Class valiable
+// Class variables
 //---------------------------------------------------------
 const int	ChmEventMq::DEFAULT_RETRYCOUNT;
 const long	ChmEventMq::DEFAULT_TIMEOUT_US;
@@ -192,7 +192,7 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	bool				result;
 	time_t				start_time;
 	while(pThis->notify_merge_update){
-		// get perameter
+		// get parameter
 		while(!fullock::flck_trylock_noshared_mutex(&(pThis->mparam_list_lockval)));	// LOCK
 		pUpdateDataParam = NULL;
 		if(0 < pThis->merge_param_list.size()){
@@ -206,7 +206,7 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 		}
 		// copy param
 		CHM_MERGE_GETPARAM	getparam;
-		getparam.starthash			= 0;									// must be start posision 0
+		getparam.starthash			= 0;									// must be start position 0
 		getparam.startts.tv_nsec	= pUpdateDataParam->startts.tv_nsec;
 		getparam.startts.tv_sec		= pUpdateDataParam->startts.tv_sec;
 		getparam.endts.tv_nsec		= pUpdateDataParam->endts.tv_nsec;
@@ -234,7 +234,7 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 			pdatas	= NULL;
 			datacnt	= 0;
 			if(!pThis->mgetfunc(handle, &getparam, &nexthash, &pdatas, &datacnt)){
-				WAN_CHMPRN("Failed to get hash datas, probabry no more data.");
+				WAN_CHMPRN("Failed to get hash datas, probably no more data.");
 				break;
 			}else if(0 == datacnt){
 				MSG_CHMPRN("Finish to get datas.");
@@ -287,7 +287,7 @@ bool ChmEventMq::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 	ChmEventMq*	pMqObj	= reinterpret_cast<ChmEventMq*>(common_param);
 	mqd_t		mqfd	= static_cast<mqd_t>(wp_param);
 	if(!pMqObj || CHM_INVALID_HANDLE == mqfd){
-		ERR_CHMPRN("Paraemters are wrong.");
+		ERR_CHMPRN("Parameters are wrong.");
 		return true;		// sleep thread
 	}
 
@@ -530,7 +530,7 @@ bool ChmEventMq::UpdateInternalData(void)
 		//
 		//	- parameter is NULL(because thread is sleep at start)
 		//	- sleep at starting
-		//	- not at onece(not one shot)
+		//	- not at once(not one shot)
 		//	- sleep after every working
 		//	- not keep event count
 		//
@@ -1055,7 +1055,7 @@ bool ChmEventMq::BuildC2CHeadEx(PCOMHEAD pComHead, PCOMHEAD pReqComHead, chmpxid
 	}
 
 	if(!pReqComHead){
-		// Send New C2C Message type(deperture is this)
+		// Send New C2C Message type(departure is this)
 		if(pChmCntrl->IsChmpxType()){
 			// must start client, peer end chmpx
 			ERR_CHMPRN("Something wrong, because starting C2C message from CHMPX process.");
@@ -1073,7 +1073,7 @@ bool ChmEventMq::BuildC2CHeadEx(PCOMHEAD pComHead, PCOMHEAD pReqComHead, chmpxid
 			}
 		}else{
 			if(!pImData->IsMsgidActivated(frommsgid)){
-				ERR_CHMPRN("Deperture msgid(0x%016" PRIx64 ") is not activated.", frommsgid);
+				ERR_CHMPRN("Departure msgid(0x%016" PRIx64 ") is not activated.", frommsgid);
 				return false;
 			}
 		}
@@ -1105,7 +1105,7 @@ bool ChmEventMq::BuildC2CHeadEx(PCOMHEAD pComHead, PCOMHEAD pReqComHead, chmpxid
 			return false;
 		}
 
-		// make peer ternimate/deperture msgid.
+		// make peer terminate/departure msgid.
 		msgid_t		peer_dept_msgid = pReqComHead->term_ids.msgid;
 		msgid_t		peer_term_msgid = pImData->GetRandomChmpxMsgId();		// one of chmpx msgid(because start response msg)
 		if(CHM_INVALID_MSGID == peer_term_msgid){
@@ -1212,10 +1212,10 @@ bool ChmEventMq::Processing(PCOMPKT pComPkt)
 		}
 
 		// [NOTICE]
-		// Come here, following patturn:
+		// Come here, following pattern:
 		//
-		// 1) socket -> chmps(slave)  -> MQ
-		// 2) socket -> chmps(server) -> MQ
+		// 1) socket -> chmpx(slave)  -> MQ
+		// 2) socket -> chmpx(server) -> MQ
 		//
 		// Case 1) Must be set end point of msgid
 		// Case 2) Set or not set end point of msgid
@@ -1236,7 +1236,7 @@ bool ChmEventMq::Processing(PCOMPKT pComPkt)
 		}
 		pComPkt->head.peer_term_msgid = pComPkt->head.term_ids.msgid;
 
-		// set deperture msgid is self waiting msgid
+		// set departure msgid is self waiting msgid
 		if(CHM_INVALID_MSGID != pComPkt->head.peer_dept_msgid){
 			MSG_CHMPRN("Here is the message is after receiving from socket, but it has peer_dept_msgid. so reset it by myself.");
 		}
@@ -1496,7 +1496,7 @@ bool ChmEventMq::SendAck(const COMPOSEDMSGID& composed, bool is_success)
 	for(cnt = 0; cnt < retry_count; cnt++){
 		if(-1 == mq_send(mqfd, reinterpret_cast<const char*>(&composed_msgid), sizeof(msgid_t), priority)){
 			if(errno != EAGAIN){
-				ERR_CHMPRN("Failed to renponse ack to composed msgid(0x%016" PRIx64 "), error=%d", composed_msgid, errno);
+				ERR_CHMPRN("Failed to response ack to composed msgid(0x%016" PRIx64 "), error=%d", composed_msgid, errno);
 				return false;
 			}
 			nanosleep(&sleeptime, NULL);
@@ -1854,7 +1854,7 @@ bool ChmEventMq::ReceiveBody(PCOMPKT pComPkt, unsigned char** ppbody, size_t& bl
 }
 
 //
-// Read mesasge body by specified PCOMPKT head, and makes, returns full PCOMPKT.
+// Read message body by specified PCOMPKT head, and makes, returns full PCOMPKT.
 //
 // [NOTICE]
 // Returned PCOMPKT is needed to free, but must not free pComPkt.
@@ -1966,7 +1966,7 @@ bool ChmEventMq::PxCltSendMergeGetLastTime(struct timespec& lastts)
 		return false;
 	}
 	if(!notify_merge_get){
-		ERR_CHMPRN("Already run getting last upate time logic.");
+		ERR_CHMPRN("Already run getting last update time logic.");
 		return false;
 	}
 	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
@@ -2017,7 +2017,7 @@ bool ChmEventMq::PxCltSendMergeGetLastTime(struct timespec& lastts)
 
 	// [LOOP]
 	//
-	// wait for receving result
+	// wait for receiving result
 	//
 	notify_merge_get			= false;									// force
 	pres_lasttime				= &lastts;
@@ -2253,7 +2253,7 @@ bool ChmEventMq::PxCltReceiveRequestUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCl
 	PPXCLT_REQ_UPDATEDATA	pReqUpdateData	= CVT_CLTPTR_REQ_UPDATEDATA(pCltAll);
 
 	if(!mgetfunc){
-		// not regist merge get function.
+		// not register merge get function.
 		MSG_CHMPRN("mgetfunc is not set, so nothing to do for merge.");
 
 		// send finish to update data
@@ -2294,7 +2294,7 @@ bool ChmEventMq::PxCltReceiveRequestUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCl
 		//
 		//	- parameter is this object
 		//	- not sleep at starting
-		//	- at onece(one shot)                	(*1)
+		//	- at once(one shot)                	(*1)
 		//	- sleep after every working			    do not care this value because (*1)
 		//	- not keep event count					do not care this value because (*1)
 		//
@@ -2498,7 +2498,7 @@ bool ChmEventMq::PxCltReceiveSetUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll
 		return false;
 	}
 	if(!msetfunc){
-		ERR_CHMPRN("This object does not regist merge set update data function.");
+		ERR_CHMPRN("This object does not register merging update data function.");
 		return true;
 	}
 
@@ -2733,7 +2733,7 @@ bool ChmEventMq::PxCltSendCloseNotify(msgidlist_t& msgids)
 	// set common datas
 	PPXCLT_ALL			pCltAll		= CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCLT_CLOSE_NOTIFY	pCloseNotify= CVT_CLTPTR_CLOSE_NOTIFY(pCltAll);
-	SET_PXCLTPKT(pComPkt, pChmCntrl->IsChmpxType(), CHMPX_CLT_CLOSE_NOTIFY, msgids.front(), CHM_INVALID_MSGID, GetSerialNumber(), ext_length);	// deperture msgid is one of msgids
+	SET_PXCLTPKT(pComPkt, pChmCntrl->IsChmpxType(), CHMPX_CLT_CLOSE_NOTIFY, msgids.front(), CHM_INVALID_MSGID, GetSerialNumber(), ext_length);	// departure msgid is one of msgids
 
 	pCloseNotify->head.type		= CHMPX_CLT_CLOSE_NOTIFY;
 	pCloseNotify->head.length	= SIZEOF_CHMPX_CLT(CHMPX_CLT_CLOSE_NOTIFY) + ext_length;
@@ -2763,7 +2763,7 @@ bool ChmEventMq::PxCltSendCloseNotify(msgidlist_t& msgids)
 			WAN_CHMPRN("Could not send CHMPX_CLT_CLOSE_NOTIFY to msgid(0x%016" PRIx64 "), but continue....", *iter);
 		}else{
 			// [NOTE]
-			// If the client on slave, enough to sending onece.
+			// If the client on slave, enough to sending once.
 			if(pChmCntrl->IsClientOnSlvType()){
 				break;
 			}
@@ -2841,7 +2841,7 @@ bool ChmEventMq::PxCltSendJoinNotify(pid_t pid)
 		return false;
 	}
 
-	// deperture msgid
+	// departure msgid
 	msgid_t	dept_msgid = CHM_INVALID_MSGID;
 	if(pChmCntrl->IsClientOnSlvType()){
 		dept_msgid = ActivatedMsgId();
@@ -2849,7 +2849,7 @@ bool ChmEventMq::PxCltSendJoinNotify(pid_t pid)
 		dept_msgid = pImData->GetRandomClientMsgId();
 	}
 	if(CHM_INVALID_MSGID == dept_msgid){
-		ERR_CHMPRN("Could not get own msgid(deperture).");
+		ERR_CHMPRN("Could not get own msgid(departure).");
 		CHM_Free(pComPkt);
 		return false;
 	}

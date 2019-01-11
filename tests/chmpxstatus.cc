@@ -105,13 +105,13 @@ inline std::string PRN_TIMESPEC(const timespec& ts)
 static void Help(char* progname)
 {
 	PRN("");
-	PRN("Usage: %s -conf <configration file path> [-ctlport <port>] [-self] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
+	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] [-self] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
 	PRN("Usage: %s -h", progname ? programname(progname) : "program");
 	PRN("");
 	PRN("Option");
 	PRN("  -conf <file name>    configuration file( .ini / .json / .yaml ) path");
 	PRN("  -json <json>         configuration JSON string\n");
-	PRN("  -ctlport <port>      specify the self contrl port(*)");
+	PRN("  -ctlport <port>      specify the self control port(*)");
 	PRN("  -self                print only self chmpx");
 	PRN("  -d <param>           specify the debugging output mode:");
 	PRN("                        silent - no output");
@@ -124,7 +124,7 @@ static void Help(char* progname)
 	PRN("");
 	PRN("(*) if ctlport option is specified, chmpx searches same ctlport in configuration");
 	PRN("    file and ignores \"CTLPORT\" directive in \"GLOBAL\" section. and chmpx will");
-	PRN("    start in the mode indicated by the server entry that has beed detected.");
+	PRN("    start in the mode indicated by the server entry that has been detected.");
 	PRN("");
 }
 
@@ -170,7 +170,7 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("auto merge                                   = %s",				pInfo->pchminfo->is_auto_merge ? "yes" : "no");
 	PRN("suspend auto merge                           = %s",				pInfo->pchminfo->is_auto_merge_suspend ? "yes" : "no");
 	PRN("merge processing(do merge)                   = %s",				pInfo->pchminfo->is_do_merge ? "yes" :"no");
-	PRN("SSL/TLS minium version                       = %s",				CHM_GET_STR_SSLTLS_VERSION(pInfo->pchminfo->ssl_min_ver));
+	PRN("SSL/TLS minimum version                      = %s",				CHM_GET_STR_SSLTLS_VERSION(pInfo->pchminfo->ssl_min_ver));
 	PRN("NSSDB directory path                         = %s",				pInfo->pchminfo->nssdb_dir);
 	PRN("timeout for merge                            = %zd (s)",			pInfo->pchminfo->timeout_merge);
 	PRN("thread count for socket                      = %d",				pInfo->pchminfo->evsock_thread_cnt);
@@ -178,9 +178,9 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("maximum socket count per chmpx(socket pool)  = %d",				pInfo->pchminfo->max_sock_pool);
 	PRN("timeout for socket pool                      = %zd (s)",			pInfo->pchminfo->sock_pool_timeout);
 	PRN("retry count on socket                        = %d",				pInfo->pchminfo->sock_retrycnt);
-	PRN("timeout for send/recieve on socket           = %ld (us)",			pInfo->pchminfo->timeout_wait_socket);
+	PRN("timeout for send/receive on socket           = %ld (us)",			pInfo->pchminfo->timeout_wait_socket);
 	PRN("timeout for connect on socket                = %ld (us)",			pInfo->pchminfo->timeout_wait_connect);
-	PRN("timeout for send/recieve on socket           = %ld (us)",			pInfo->pchminfo->timeout_wait_mq);
+	PRN("timeout for send/receive on socket           = %ld (us)",			pInfo->pchminfo->timeout_wait_mq);
 	PRN("maximum MQ count                             = %ld",				pInfo->pchminfo->max_mqueue);
 	PRN("chmpx process MQ count                       = %ld",				pInfo->pchminfo->chmpx_mqueue);
 	PRN("maximum queue per chmpx process MQ           = %ld",				pInfo->pchminfo->max_q_per_chmpxmq);
@@ -194,8 +194,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 
 	// chmpx info & info ex --> chmpx manager
 	PRN("chmpx name                                   = %s",				pInfo->pchminfo->chmpx_man.group);
-	PRN("configration file version                    = %ld",				pInfo->pchminfo->chmpx_man.cfg_revision);
-	PRN("configration file date                       = %zu (unix time)",	pInfo->pchminfo->chmpx_man.cfg_date);
+	PRN("configuration file version                   = %ld",				pInfo->pchminfo->chmpx_man.cfg_revision);
+	PRN("configuration file date                      = %zu (unix time)",	pInfo->pchminfo->chmpx_man.cfg_date);
 	PRN("replication count                            = %ld",				pInfo->pchminfo->chmpx_man.replica_count);
 	PRN("maximum chmpx count                          = %ld",				pInfo->pchminfo->chmpx_man.chmpx_count);
 	PRN("base hash count                              = %ld",				pInfo->pchminfo->chmpx_man.chmpx_bhash_count);
@@ -394,7 +394,7 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 	PRN("last assigned msgid                          = 0x%016" PRIx64 ,	pInfo->pchminfo->last_msgid_assigned);
 
 	// chmpx info & info ex --> client process
-	PRN("joining client proces = {");
+	PRN("joining client process = {");
 	for(counter = 0, pproclist = pInfo->pchminfo->client_pids; pproclist; pproclist = pproclist->next, ++counter){
 		PRN("  [%d] pid                                   = %d",			counter, pproclist->pid);
 	}

@@ -66,11 +66,11 @@ template<typename T> inline bool CHMEMPTYSTR(const T& pstr)
 
 #if defined(__cplusplus)
 #define	CHM_OFFSET(baseaddr, offset, type)	(offset > 0 ? reinterpret_cast<type>(reinterpret_cast<off_t>(baseaddr) + offset) : reinterpret_cast<type>(baseaddr)) 					// convert pointer with offset
-#define	CHM_ABS(baseaddr, offset, type)		(reinterpret_cast<off_t>(offset) > 0 ? reinterpret_cast<type>(reinterpret_cast<off_t>(baseaddr) + reinterpret_cast<off_t>(offset)) : 0) // To Absorute address
+#define	CHM_ABS(baseaddr, offset, type)		(reinterpret_cast<off_t>(offset) > 0 ? reinterpret_cast<type>(reinterpret_cast<off_t>(baseaddr) + reinterpret_cast<off_t>(offset)) : 0) // To Absolute address
 #define	CHM_REL(baseaddr, address, type)	(address > 0 ? reinterpret_cast<type>(reinterpret_cast<off_t>(address) - reinterpret_cast<off_t>(baseaddr)) : 0)						// To Relative address
 #else	// __cplusplus
 #define	CHM_OFFSET(baseaddr, offset, type)	(offset > 0 ? (type)((off_t)baseaddr + offset) : (type)baseaddr) 	// convert pointer with offset
-#define	CHM_ABS(baseaddr, offset, type)		(offset > 0 ? (type)((off_t)baseaddr + (off_t)offset) : 0) 			// To Absorute address
+#define	CHM_ABS(baseaddr, offset, type)		(offset > 0 ? (type)((off_t)baseaddr + (off_t)offset) : 0) 			// To Absolute address
 #define	CHM_REL(baseaddr, address, type)	(address > 0 ? (type)((off_t)address - (off_t)baseaddr) : 0)		// To Relative address
 #endif	// __cplusplus
 

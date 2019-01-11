@@ -68,7 +68,7 @@ typedef struct chmth_wp_param{
 	std::string				thread_name;
 	ChmThread*				pchmthread;				// pointer to ChmThread
 	volatile chmthsts_t		status;					// exit, sleep, working...
-	bool					is_onece;				// if true, thread exits after working onece
+	bool					is_once;				// if true, thread exits after working once
 	bool					is_nosleep;				// if true, thread never sleep
 	bool					is_keep_evcnt;			// if false, no event stacking
 	Tfp_Chm_WorkerProc		work_proc;
@@ -78,7 +78,7 @@ typedef struct chmth_wp_param{
 	pthread_cond_t			cond_val;
 	pthread_t				threadid;				// thread id
 
-	chmth_wp_param() : thread_name(""), pchmthread(NULL), status(0), is_onece(false), is_nosleep(false), is_keep_evcnt(true), work_proc(NULL), common_param(NULL), wp_param(0)	// status = CHMTHCOM_SLEEP
+	chmth_wp_param() : thread_name(""), pchmthread(NULL), status(0), is_once(false), is_nosleep(false), is_keep_evcnt(true), work_proc(NULL), common_param(NULL), wp_param(0)	// status = CHMTHCOM_SLEEP
 	{
 		CHMTHREAD_INITIALIZE_CONDVAL(cond_mutex, cond_val);
 	}
@@ -122,7 +122,7 @@ class ChmThread
 
 		bool HasThread(void) const { return (0 < chmthlist.size()); }
 		int GetThreadCount(void) const { return chmthlist.size(); }
-		int CreateThreads(int thread_cnt, Tfp_Chm_WorkerProc work_func, Tfp_Chm_FreeParameter free_func = NULL, void* common_param = NULL, chmthparam_t wp_param = 0, bool is_sleep_at_start = true, bool is_onece = false, bool is_nosleep = false, bool is_keep_evcnt = true);
+		int CreateThreads(int thread_cnt, Tfp_Chm_WorkerProc work_func, Tfp_Chm_FreeParameter free_func = NULL, void* common_param = NULL, chmthparam_t wp_param = 0, bool is_sleep_at_start = true, bool is_once = false, bool is_nosleep = false, bool is_keep_evcnt = true);
 		int ExitThreads(int thread_cnt, bool is_wait = true);
 		bool ExitAllThreads(void);
 		bool IsThreadRun(void);

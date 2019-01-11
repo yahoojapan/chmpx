@@ -334,7 +334,7 @@ bool ChmSecureSock::SetMinVersion(gnutls_session_t session)
 			break;
 
 		default:
-			ERR_CHMPRN("SSL/TLS minimum version value(%s) is somehing wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
+			ERR_CHMPRN("SSL/TLS minimum version value(%s) is something wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
 			strPriority += ":+VERS-TLS-ALL:+VERS-SSL3.0";
 			break;
 	}
@@ -627,7 +627,7 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 		return NULL;
 	}
 
-	// print infomation for session
+	// print information for session
 	if(NULL == (pDescSession = gnutls_session_get_desc(session))){
 		WAN_CHMPRN("Could not get description for server session");
 	}else{
@@ -731,7 +731,7 @@ ChmSSSession ChmSecureSock::ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt,
 		return NULL;
 	}
 
-	// print infomation for session
+	// print information for session
 	if(NULL == (pDescSession = gnutls_session_get_desc(session))){
 		WAN_CHMPRN("Could not get description for slave session");
 	}else{
@@ -823,7 +823,7 @@ ChmSecureSock::ChmSecureSock(const char* CApath, const char* CAfile, bool is_ver
 ChmSecureSock::~ChmSecureSock(void)
 {
 	if(!ChmSecureSock::FreeLibrary()){
-		ERR_CHMPRN("Something error occurred in descructor.");
+		ERR_CHMPRN("Something error occurred in destructor.");
 	}
 }
 

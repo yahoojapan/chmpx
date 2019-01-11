@@ -59,7 +59,7 @@ class ChmCntrl
 
 		typedef std::map<int, ChmEventBase*>	evobj_map_t;	// Key is number which is kind of event object.
 
-		static const int		DEFAULT_MAX_EVENT_CNT	= 32;	// receive max event at onece for CHMCHNTL_TYPE_CHMPXPROC
+		static const int		DEFAULT_MAX_EVENT_CNT	= 32;	// receive max event at once for CHMCHNTL_TYPE_CHMPXPROC
 		static const int		DEFAULT_EVENT_TIMEOUT	= 100;	// timeout for epoll wait(100ms) for CHMCHNTL_TYPE_CHMPXPROC
 		static const int		EVENT_NOWAIT 			= 0;	// no wait for epoll
 		static volatile bool	DoLoop;							// Break loop flag
@@ -91,7 +91,7 @@ class ChmCntrl
 		bool ReInitialize(long waitms = 0L, int trycnt = 1);
 		bool IsInitialized(void) const;
 		bool InitializeEventFd(void);
-		bool ConfigrationUpdateNotify(void);
+		bool ConfigurationUpdateNotify(void);
 
 		bool Processing(PCOMPKT pComPkt, EVOBJTYPE call_ev_type);
 

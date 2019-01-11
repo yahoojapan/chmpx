@@ -101,12 +101,12 @@ bool sorted_insert_strmaparr(strmaparr_t& sorted_smaps, strmap_t& smap, const ch
 							merge_strmap((*iter), smap);
 							return true;
 						}else if(strname2 < sorted_strname2){
-							// over posission, insert data
+							// over position, insert data
 							sorted_smaps.insert(iter, smap);
 							return true;
 						}
 					}else{
-						// over posission, insert data
+						// over position, insert data
 						sorted_smaps.insert(iter, smap);
 						return true;
 					}
@@ -115,12 +115,12 @@ bool sorted_insert_strmaparr(strmaparr_t& sorted_smaps, strmap_t& smap, const ch
 			break;
 
 		}else if(strname1 < (*iter)[pSortKey1]){
-			// over posission, insert data
+			// over position, insert data
 			sorted_smaps.insert(iter, smap);
 			return true;
 		}
 	}
-	// not found, insert to lastest posision
+	// not found, insert to lastest position
 	sorted_smaps.push_back(smap);
 
 	return true;
