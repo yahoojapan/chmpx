@@ -47,13 +47,13 @@ display help
 .IP \fB\-v\fR 15
 display version.
 .IP \fB\-conf\ [file\ path]\fR 15
-specify configration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
+specify configuration file(.ini .yaml .json) which is same file for CHMPX server/slave node.
 .IP \fB\-json\ [json\ string]\fR 15
-specify configration json string which is same file for CHMPX server/slave node.
+specify configuration json string which is same file for CHMPX server/slave node.
 .IP \fB\-ctlport\ [control\ port\ number]\fR 15
-specify the self contrl port. if ctlport option is specified, chmpx searches same ctlport in configuration and ignores "CTLPORT" directive in "GLOBAL" section. and chmpx will start in the mode indicated by the server entry that has beed detected.
+specify the self control port. if ctlport option is specified, chmpx searches same ctlport in configuration and ignores "CTLPORT" directive in "GLOBAL" section. and chmpx will start in the mode indicated by the server entry that has been detected.
 .IP \fB\-d\fR\ [ERR\ |\ WAN\ |\ INFO\ |\ DUMP]\fR 15
-specify debugging level, chmpx displaies debugging message for itself.
+specify debugging level, chmpx displays debugging message for itself.
 .IP \fB\-dl\ [file\ path]\fR 15
 specify sending message data length by byte. default value and minimum value are 64 bytes.
 .br
@@ -149,11 +149,11 @@ You can see these function prototypes in chmpx.h
 .TP
 CHMPX C++ Language interface is implemented almost in chmcntrl.h. You can use public ChmCntrl class methods like C Language interface.
 .br
-.SH CONFIGRATION
+.SH CONFIGURATION
 .TP 0
-The chmpx program is main program for transferring message. You can run chmpx program with "\-h" option, then you can see options for chmpx. The chmpx program and clients program with library which is made by you are loading the configration file when these program start to run. The configration file is formatted "INI" file.
+The chmpx program is main program for transferring message. You can run chmpx program with "\-h" option, then you can see options for chmpx. The chmpx program and clients program with library which is made by you are loading the configuration file when these program start to run. The configuration file is formatted "INI" file.
 .TP 2
-Following keys in configration file:
+Following keys in configuration file:
 .IP [GLOBAL] 20
 global common section.
 .IP [SVRNODE] 20
@@ -164,17 +164,17 @@ slave nodes section.
 .BR
 .br
 .IP FILEVERSION 20
-serial number for configration file version.
+serial number for configuration file version.
 .IP DATE 20
 date by RFC 2822
 .IP GROUP 20
-CHMPX group name as claster name.
+CHMPX group name as cluster name.
 .IP MODE 20
 server or slave
 .IP DELIVERMODE 20
 random or hash, random means random transferred messages, hash is sending message to one of node.
 .IP MAXCHMPX 20
-maximum chmpx server in claster
+maximum chmpx server in cluster
 .IP REPLICA 20
 duplicate messages
 .IP MAXMQSERVER 20
@@ -206,7 +206,7 @@ timeout for reading/writing on MQ by us.
 .IP MQRETRYCNT 20
 retry count for recovering connecting/sending/receiving on MQ.
 .IP MQACK 20
-send/receive the ack at comminicating on MQ.
+send/receive the ack at communicating on MQ.
 .IP SOCKTHREADCNT 20
 thread count for receiving data on socket.
 .IP MQTHREADCNT 20
@@ -230,11 +230,11 @@ default CA certs file path or directory path.
 .IP SERVER_CERT 20
 default server cert file path.
 .IP SERVER_PRIKEY 20
-default server priovate key file path.
+default server private key file path.
 .IP SLAVE_CERT 20
 default slave cert file path.
 .IP SLAVE_PRIKEY 20
-default slave priovate key file path.
+default slave private key file path.
 .IP K2HFULLMAP 20
 k2hash option which is used by chmpx.(see man k2hash)
 .IP K2HMASKBIT 20
@@ -249,32 +249,32 @@ k2hash option which is used by chmpx.(see man k2hash)
 .IP NAME 20
 server/slave name by FQDN. you can use regular expression(for slave name) or easiness regular expression(for server name)
 .TP
-You can see the sample of configration file in docs/exsample directory.
+You can see the sample of configuration file in docs/example directory.
 .SH ENVIRONMENT
 .TP 2
-CHMPX use some environments automatically, plese take care these environments.
+CHMPX use some environments automatically, please take care these environments.
 .IP CHMDBGMODE 20
 specifies debugging level: INFO/WAN/ERR/SILENT
 .IP CHMDBGFILE 20
 output file path for message(default: stderr)
 .IP CHMCONFFILE 20
-specify configuratin file by environment, chmpx uses this value when configuration file or json string is not specified in command line.
+specify configuration file by environment, chmpx uses this value when configuration file or json string is not specified in command line.
 .IP CHMJSONCONF 20
-specify configuratin json string by environment, chmpx uses this value when configuration file or json string is not specified in command line.
+specify configuration json string by environment, chmpx uses this value when configuration file or json string is not specified in command line.
 .SH NOTES
 .TP 0
 chmpxbench is tool for benchmark.
 .TP 0
 chmpxstatus is tool for checking status local node.
 .TP 0
-chmpxlinetool is tool for controling/checking chmpx nodes and tools on command line.
+chmpxlinetool is tool for controlling/checking chmpx nodes and tools on command line.
 .TP 0
-chmpxconftest is tool for testing configration file or json string.
+chmpxconftest is tool for testing configuration file or json string.
 .SH SEE ALSO
 .TP
 chmpxbench(1), chmpxstatus(1), chmpxconftest(1), chmpxlinetool(1)
 .SH BUGS
 .TP
-Please report owner and comitter.
+Please report owner and committer.
 .SH AUTHOR
 CHMPX has been written by Takeshi Nakatani.

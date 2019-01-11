@@ -72,7 +72,7 @@ struct merge_map
 };
 typedef merge_map<std::string, std::string>	merge_strmap;
 
-// sepalate
+// separate
 bool str_paeser(const char* pbase, strlst_t& strarr, const char* psep = NULL, bool istrim = true);
 bool str_split(const char* pbase, strlst_t& strarr, char sep, bool istrim = true);
 

@@ -293,7 +293,7 @@ int main(int argc, char** argv)
 						break;
 					}
 				}else{
-					ERR_CHMPRN("unkown event for fd(%d).\n", events[ecnt].data.fd);
+					ERR_CHMPRN("unknown event for fd(%d).\n", events[ecnt].data.fd);
 				}
 			}
 		}

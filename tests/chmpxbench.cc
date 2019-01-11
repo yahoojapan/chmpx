@@ -77,7 +77,7 @@ typedef struct bench_opts{
 typedef struct child_control{
 	int				procid;				// process id for child
 	int				threadid;			// thread id(gettid)
-	pthread_t		pthreadid;			// pthead id(pthread_create)
+	pthread_t		pthreadid;			// pthread id(pthread_create)
 	bool			is_ready;			// 
 	bool			is_exit;			// 
 	struct timespec	ts;					// result time
@@ -249,10 +249,10 @@ static void Help(char* progname)
 	PRN("        -l [loop count]   Loop count(default 1), 0 means no limit.");
 	PRN("        -proccnt          process count.");
 	PRN("        -threadcnt        thread count per one process.");
-	PRN("        -ta               Turn around mode.(message is terned around on server to slave.)");
+	PRN("        -ta               Turn around mode.(message is turned around on server to slave.)");
 	PRN("        -b                Broadcast message(only client mode)");
 	PRN("        -dl [bytes]       send message size.(minimum bytes is %d)", MINIMUM_DATA_LENGTH);
-	PRN("        -pr               print sending/recieving message.");
+	PRN("        -pr               print sending/receiving message.");
 	PRN("        -mergedump        display merge request/data.");
 	PRN("        -d [debug level]  \"ERR\" / \"WAN\" / \"INF\" / \"DUMP\"");
 	PRN("        -h                display help");
@@ -501,7 +501,7 @@ static bool MergeGetCallback(chmpx_h handle, const PCHM_MERGE_GETPARAM pparam, c
 			PRN("        datacnt             = 0");
 			PRN("        pdatas              = NULL");
 			PRN("        pdatas->byptr       = NULL");
-			PRN("        pdatas->lengfth     = 0");
+			PRN("        pdatas->length      = 0");
 			PRN("    }");
 		}
 	}else{
@@ -522,7 +522,7 @@ static bool MergeGetCallback(chmpx_h handle, const PCHM_MERGE_GETPARAM pparam, c
 			PRN("        datacnt             = 1");
 			PRN("        pdatas              = %p",		*ppdatas);
 			PRN("        pdatas->byptr       = %p(%s)",	(*ppdatas ? (*ppdatas)->byptr : NULL), ((*ppdatas && (*ppdatas)->byptr) ? reinterpret_cast<char*>((*ppdatas)->byptr) : "null"));
-			PRN("        pdatas->lengfth     = %zu",	(*ppdatas ? (*ppdatas)->length : 0));
+			PRN("        pdatas->length      = %zu",	(*ppdatas ? (*ppdatas)->length : 0));
 			PRN("    }");
 		}
 	}
@@ -929,7 +929,7 @@ static void PrintResult(const PEXECCNTL pexeccntl, const PCHLDCNTL pchldcntl, st
 	PRN("CHMPX bench mark");
 	PRN("-----------------------------------------------------------");
 	PRN("CHMPX mode                    %s",			pexeccntl->opt.isServerMode ? "Server mode" : "Slave mode");
-	PRN("CHMPX configration            %s",			pexeccntl->opt.szConfig);
+	PRN("CHMPX configuration           %s",			pexeccntl->opt.szConfig);
 	PRN("-----------------------------------------------------------");
 	PRN("Total loop count              %ld",		0 == pexeccntl->opt.LoopCnt ? 0 : pexeccntl->opt.proccnt * pexeccntl->opt.threadcnt * pexeccntl->opt.LoopCnt);
 	PRN("  Process count               %ld",		pexeccntl->opt.proccnt);

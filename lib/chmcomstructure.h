@@ -35,7 +35,7 @@
 #define	MQ_PRIORITY_MSG				10						// COM_C2C
 
 // 
-// The two higher bits in serial number is for tha ACK on MQ.
+// The two higher bits in serial number is for the ACK on MQ.
 //
 #define	MQ_ACK_TYPE_MASK			(static_cast<serial_t>(0x80000000) & MASK64_LOWBIT)
 #define	MQ_ACK_CODE_MASK			(static_cast<serial_t>(0x40000000) & MASK64_LOWBIT)
@@ -57,7 +57,7 @@
 typedef struct chmpx_common_merge_param{
 	chmpxid_t		chmpxid;									// requester chmpx
 	struct timespec	startts;									// start time for update datas
-	chmhash_t		max_pending_hash;							// max panding hash value
+	chmhash_t		max_pending_hash;							// max pending hash value
 	chmhash_t		pending_hash;								// new(pending) hash value
 	chmhash_t		max_base_hash;								// max base hash value
 	chmhash_t		base_hash;									// base hash value
@@ -87,8 +87,8 @@ typedef struct chmpx_common_merge_param{
 //---------------------------------------------------------
 // COM_C2PX, COM_PX2C: Communication Packets
 //---------------------------------------------------------
-// These packets are used for comminicating on MQ.
-// So do not change bity order.
+// These packets are used for communicating on MQ.
+// So do not change bit order.
 //
 typedef uint64_t						pxclttype_t;		// type for packet
 typedef uint64_t						reqidmapflag_t;		// flag type for request update status for each chmpxid
@@ -102,7 +102,7 @@ typedef uint64_t						reqidmapflag_t;		// flag type for request update status fo
 #define	CHMPX_CLT_REQ_UPDATEDATA		5					// Command for request update datas(chmpx server node to server client)
 #define	CHMPX_CLT_RES_UPDATEDATA		6					// Response for request update datas(server client to chmpx server node)
 #define	CHMPX_CLT_SET_UPDATEDATA		7					// Command for set update datas(chmpx server node to server client)
-#define	CHMPX_CLT_RESULT_UPDATEDATA		8					// Resonse for result of update data(server client to chmpx server node)
+#define	CHMPX_CLT_RESULT_UPDATEDATA		8					// Response for result of update data(server client to chmpx server node)
 #define	CHMPX_CLT_ABORT_UPDATEDATA		9					// Command for abort update data(chmpx server node to server client)
 
 #define	STRPXCLTTYPE(type)			(	CHMPX_CLT_UNKNOWN			== type ? "CHMPX_CLT_UNKNOWN"			: \

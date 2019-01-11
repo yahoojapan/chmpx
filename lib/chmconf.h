@@ -275,7 +275,7 @@ class CHMConf : public ChmEventBase
 	protected:
 		CHMConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* pJson = NULL);
 
-		virtual bool LoadConfigration(CHMCFGINFO& chmcfginfo) const = 0;
+		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const = 0;
 
 		bool GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
 		bool GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
@@ -332,8 +332,8 @@ class CHMIniConf : public CHMConf
 	protected:
 		CHMIniConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT);
 
-		virtual bool LoadConfigration(CHMCFGINFO& chmcfginfo) const;
-		bool LoadConfigrationRaw(CFGRAW& chmcfgraw) const;
+		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
+		bool LoadConfigurationRaw(CFGRAW& chmcfgraw) const;
 		bool ReadFileContents(const std::string& filename, strlst_t& linelst, strlst_t& allfiles) const;
 
 	public:
@@ -350,7 +350,7 @@ class CHMYamlBaseConf : public CHMConf
 	protected:
 		CHMYamlBaseConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* pJson = NULL);
 
-		virtual bool LoadConfigration(CHMCFGINFO& chmcfginfo) const;
+		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
 
 	public:
 		virtual ~CHMYamlBaseConf();

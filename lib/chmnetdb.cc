@@ -40,7 +40,7 @@
 using namespace	std;
 
 //---------------------------------------------------------
-// Class valiables
+// Class variables
 //---------------------------------------------------------
 const time_t	ChmNetDb::ALIVE_TIME;
 int				ChmNetDb::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
@@ -78,7 +78,7 @@ bool ChmNetDb::CacheOut(void)
 bool ChmNetDb::GetLocalHostname(string& hostname)
 {
 	if(!ChmNetDb::Get()->GetHostname("localhost", hostname, true)){
-		MSG_CHMPRN("Could not get localhost to global hostanme.");
+		MSG_CHMPRN("Could not get localhost to global hostname.");
 		return false;
 	}
 	return true;
@@ -87,7 +87,7 @@ bool ChmNetDb::GetLocalHostname(string& hostname)
 bool ChmNetDb::GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inetv6)
 {
 	if(!ppaddrinfo){
-		ERR_CHMPRN("Paramete is wrong.");
+		ERR_CHMPRN("Parameter is wrong.");
 		return false;
 	}
 	*ppaddrinfo = NULL;
@@ -232,7 +232,7 @@ bool ChmNetDb::InitializeLocalHostName(void)
 	int					result;
 	struct utsname		buf;
 
-	// Get local hostanme by uname
+	// Get local hostname by uname
 	if(-1 == uname(&buf)){
 		ERR_CHMPRN("Failed to get own host(node) name, errno=%d", errno);
 		return false;

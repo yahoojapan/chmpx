@@ -296,7 +296,7 @@ PRLock*			ChmSecureSock::CertMapLock				= NULL;
 bool ChmSecureSock::InitLibrary(NSSInitContext** ctx, const char* CApath, const char* CAfile, bool is_verify_peer)
 {
 	if(!ctx){
-		ERR_CHMPRN("Paramter is wrong");
+		ERR_CHMPRN("Parameter is wrong");
 		return false;
 	}
 
@@ -315,7 +315,7 @@ bool ChmSecureSock::InitLibrary(NSSInitContext** ctx, const char* CApath, const 
 		}
 	}
 
-	// NSS Inisialize
+	// NSS Initialize
 	if(!NSS_IsInitialized() || 0 == ChmSecureSock::nss_init_count){
 		++(ChmSecureSock::nss_init_count);
 
@@ -352,7 +352,7 @@ bool ChmSecureSock::InitLibrary(NSSInitContext** ctx, const char* CApath, const 
 		if(SECSuccess != NSS_SetDomesticPolicy()){
 			ERR_CHMPRN("Failed set domestic cipher by NSS_SetDomesticPolicy, but continue...");
 		}
-		// Set session ID cache configration on server as default.
+		// Set session ID cache configuration on server as default.
 		if(SECSuccess != SSL_ConfigServerSessionIDCache(0, 100, (24 * 60 * 60), NULL)){
 			ERR_CHMPRN("Failed SSL_ConfigServerSessionIDCache, but continue...");
 		}
@@ -469,7 +469,7 @@ bool ChmSecureSock::InitLoadExtModule(void)
 		if(NULL == (pModule = SECMOD_LoadUserModule(szConfig, NULL, PR_FALSE)) || !(pModule->loaded)){
 			ERR_CHMPRN("Failed SECMOD_LoadUserModule for \"%s\"", szConfig);
 			ERR_CHMPRN("[NOTICE]");
-			ERR_CHMPRN("*** This host does not have \"libnsspem.so\", then you could not load PEM CERTTIFICATION FILES directly.");
+			ERR_CHMPRN("*** This host does not have \"libnsspem.so\", then you could not load PEM CERTIFICATION FILES directly.");
 			ERR_CHMPRN("*** You must use NSSDB with the certificate loaded in advance and specify certs with NICKNAME.");
 			if(pModule){
 				SECMOD_DestroyModule(pModule);
@@ -572,11 +572,11 @@ string ChmSecureSock::GetSessionInfo(PRFileDesc* session)
 	SSLCipherSuiteInfo	suite;
 
 	if(SECSuccess != SSL_GetChannelInfo(session, &channel, sizeof(channel))){
-		ERR_CHMPRN("Failed to get channel infomation for SSL/TLS session" CHM_NSS_ERR_PRN_FORM, CHM_NSS_ERR_PRN_ARGS);
+		ERR_CHMPRN("Failed to get channel information for SSL/TLS session" CHM_NSS_ERR_PRN_FORM, CHM_NSS_ERR_PRN_ARGS);
 		return strInfo;
 	}
 	if(sizeof(channel) != channel.length){
-		ERR_CHMPRN("Succeed to get channel infomation for SSL/TLS session, but channel infomation length is not expcted size.");
+		ERR_CHMPRN("Succeed to get channel information for SSL/TLS session, but channel information length is not expected size.");
 		return strInfo;
 	}
 
@@ -614,7 +614,7 @@ string ChmSecureSock::GetSessionInfo(PRFileDesc* session)
 			strInfo += "empty cipher suite";
 		}
 	}else{
-		ERR_CHMPRN("Failed to get Sipher suite for SSL/TLS session" CHM_NSS_ERR_PRN_FORM ", but continue...", CHM_NSS_ERR_PRN_ARGS);
+		ERR_CHMPRN("Failed to get Cipher suite for SSL/TLS session" CHM_NSS_ERR_PRN_FORM ", but continue...", CHM_NSS_ERR_PRN_ARGS);
 		strInfo += "unknown cipher suite";
 	}
 	return strInfo;
@@ -631,7 +631,7 @@ bool ChmSecureSock::SetMinVersion(PRFileDesc* model)
 
 	// Get current version range
 	if(SECSuccess != SSL_VersionRangeGetDefault(ssl_variant_stream, &curvers)){
-		ERR_CHMPRN("Could not get current SSL/TLS version range" CHM_NSS_ERR_PRN_FORM ", but contiue...", CHM_NSS_ERR_PRN_ARGS);
+		ERR_CHMPRN("Could not get current SSL/TLS version range" CHM_NSS_ERR_PRN_FORM ", but continue...", CHM_NSS_ERR_PRN_ARGS);
 		// reset
 		curvers.min = 0;
 		curvers.max = 0;
@@ -671,7 +671,7 @@ bool ChmSecureSock::SetMinVersion(PRFileDesc* model)
 			break;
 
 		default:
-			ERR_CHMPRN("SSL/TLS minimum version value(%s) is somehing wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
+			ERR_CHMPRN("SSL/TLS minimum version value(%s) is something wrong, thus we use %s setting as default", CHM_GET_STR_SSLTLS_VERSION(ChmSecureSock::ssl_min_ver), CHM_GET_STR_SSLTLS_VERSION(CHM_SSLTLS_VER_SSLV3));
 			newvers.max = curvers.max <= SSL_LIBRARY_VERSION_TLS_1_0 ? SSL_LIBRARY_VERSION_TLS_1_0 : curvers.max;
 			newvers.min = SSL_LIBRARY_VERSION_TLS_1_0;
 			break;
@@ -744,7 +744,7 @@ bool ChmSecureSock::LoadCACerts(chmpk11list_t& pk11objlist)
 			// when specifying those.
 			// Then we do not set PR_SKIP_HIDDEN flag.
 			//
-			// AND WE NEED TO CHECK FILE EXTENTION OR FORMAT BEFORE CALLING PK11 FUNCTION.
+			// AND WE NEED TO CHECK FILE EXTENSION OR FORMAT BEFORE CALLING PK11 FUNCTION.
 			//
 			while(NULL != (entry = PR_ReadDir(dir, PR_SKIP_BOTH))){
 				if(0 == strcmp(entry->name, ".") || 0 == strcmp(entry->name, "..")){
@@ -1060,7 +1060,7 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 	bool	result = true;
 	if(action_result < 0){
 		if(PR_WOULD_BLOCK_ERROR == PR_GetError()){
-			// somtimes gets PR_WOULD_BLOCK_ERROR on Nonblocking I/O, thus retry
+			// sometimes gets PR_WOULD_BLOCK_ERROR on Nonblocking I/O, thus retry
 			is_retry	= true;
 			is_close	= false;
 			result		= false;

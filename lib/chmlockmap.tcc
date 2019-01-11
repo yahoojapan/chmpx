@@ -83,9 +83,9 @@ inline size_t chm_lock_map<key_type, val_type>::count(void)
 }
 
 //
-// This method returns not referance to value, because if returns it,
-// this methos must lock.
-// So this methos returns copied value.
+// This method returns not reference to value, because if returns it,
+// this method must lock.
+// So this method returns copied value.
 //
 template<typename key_type, typename val_type>
 inline val_type chm_lock_map<key_type, val_type>::operator[](const key_type& key)
@@ -103,9 +103,9 @@ inline val_type chm_lock_map<key_type, val_type>::operator[](const key_type& key
 }
 
 //
-// This method returns not referance to value, because if returns it,
-// this methos must lock.
-// So this methos returns copied value.
+// This method returns not reference to value, because if returns it,
+// this method must lock.
+// So this method returns copied value.
 //
 template<typename key_type, typename val_type>
 inline val_type chm_lock_map<key_type, val_type>::get(const key_type& key)

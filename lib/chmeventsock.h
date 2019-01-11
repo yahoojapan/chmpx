@@ -95,7 +95,7 @@ class ChmEventSock : public ChmEventBase
 	public:
 		static const int			DEFAULT_SOCK_THREAD_CNT		= 0;		// socket processing thread count
 		static const int			DEFAULT_MAX_SOCK_POOL		= 1;		// max socket count for each chmpx
-		static const time_t			DEFAULT_SOCK_POOL_TIMEOUT	= 60;		// timeout value till closing for unsed socket in pool
+		static const time_t			DEFAULT_SOCK_POOL_TIMEOUT	= 60;		// timeout value till closing for not used socket in pool
 		static const time_t			NO_SOCK_POOL_TIMEOUT		= 0;		// no timeout for socket pool
 		static const int			DEFAULT_KEEPIDLE			= 60;		// time until sending keep alive
 		static const int			DEFAULT_KEEPINTERVAL		= 10;		// interval for sending keep alive
@@ -118,7 +118,7 @@ class ChmEventSock : public ChmEventBase
 		sock_ids_map_t				slavesockmap;							// from slave sockets
 		sock_pending_map_t			acceptingmap;							// from slave sockets before accepting
 		sock_ids_map_t				ctlsockmap;								// from client sockets to ctlport
-		sock_ssl_map_t				sslmap;									// to server/from slave ssl object maping
+		sock_ssl_map_t				sslmap;									// to server/from slave ssl object mapping
 		sendlockmap_t				sendlockmap;							// lock socket map for sending
 		bool						startup_servicein;						// SERVICE IN pending at start when automerge mode is true
 		volatile bool				is_run_merge;							// whichever run or abort in merging
@@ -186,7 +186,7 @@ class ChmEventSock : public ChmEventBase
 		bool LockSendSock(int sock) { return RawLockSendSock(sock, true, false); }
 		bool TryLockSendSock(int sock) { return RawLockSendSock(sock, true, true); }
 		bool UnlockSendSock(int sock) { return RawLockSendSock(sock, false, false); }
-		bool RawLockSendSock(int sock, bool is_lock, bool is_onece);
+		bool RawLockSendSock(int sock, bool is_lock, bool is_once);
 		bool GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check_slave);
 
 		// Send with locking
@@ -313,8 +313,8 @@ class ChmEventSock : public ChmEventBase
 		virtual bool Clean(void);
 		virtual bool UpdateInternalData(void);
 		virtual bool GetEventQueueFds(event_fds_t& fds);
-		virtual bool SetEventQueue(void);						// Make Socket for reciver side and add it to event queue fd.
-		virtual bool UnsetEventQueue(void);						// Unset mqfd from event queue fd, and destry it.
+		virtual bool SetEventQueue(void);						// Make Socket for receiver side and add it to event queue fd.
+		virtual bool UnsetEventQueue(void);						// Unset mqfd from event queue fd, and destroy it.
 		virtual bool IsEventQueueFd(int fd);
 
 		virtual bool Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength);

@@ -31,7 +31,7 @@
 DECL_EXTERN_C_START
 
 //---------------------------------------------------------
-// Valiable types
+// Variable types
 //---------------------------------------------------------
 typedef uint64_t		chmpxid_t;
 typedef uint64_t		msgid_t;
@@ -64,7 +64,7 @@ typedef enum chmpx_mode{
 // Symbols for SSL/TLS minimum version
 //---------------------------------------------------------
 // [NOTE]
-// These symbols is used in chmconf.cc for analizing option.
+// These symbols is used in chmconf.cc for analyzing option.
 //
 #define	CHM_SSLTLS_VER_ERROR				-1
 #define	CHM_SSLTLS_VER_DEFAULT				0
@@ -141,7 +141,7 @@ DECL_EXTERN_C_START
 // 	LIVE		RING/SERVICE	ACTION		OPERATE		SUSPEND(NOT JOIN CLIENT)
 //-------------------------------------------------------------------------------
 // 	UP			SLAVE			NOACT		NOTHING		NOSUP
-// 	DOWN		SERVIVE IN		ADD			PENDING		SUSPEND
+// 	DOWN		SERVICE IN		ADD			PENDING		SUSPEND
 // 				SERVICE OUT		DELETE		DOING
 // 											DONE
 //-------------------------------------------------------------------------------
@@ -158,8 +158,8 @@ DECL_EXTERN_C_START
 #define	CHMPXSTS_VAL_UP						0x1			//		Server/Slave is UP
 														// (status & CHMPXSTS_MASK_RING)
 #define	CHMPXSTS_VAL_SLAVE					0x00		//		SLAVE					(not on RING)
-#define	CHMPXSTS_VAL_SRVOUT					0x10		//		SERVER is SERVIVE OUT	(on RING)
-#define	CHMPXSTS_VAL_SRVIN					0x20		//		SERVER is SERVIVE IN	(on RING)
+#define	CHMPXSTS_VAL_SRVOUT					0x10		//		SERVER is SERVICE OUT	(on RING)
+#define	CHMPXSTS_VAL_SRVIN					0x20		//		SERVER is SERVICE IN	(on RING)
 														// (status & CHMPXSTS_MASK_ACTION)
 #define	CHMPXSTS_VAL_NOACT					0x000		//		No Action
 #define	CHMPXSTS_VAL_ADD					0x100		//		Action is ADD
@@ -299,7 +299,7 @@ DECL_EXTERN_C_START
 #define	STR_CHMPXSTS_OPERATE(status)	(	IS_CHMPXSTS_NOTHING(status)	? "[Nothing]"		: \
 											IS_CHMPXSTS_PENDING(status)	? "[Pending]"		: \
 											IS_CHMPXSTS_DOING(status)	? "[Doing]"			: \
-											IS_CHMPXSTS_DONE(status)	? "[Done]"			: "[unknown OPRATION]")
+											IS_CHMPXSTS_DONE(status)	? "[Done]"			: "[unknown OPERATION]")
 #define	STR_CHMPXSTS_SUSPEND(status)	(	IS_CHMPXSTS_NOSUP(status)	? "[NoSuspend]"		: \
 											IS_CHMPXSTS_SUSPEND(status)	? "[Suspend]"		: "[unknown SUSPEND]")
 
@@ -762,7 +762,7 @@ typedef struct chminfo{
 	long			mq_per_attach;									// = MQ per attach
 	bool			mq_ack;											// MQ ACK
 	int				max_sock_pool;									// max socket count per chmpx
-	time_t			sock_pool_timeout;								// timeout value till closing for unsed socket in pool
+	time_t			sock_pool_timeout;								// timeout value till closing for not used socket in pool
 	int				sock_retrycnt;									// retry count for socket
 	suseconds_t		timeout_wait_socket;							// wait timeout for read/write socket
 	suseconds_t		timeout_wait_connect;							// wait timeout for connect socket
@@ -792,7 +792,7 @@ typedef struct chminfo{
 }CHMINFO, *PCHMINFO;
 
 //---------------------------------
-// Loggin History Raw
+// Login History Raw
 typedef struct chm_log_raw{
 	logtype_t		log_type;
 	size_t			length;
@@ -800,7 +800,7 @@ typedef struct chm_log_raw{
 	struct timespec	fin_time;				// time for end of sending/receiving
 }CHMLOGRAW, *PCHMLOGRAW;
 
-// Loggin History Area
+// Login History Area
 typedef struct chm_log{
 	bool			enable;
 	time_t			start_time;				// time for enabled log
@@ -825,7 +825,7 @@ typedef struct chmshm{
 //---------------------------------------------------------
 // Structure for communication
 //---------------------------------------------------------
-// Chmpx ssl infromation(notice: all member is byte order)
+// Chmpx ssl information(notice: all member is byte order)
 typedef struct chmpx_ssl{
 	bool		is_ssl;
 	bool		verify_peer;
@@ -837,7 +837,7 @@ typedef struct chmpx_ssl{
 	char		slave_prikey[CHM_MAX_PATH_LEN];
 }CHMPX_ATTR_PACKED CHMPXSSL, *PCHMPXSSL;
 
-// Chmpx server infromation
+// Chmpx server information
 typedef struct chmpx_server{
 	chmpxid_t	chmpxid;
 	char		name[NI_MAXHOST];		// = 1025 for getnameinfo()

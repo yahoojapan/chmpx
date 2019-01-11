@@ -127,8 +127,8 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 
 	// remove pids in shm.
 	for(pidlist_t::const_iterator iter = down_pids.begin(); iter != down_pids.end(); ++iter){
-		if(CHM_INVALID_PID != *iter && !pImData->RetriveClientPid(*iter)){
-			ERR_CHMPRN("Failed to retrive pid(%d) from shm, but continue...", *iter);
+		if(CHM_INVALID_PID != *iter && !pImData->RetrieveClientPid(*iter)){
+			ERR_CHMPRN("Failed to retrieve pid(%d) from shm, but continue...", *iter);
 		}
 	}
 
@@ -162,7 +162,7 @@ ChmEventShm::ChmEventShm(int eventqfd, ChmCntrl* pcntrl, const char* file) : Chm
 	}
 	// run check thread
 	//	- sleep at starting
-	//	- not at onece(not one shot)
+	//	- not at once(not one shot)
 	//	- sleep after every working
 	//	- keep event count
 	//
@@ -319,7 +319,7 @@ bool ChmEventShm::CheckNotifyEvent(void) const
 		return false;
 	}
 
-	// analize event types
+	// analyze event types
 	struct inotify_event*	in_event	= NULL;
 	bool					result		= false;
 	for(unsigned char* ptr = pevent; (ptr + sizeof(struct inotify_event)) <= (pevent + bytes); ptr += sizeof(struct inotify_event) + in_event->len){
@@ -360,7 +360,7 @@ bool ChmEventShm::Receive(int fd)
 	// check client process running.
 	//
 	// Checking client processes running by worker thread instead of COM_C2PX communication,
-	// becasue working in main thread is not good for performance.
+	// because working in main thread is not good for performance.
 	//
 	if(!checkthread.DoWorkThread()){
 		ERR_CHMPRN("Failed to wake up thread for checking.");
@@ -374,7 +374,7 @@ bool ChmEventShm::Receive(int fd)
 
 bool ChmEventShm::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength)
 {
-	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement thie event in this class)");
+	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement any event in this class)");
 	return true;
 }
 
@@ -393,7 +393,7 @@ bool ChmEventShm::NotifyHup(int fd)
 
 bool ChmEventShm::Processing(PCOMPKT pComPkt)
 {
-	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement thie event in this class)");
+	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement any event in this class)");
 	return true;
 }
 
