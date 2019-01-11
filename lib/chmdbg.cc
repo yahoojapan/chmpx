@@ -83,7 +83,7 @@ class CHMDbgControl
 };
 
 //
-// Class valiables
+// Class variables
 //
 const char*		CHMDbgControl::DBGENVNAME = "CHMDBGMODE";
 const char*		CHMDbgControl::DBGENVFILE = "CHMDBGFILE";

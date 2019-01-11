@@ -57,8 +57,8 @@ class ChmSecureSock
 		static chmss_ver_t		ssl_min_ver;									// SSL/TLS minimum version
 		static SECMODModule*	PKCS11_LoadedModule;							// loaded module for PKCS11
 		static SECMODModule*	PEM_LoadedModule;								// loaded module for PEM
-		static PRLock*			FindSlotLock;									// Lock oject(by PR) for slot
-		static PRLock*			CertMapLock;									// Lock oject(by PR) for Cert map
+		static PRLock*			FindSlotLock;									// Lock object(by PR) for slot
+		static PRLock*			CertMapLock;									// Lock object(by PR) for Cert map
 
 	protected:
 		NSSInitContext*			nss_ctx;										// NSS context for both server/slave

@@ -122,7 +122,7 @@ class ChmIMData
 		bool CloseSocks(int type = CLOSETG_BOTH);
 		bool IsInitialized(void) const { return (pChmShm && CHM_INVALID_HANDLE != ShmFd && pConfObj && pK2hash); }
 		bool Initialize(CHMConf* cfgobj, int eventqfd, bool is_chmpx_proc);
-		bool ReloadConfigration(void);												// now reload without server/slave list
+		bool ReloadConfiguration(void);												// now reload without server/slave list
 		const CHMSHM* GetShmBase(void) const { return pChmShm; }
 		const char* GetShmPath(void) const { return ShmPath.c_str(); }
 		K2HShm* GetK2hashObj(void) { return pK2hash; }
@@ -272,11 +272,11 @@ class ChmIMData
 		bool GetTrace(PCHMLOGRAW plograwarr, long& arrsize, logtype_t dirmask, logtype_t devmask) const;
 
 		// Process running
-		bool RetriveClientPid(pid_t pid);
+		bool RetrieveClientPid(pid_t pid);
 		bool AddClientPid(pid_t pid);
 		bool GetAllPids(pidlist_t& list);
 		bool IsClientPids(void) const;
-		bool IsNeedDettach(void) const;
+		bool IsNeedDetach(void) const;
 
 		// Others
 		bool IsAllowHostname(const char* hostname, const short* pport = NULL, PCHMPXSSL* ppssl = NULL);

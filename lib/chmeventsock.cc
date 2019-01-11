@@ -90,7 +90,7 @@ using namespace	std;
 #define	CTL_RES_SUCCESS_STATUS_NOTICE		"SUCCEED: Send status notice to no server on RING.\n"
 #define	CTL_RES_ERROR						"ERROR: Something error is occured.\n"
 #define	CTL_RES_ERROR_PARAMETER				"ERROR: Parameters are wrong.\n"
-#define	CTL_RES_ERROR_COMMUNICATION			"ERROR: Something error is occured in sending/receiveing data on RING.\n"
+#define	CTL_RES_ERROR_COMMUNICATION			"ERROR: Something error is occured in sending/receiving data on RING.\n"
 #define	CTL_RES_ERROR_COMMAND_ON_SERVER		"ERROR: The command can not be executed on the slave node.\n"
 #define	CTL_RES_ERROR_SERVICE_OUT_PARAM		"ERROR: SERVICEOUT command must have parameter as server/ctlport.(ex: \"SERVICEOUT servername.fqdn:ctlport\")\n"
 #define	CTL_RES_ERROR_MERGE_START			"ERROR: Failed to start merging.\n"
@@ -125,7 +125,7 @@ using namespace	std;
 #define	CTL_RES_INT_ERROR_NOTGETCHMPX		"INTERNAL ERROR: Could not get chmpx servers information.\n"
 
 //---------------------------------------------------------
-// Class valiable
+// Class variables
 //---------------------------------------------------------
 const int			ChmEventSock::DEFAULT_SOCK_THREAD_CNT;
 const int			ChmEventSock::DEFAULT_MAX_SOCK_POOL;
@@ -173,7 +173,7 @@ bool ChmEventSock::SetNonblocking(int sock)
 
 int ChmEventSock::WaitForReady(int sock, int type, int retrycnt, bool is_check_so_error, suseconds_t waittime)
 {
-	// [NOTE] For perforamnce
+	// [NOTE] For performance
 	// signal mask does not change after launching processes.
 	// (because it is static member in ChmSignalCntrl)
 	// So, we duplicate it's value as static value in this method.
@@ -245,7 +245,7 @@ int ChmEventSock::WaitForReady(int sock, int type, int retrycnt, bool is_check_s
 			// [NOTE]
 			// we do not check POLLERR, POLLNVAL and POLLHUP status.
 			// These are not an error since it is one of the factors for canceling the wait state.
-			// And if socket status is somthing wrong, probabry it can be caught after return this
+			// And if socket status is something wrong, probably it can be caught after return this
 			// method.
 			//
 
@@ -485,7 +485,7 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, const unsigned char* pbyd
 				}
 			}else{
 				if(!is_retry){
-					// If the socket is closed, it occures notification. so nothing to do here.
+					// If the socket is closed, it occurs notification. so nothing to do here.
 					ERR_CHMPRN("Failed to write from SSL on sock(%d), and the socket is %s.", sock, (is_closed ? "closed" : "not closed"));
 					return false;
 				}
@@ -506,7 +506,7 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, const unsigned char* pbyd
 			if(-1 == (onesent = send(sock, &pbydata[totalsent], length - totalsent, is_blocking ? 0 : MSG_DONTWAIT))){
 				if(EINTR == errno){
 					// retry assap
-					MSG_CHMPRN("Interapted signal during sending to sock(%d), errno=%d(EINTR).", sock, errno);
+					MSG_CHMPRN("Interrupted signal during sending to sock(%d), errno=%d(EINTR).", sock, errno);
 
 				}else if(EAGAIN == errno || EWOULDBLOCK == errno){
 					// wait(non blocking)
@@ -560,7 +560,7 @@ bool ChmEventSock::RawReceiveByte(int sock, ChmSSSession ssl, bool& is_closed, u
 				}
 			}else{
 				if(!is_retry){
-					// If the socket is closed, it occures notification. so nothing to do here.
+					// If the socket is closed, it occurs notification. so nothing to do here.
 					ERR_CHMPRN("Failed to receive from SSL on sock(%d), and the socket is %s.", sock, (is_closed ? "closed" : "not closed"));
 					return false;
 				}
@@ -582,7 +582,7 @@ bool ChmEventSock::RawReceiveByte(int sock, ChmSSSession ssl, bool& is_closed, u
 			if(-1 == (onerecv = recv(sock, &pbuff[totalrecv], length - totalrecv, is_blocking ? 0 : MSG_DONTWAIT))){
 				if(EINTR == errno){
 					// retry assap
-					MSG_CHMPRN("Interapted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
+					MSG_CHMPRN("Interrupted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
 
 				}else if(EAGAIN == errno || EWOULDBLOCK == errno){
 					// wait(non blocking)
@@ -645,7 +645,7 @@ bool ChmEventSock::RawReceiveAny(int sock, bool& is_closed, unsigned char* pbuff
 		if(-1 == (onerecv = recv(sock, pbuff, *plength, is_blocking ? 0 : MSG_DONTWAIT))){
 			if(EINTR == errno){
 				// retry
-				MSG_CHMPRN("Interapted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
+				MSG_CHMPRN("Interrupted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
 
 			}else if(EAGAIN == errno || EWOULDBLOCK == errno){
 				// no data(return assap)
@@ -719,7 +719,7 @@ bool ChmEventSock::RawReceive(int sock, ChmSSSession ssl, bool& is_closed, PCOMP
 		// ntoh
 		NTOH_PCOMPKT(&ComPkt);
 		if(ComPkt.length < sizeof(COMPKT)){
-			ERR_CHMPRN("The packet length(%zu) in resieved COMPKT from sock(%d) is too short, should be %zu byte.", ComPkt.length, sock, sizeof(COMPKT));
+			ERR_CHMPRN("The packet length(%zu) in received COMPKT from sock(%d) is too short, should be %zu byte.", ComPkt.length, sock, sizeof(COMPKT));
 			return false;
 		}
 		totallength = ComPkt.length;
@@ -731,7 +731,7 @@ bool ChmEventSock::RawReceive(int sock, ChmSSSession ssl, bool& is_closed, PCOMP
 	bool			is_alloc = false;
 	if(NULL == *ppComPkt){
 		if(NULL == (pbyall = reinterpret_cast<unsigned char*>(malloc(totallength)))){
-			ERR_CHMPRN("Coult not allocate memory(size=%zu)", totallength);
+			ERR_CHMPRN("Could not allocate memory(size=%zu)", totallength);
 			return false;
 		}
 		*ppComPkt	= reinterpret_cast<PCOMPKT>(pbyall);
@@ -1197,7 +1197,7 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 	ChmEventSock*		pSockObj	= reinterpret_cast<ChmEventSock*>(common_param);
 	int					sock		= static_cast<int>(wp_param);
 	if(!pSockObj || CHM_INVALID_SOCK == sock){
-		ERR_CHMPRN("Paraemtera are wrong.");
+		ERR_CHMPRN("Parameters are wrong.");
 		return true;		// sleep thread
 	}
 	chmpxid_t			tgchmpxid	= pSockObj->GetAssociateChmpxid(sock);
@@ -1353,7 +1353,7 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 
 	//
 	// [NOTE]
-	// If this chmpx join at first time to ring, probabry base hash value is ignored.
+	// If this chmpx join at first time to ring, probably base hash value is ignored.
 	// (but max base hash is not ignored.)
 	//
 	tmp_hashval		= static_cast<chmhash_t>(-1);
@@ -1459,7 +1459,7 @@ bool ChmEventSock::ServerSockMapCallback(sock_ids_map_t::iterator& iter, void* p
 	// close
 	if(CHM_INVALID_SOCK != sock){
 		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shutdown ssl, close socket
 	}
 	return true;
 }
@@ -1490,7 +1490,7 @@ bool ChmEventSock::SlaveSockMapCallback(sock_ids_map_t::iterator& iter, void* ps
 	// close
 	if(CHM_INVALID_SOCK != sock){
 		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shutdown ssl, close socket
 	}
 	return true;
 }
@@ -1519,7 +1519,7 @@ bool ChmEventSock::AcceptMapCallback(sock_pending_map_t::iterator& iter, void* p
 	// close
 	if(CHM_INVALID_SOCK != sock){
 		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shutdown ssl, close socket
 	}
 	return true;
 }
@@ -1548,7 +1548,7 @@ bool ChmEventSock::ControlSockMapCallback(sock_ids_map_t::iterator& iter, void* 
 	// close
 	if(CHM_INVALID_SOCK != sock){
 		pSockObj->UnlockSendSock(sock);						// UNLOCK SOCK(For safety)
-		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shotdown ssl, close socket
+		pSockObj->CloseSocketWithEpoll(sock);				// Delete sock from epoll, shutdown ssl, close socket
 	}
 	return true;
 }
@@ -1702,14 +1702,14 @@ bool ChmEventSock::UpdateInternalData(void)
 	// merge thread
 	if(!IsDoMerge() && is_run_merge){
 		// now work to merge, but we do do not stop it.
-		WAN_CHMPRN("Re-initialize by configration. new do_merge mode is false, but mergeing now. be careful about merging.");
+		WAN_CHMPRN("Re-initialize by configuration. new do_merge mode is false, but merging now. be careful about merging.");
 	}
 	if(IsDoMerge() && !mergethread.HasThread()){
 		// do_merge false to true, we need to run merge thread.
 		//
 		//	- parameter is this object
 		//	- sleep at starting
-		//	- not at onece(not one shot)
+		//	- not at once(not one shot)
 		//	- sleep after every working
 		//	- keep event count
 		//
@@ -1760,7 +1760,7 @@ bool ChmEventSock::UpdateInternalData(void)
 		//
 		//	- parameter is NULL(because thread is sleep at start)
 		//	- sleep at starting
-		//	- not at onece(not one shot)
+		//	- not at once(not one shot)
 		//	- sleep after every working
 		//	- not keep event count
 		//
@@ -2076,21 +2076,21 @@ bool ChmEventSock::IsSafeParamsForSSL(void)
 //---------------------------------------------------------
 // [NOTE]
 // This method uses and manages socket lock mapping.
-// Because this library supports multi-thread for sending/recieving, this class needs to
+// Because this library supports multi-thread for sending/receiving, this class needs to
 // lock socket before sending. (but the control socket does not be needed to lock.)
 //
 // [NOTICE]
 // For locking, we use sendlockmap_t class(template), and use directly lock variable in
 // sendlockmap_t here.
 //
-bool ChmEventSock::RawLockSendSock(int sock, bool is_lock, bool is_onece)
+bool ChmEventSock::RawLockSendSock(int sock, bool is_lock, bool is_once)
 {
 	if(CHM_INVALID_SOCK == sock){
 		return false;
 	}
 	pid_t	tid		= gettid();
 	bool	result	= false;
-	for(bool is_loop = true; !result && is_loop; is_loop = !is_onece){
+	for(bool is_loop = true; !result && is_loop; is_loop = !is_once){
 		// get trylock
 		if(!fullock::flck_trylock_noshared_mutex(&sendlockmap.lockval)){
 			// [NOTE]
@@ -2883,7 +2883,7 @@ bool ChmEventSock::NotifyHup(int fd)
 //
 // The connection which this server connect to other servers for joining RING
 // when the mode is both server and slave is set EPOLLRDHUP for epoll.
-// Then the connection occurres EPOLLRDHUP event by epoll, thus this method is
+// Then the connection occurs EPOLLRDHUP event by epoll, thus this method is
 // called.
 // This method closes the socket and reconnect next server on RING.
 //
@@ -3019,7 +3019,7 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 		// rechain
 		bool	is_rechain	= false;
 		if(!CheckRechainRing(nextchmpxid, is_rechain)){
-			ERR_CHMPRN("Something error occured in rehcaining RING, but continue...");
+			ERR_CHMPRN("Something error occured in rechaining RING, but continue...");
 		}else{
 			if(is_rechain){
 				MSG_CHMPRN("Rechained RING to chmpxid(0x%016" PRIx64 ") for down chmpxid(0x%016" PRIx64 ").", nextchmpxid, chmpxid);
@@ -3031,7 +3031,7 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 
 	// [NOTICE]
 	// If merging, at first stop merging before sending "SERVER_DOWN".
-	// Then do not care about status and pengins hash when receiving "SERVER_DOWN".
+	// Then do not care about status and pending hash when receiving "SERVER_DOWN".
 	//
 	if(CHM_INVALID_CHMPXID == nextchmpxid){
 		// there is no server on RING.
@@ -3165,7 +3165,7 @@ bool ChmEventSock::CloseSelfSocks(void)
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// close own liten sockets
+	// close own listen sockets
 	int	sock	= CHM_INVALID_SOCK;
 	int	ctlsock	= CHM_INVALID_SOCK;
 	if(!pImData->GetSelfSocks(sock, ctlsock)){
@@ -3280,7 +3280,7 @@ bool ChmEventSock::CloseSocketWithEpoll(int sock)
 	}
 	if(0 != epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL)){
 		// [NOTE]
-		// Sometimes epoll_ctl retuns error, because socket is not add epoll yet.
+		// Sometimes epoll_ctl returns error, because socket is not add epoll yet.
 		//
 		MSG_CHMPRN("Failed to delete socket(%d) from epoll event, probably already remove it.", sock);
 	}
@@ -3326,7 +3326,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 {
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// get hostanme/port
+	// get hostname/port
 	string	hostname;
 	short	port	= CHM_INVALID_PORT;
 	short	ctlport	= CHM_INVALID_PORT;
@@ -3354,7 +3354,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		CHM_CLOSESOCK(sock);
 		return false;
 	}
-	if(ssldata.is_ssl){		// Check whichever the terget server is ssl
+	if(ssldata.is_ssl){		// Check whichever the target server is ssl
 		// Get own keys
 		if(!pImData->GetSelfSsl(ssldata)){
 			ERR_CHMPRN("Failed to get SSL structure from self chmpx.");
@@ -3379,7 +3379,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		}
 
 		// Set SSL mapping
-		sslmap.set(sock, ssl, true);		// over write whtere exitsts or does not.
+		sslmap.set(sock, ssl, true);		// over write whether exitsts or does not.
 	}
 
 	// Send coninit_req
@@ -3389,7 +3389,7 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		return false;
 	}
 
-	// Receive resnponse
+	// Receive response
 	// 
 	// [NOTICE]
 	// retry count is sock_retry_count
@@ -3818,9 +3818,9 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 	return CHM_INVALID_CHMPXID;
 }
 
-// Check next chmpxid which is over step deperture chmpxid in RING.
+// Check next chmpxid which is over step departure chmpxid in RING.
 // On this case, if send packet to next chmpxid, it includes loop packet in RING.
-// So we need to check next and deperture chmpxid before transfer packet.
+// So we need to check next and departure chmpxid before transfer packet.
 //
 bool ChmEventSock::IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t next_chmpxid)
 {
@@ -3857,11 +3857,11 @@ bool ChmEventSock::IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t ne
 			continue;
 		}
 		if(next_chmpxid == chmpxid){
-			MSG_CHMPRN("Found next chmpxid(0x%016" PRIx64 ") before deperture chmpxid(0x%016" PRIx64 "), so can send this pkt.", next_chmpxid, dept_chmpxid);
+			MSG_CHMPRN("Found next chmpxid(0x%016" PRIx64 ") before departure chmpxid(0x%016" PRIx64 "), so can send this pkt.", next_chmpxid, dept_chmpxid);
 			return true;
 		}
 		if(dept_chmpxid == chmpxid){
-			MSG_CHMPRN("Found deperture chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so can not send this pkt.", dept_chmpxid, next_chmpxid);
+			MSG_CHMPRN("Found departure chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so can not send this pkt.", dept_chmpxid, next_chmpxid);
 			return false;
 		}
 	}
@@ -3897,7 +3897,7 @@ bool ChmEventSock::Accept(int sock)
 	MSG_CHMPRN("Accept new socket(%d)", newsock);
 	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);			// UNLOCK
 
-	// get hostanme for accessing control
+	// get hostname for accessing control
 	string	stripaddress;
 	string	strhostname;
 	if(!ChmNetDb::CvtAddrInfoToIpAddress(&from, fromlen, stripaddress)){
@@ -4021,7 +4021,7 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 		ERR_CHMPRN("Something error occured during converting IPv4-mapped IPv6 addresses to plain IPv4, but continue...");
 	}
 
-	// get hostanme for accessing control
+	// get hostname for accessing control
 	string	stripaddress;
 	string	strhostname;
 	if(!ChmNetDb::CvtAddrInfoToIpAddress(&from, fromlen, stripaddress)){
@@ -4104,7 +4104,7 @@ bool ChmEventSock::InitialAllServerStatus(void)
 	}
 	if(CHM_INVALID_SOCK == sock){
 		MSG_CHMPRN("There is no server to connect port, so it means any server ready up.");
-		return true;		// Succeed to udate
+		return true;		// Succeed to update
 	}
 
 	// Send request
@@ -4118,7 +4118,7 @@ bool ChmEventSock::InitialAllServerStatus(void)
 		return false;
 	}
 
-	// Receive resnponse
+	// Receive response
 	// 
 	// [NOTICE]
 	// retry count is sock_retry_count
@@ -4174,7 +4174,7 @@ bool ChmEventSock::InitialAllServerStatus(void)
 		ERR_CHMPRN("Failed to send PXCOM_MERGE_SUSPEND_GET, but continue...");
 	}else{
 		//
-		// Receive resnponse(MERGE_SUSPEND_RES)
+		// Receive response(MERGE_SUSPEND_RES)
 		// 
 		// [NOTICE]
 		// retry count is sock_retry_count
@@ -4311,7 +4311,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 
 				// [NOTICE]
-				// Close all socket, it occurres epoll event on the other servers.
+				// Close all socket, it occurs epoll event on the other servers.
 				// Because other servers send server down notify, this server do 
 				// nothing.
 				//
@@ -4346,7 +4346,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusUpdate(&(pComPkt->head), pChmpxCom, &pResComPkt)){
 				// Failed Status Update
-				// (recoverd status update in receive funcion if possible)
+				// (recovered status update in receive function if possible)
 				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 				return false;
 			}
@@ -4635,7 +4635,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				return false;
 			}
 			if(pResComPkt){
-				// Success, renponsing compkt(suspend res) to sending server
+				// Success, responding compkt(suspend res) to sending server
 				if(!Send(pResComPkt, NULL, 0L)){
 					ERR_CHMPRN("Sending ComPkt type(%" PRIu64 ":%s) against ComPkt type(%" PRIu64 ":%s), Something error occured.", pResComPkt->head.type, STRCOMTYPE(pResComPkt->head.type), pComPkt->head.type, STRCOMTYPE(pComPkt->head.type));
 					CHM_Free(pResComPkt);
@@ -4649,7 +4649,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 
 		}else if(CHMPX_COM_MERGE_SUSPEND_RES == pChmpxCom->val_head.type){
 			// Not allow this packat receiving here.
-			WAN_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). But this packet can not be recieved in initalizing method, because this is only used for initializing.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+			WAN_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). But this packet can not be received in initializing method, because this is only used for initializing.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 			return false;
 
 		}else if(CHMPX_COM_SERVER_DOWN == pChmpxCom->val_head.type){
@@ -4670,7 +4670,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			}
 
 			// [NOTICE]
-			// The status is alreay updated, because probably received "merge abort" before receiving "SERVER_DOWN",
+			// The status is already updated, because probably received "merge abort" before receiving "SERVER_DOWN",
 			// so status changed at that time.
 			// Thus do not care about status here.
 			//
@@ -4725,7 +4725,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 		DUMPCOM_COMPKT("Sock::Processing(COM_C2C)", pComPkt);
 
 		// [NOTICE]
-		// Come here, following patturn:
+		// Come here, following pattern:
 		//
 		// 1) client -> MQ -> chmpx(server) -> chmpx(slave)
 		// 2) client -> MQ -> chmpx(slave)  -> chmpx(server)
@@ -4799,7 +4799,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 					MSG_CHMPRN("Could not find slave socket for server chmpx(0x%016" PRIx64 "), thus try to connect chmpx(server mode).", pTmpPkt->head.term_ids.chmpxid);
 
 					// [NOTE]
-					// if server node and deperture and terminate chmpx id are same,
+					// if server node and departure and terminate chmpx id are same,
 					// need to send this packet to MQ directly.
 					// and if do not send packet on this case, drop it here.
 					//
@@ -4913,7 +4913,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 		if(!CtlComMergeStart(strResponse)){
 			ERR_CHMPRN("CTL_COMMAND_START_MERGE is failed, so stop merging.");
 		}else{
-			MSG_CHMPRN("CTL_COMMAND_START_MERGE is succeed, so do next step after reciveing result.");
+			MSG_CHMPRN("CTL_COMMAND_START_MERGE is succeed, so do next step after receiving result.");
 		}
 
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_STOP_MERGE)){
@@ -4935,7 +4935,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SUSPEND_MERGE)){
 		// Suspend Merge
 		if(!CtlComMergeSuspend(strResponse)){
-			ERR_CHMPRN("CTL_COMMAND_SUSPEND_MERGE is failed, so automatically merging is default configration.");
+			ERR_CHMPRN("CTL_COMMAND_SUSPEND_MERGE is failed, so automatically merging is default configuration.");
 		}else{
 			MSG_CHMPRN("CTL_COMMAND_SUSPEND_MERGE is succeed, so automatically merging is suspended.");
 		}
@@ -4945,7 +4945,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 		if(!CtlComMergeNoSuspend(strResponse)){
 			ERR_CHMPRN("CTL_COMMAND_NOSUP_MERGE is failed, so automatically merging is unknown(you can see it by dump command).");
 		}else{
-			MSG_CHMPRN("CTL_COMMAND_NOSUP_MERGE is succeed, so automatically merging is set default(configration).");
+			MSG_CHMPRN("CTL_COMMAND_NOSUP_MERGE is succeed, so automatically merging is set default(configuration).");
 		}
 
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SERVICE_IN)){
@@ -4970,7 +4970,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 				ERR_CHMPRN("%s command parameter(%s) must be servername:port.", strCommand.c_str(), strTmp.c_str());
 				strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
 			}else{
-				// retriving the server which is set SERVICE OUT on RING
+				// retrieving the server which is set SERVICE OUT on RING
 				string	strServer	= paramarray.front();	paramarray.pop_front();
 				string	strCtlPort	= paramarray.front();
 				short	ctlport		= static_cast<short>(atoi(strCtlPort.c_str()));
@@ -5189,7 +5189,7 @@ bool ChmEventSock::ChangeStatusBeforeMergeStart(void)
 			// [SERVICE IN] [DOWN] [DELETE] [PENDING] --> [SERVICE IN] [DOWN] [DELETE] [DONE]
 			SET_CHMPXSTS_DONE(status);
 		}else{
-			MSG_CHMPRN("Unkown status(0x%016" PRIx64 ":%s), so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
+			MSG_CHMPRN("Unknown status(0x%016" PRIx64 ":%s), so not change status and nothing to do.", status, STR_CHMPXSTS_FULL(status).c_str());
 			return false;
 		}
 	}
@@ -5369,7 +5369,7 @@ bool ChmEventSock::MergeDone(void)
 	// if the mode for merge is automatical, do complete here.
 	if(IsAutoMerge()){
 		if(!RequestMergeComplete()){
-			ERR_CHMPRN("Could not change status merge \"COMPLETE\", probabry another server does not change status yet, DO COMPMERGE BY MANUAL!");
+			ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, DO COMPMERGE BY MANUAL!");
 		}
 	}
 	return true;
@@ -5423,7 +5423,7 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 
 			// do service in
 			if(!RequestServiceIn()){
-				WAN_CHMPRN("Failed to request \"servce in\" status before auto merging, maybe operating now.");
+				WAN_CHMPRN("Failed to request \"service in\" status before auto merging, maybe operating now.");
 				return true;
 			}
 
@@ -5435,7 +5435,7 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 		}else{
 			// Not [SERVICE OUT] [UP] [NOACT] [NOTHING] status
 			WAN_CHMPRN("Server is status(0x%016" PRIx64 ":%s), it must be SERVICE OUT / UP / NOACT / NOTHING. but continue...", status, STR_CHMPXSTS_FULL(status).c_str());
-			// for recover panding flag
+			// for recover pending flag
 			startup_servicein = false;
 		}
 	}
@@ -5555,8 +5555,8 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 }
 
 //
-// This method sends only "STATUS_COMFIRM".
-// After that, this process receives "STATUS_COMFIRM" result, and sends "MERGE_START" automatically.
+// This method sends only "STATUS_CONFIRM".
+// After that, this process receives "STATUS_CONFIRM" result, and sends "MERGE_START" automatically.
 //
 bool ChmEventSock::RequestMergeStart(string* pstring)
 {
@@ -6139,7 +6139,7 @@ bool ChmEventSock::RequestServiceOut(chmpxid_t chmpxid, string* pstring)
 
 		CHANGE_CHMPXSTS_TO_SRVOUT(status);
 		if(status == old_status){
-			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by sevice out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by service out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
 			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
 			return false;
 		}
@@ -6192,7 +6192,7 @@ bool ChmEventSock::RequestServiceOut(chmpxid_t chmpxid, string* pstring)
 
 		CHANGE_CHMPXSTS_TO_SRVOUT(status);
 		if(status == old_status){
-			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by sevice out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by service out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
 			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
 			return false;
 		}
@@ -6731,7 +6731,7 @@ bool ChmEventSock::CtlComSelfStatus(string& strResponse)
 	ss << "        minimum           = "	<< to_string(server_stat.min_body_bytes)			<< " bytes"	<< endl;
 	ss << "        maximum           = "	<< to_string(server_stat.max_body_bytes)			<< " bytes"	<< endl;
 	ss << "        total             = "	<< to_string(server_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.total_elapsed_time.tv_nsec)<< "ns"	<< endl;
-	ss << "        minmum            = "	<< to_string(server_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "        minimum           = "	<< to_string(server_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
 	ss << "        maximum           = "	<< to_string(server_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(server_stat.max_elapsed_time.tv_nsec)	<< "ns"	<< endl;
 	ss << "    }"																				<< endl;
 	ss << "    To(From) Slaves       = {"														<< endl;
@@ -6741,7 +6741,7 @@ bool ChmEventSock::CtlComSelfStatus(string& strResponse)
 	ss << "        minimum           = "	<< to_string(slave_stat.min_body_bytes)				<< " bytes"	<< endl;
 	ss << "        maximum           = "	<< to_string(slave_stat.max_body_bytes)				<< " bytes"	<< endl;
 	ss << "        total             = "	<< to_string(slave_stat.total_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.total_elapsed_time.tv_nsec)	<< "ns"	<< endl;
-	ss << "        minmum            = "	<< to_string(slave_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
+	ss << "        minimum           = "	<< to_string(slave_stat.min_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.min_elapsed_time.tv_nsec)	<< "ns"	<< endl;
 	ss << "        maximum           = "	<< to_string(slave_stat.max_elapsed_time.tv_sec)	<< "s "	<< to_string(slave_stat.max_elapsed_time.tv_nsec)	<< "ns"	<< endl;
 	ss << "    }"																				<< endl;
 	ss << "}"																					<< endl;
@@ -6985,7 +6985,7 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_REQ to sock(%d).", sock);
 
 		// [NOTE]
-		// When this methos is called from InitialAllServerStatus(), the sock is not mapped.
+		// When this method is called from InitialAllServerStatus(), the sock is not mapped.
 		// Then we close sock when need_sock_close is true.
 		//
 		if(need_sock_close && is_closed){
@@ -7390,7 +7390,7 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 		// check & rechain
 		bool	is_rechain = false;
 		if(!CheckRechainRing(pJoinRing->server.chmpxid, is_rechain)){
-			ERR_CHMPRN("Something error occured in rehcaining RING, but continue...");
+			ERR_CHMPRN("Something error occured in rechaining RING, but continue...");
 			ResultCode = CHMPX_COM_RES_ERROR;
 		}else{
 			if(is_rechain){
@@ -7416,14 +7416,14 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -7565,14 +7565,14 @@ bool ChmEventSock::PxComReceiveStatusUpdate(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -7748,7 +7748,7 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		}else{
 			// Compare
 			if(!pImData->CompareChmpxSvrs(pReqChmsvrs, pReqStsConfirm->count)){
-				MSG_CHMPRN("Status(%ld count status) could not comfirm.", pReqStsConfirm->count);
+				MSG_CHMPRN("Status(%ld count status) could not confirm.", pReqStsConfirm->count);
 				ResultCode = CHMPX_COM_RES_ERROR;
 			}else{
 				ResultCode = CHMPX_COM_RES_SUCCESS;
@@ -7756,14 +7756,14 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -7969,7 +7969,7 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			//
 			bool	is_rechain = false;
 			if(!CheckRechainRing(pStatusChange->server.chmpxid, is_rechain)){
-				ERR_CHMPRN("Something error occured in rehcaining RING, but continue...");
+				ERR_CHMPRN("Something error occured in rechaining RING, but continue...");
 				ResultCode = CHMPX_COM_RES_ERROR;
 			}else{
 				if(is_rechain){
@@ -7987,14 +7987,14 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			}
 
 			if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-				// Deperture chmpx maybe DOWN!
+				// Departure chmpx maybe DOWN!
 				//
 				// [NOTICE]
-				// This case is very small case, deperture server sends this packet but that server could not
+				// This case is very small case, departure server sends this packet but that server could not
 				// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 				// So we do not transfer this packet, because it could not be stopped in RING.
 				//
-				ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+				ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 				*ppResComPkt = NULL;
 
 			}else{
@@ -8131,14 +8131,14 @@ bool ChmEventSock::PxComReceiveMergeStart(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -8246,14 +8246,14 @@ bool ChmEventSock::PxComReceiveMergeAbort(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -8395,14 +8395,14 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -8557,14 +8557,14 @@ bool ChmEventSock::PxComReceiveMergeSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -8681,14 +8681,14 @@ bool ChmEventSock::PxComReceiveMergeNoSuspend(PCOMHEAD pComHead, PPXCOM_ALL pCom
 		}
 
 		if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-			// Deperture chmpx maybe DOWN!
+			// Departure chmpx maybe DOWN!
 			//
 			// [NOTICE]
-			// This case is very small case, deperture server sends this packet but that server could not
+			// This case is very small case, departure server sends this packet but that server could not
 			// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 			// So we do not transfer this packet, because it could not be stopped in RING.
 			//
-			ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+			ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 			*ppResComPkt = NULL;
 
 		}else{
@@ -8762,7 +8762,7 @@ bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
 		ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_SUSPEND_GET to sock(%d).", sock);
 
 		// [NOTE]
-		// This methos is called from only InitialAllServerStatus(), then the sock is not mapped.
+		// This method is called from only InitialAllServerStatus(), then the sock is not mapped.
 		// Then we do not close sock here, it will be closed in InitialAllServerStatus().
 		//
 		CHM_Free(pComPkt);
@@ -8826,7 +8826,7 @@ bool ChmEventSock::PxComReceiveMergeSuspendRes(PCOMHEAD pComHead, PPXCOM_ALL pCo
 	if(pComHead->term_ids.chmpxid == selfchmpxid){
 		// To me
 		if(CHMPX_COM_RES_SUCCESS != pMergeSuspendRes->head.result){
-			WAN_CHMPRN("PXCOM_MERGE_SUSPEND_RES is failed, somthing wrong or target ring does not support this command.");
+			WAN_CHMPRN("PXCOM_MERGE_SUSPEND_RES is failed, something wrong or target ring does not support this command.");
 			return true;
 		}
 
@@ -8968,14 +8968,14 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 
 		if(CHM_INVALID_CHMPXID != nextchmpxid){
 			if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-				// Deperture chmpx maybe DOWN!
+				// Departure chmpx maybe DOWN!
 				//
 				// [NOTICE]
-				// This case is very small case, deperture server sends this packet but that server could not
+				// This case is very small case, departure server sends this packet but that server could not
 				// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 				// So we do not transfer this packet, because it could not be stopped in RING.
 				//
-				ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+				ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 				*ppResComPkt = NULL;
 
 			}else{
@@ -9171,7 +9171,7 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			// Succeed request update data
 			while(!fullock::flck_trylock_noshared_mutex(&mergeidmap_lockval));	// LOCK
 
-			// copy all update data resuest status
+			// copy all update data request status
 			PPXCOM_REQ_IDMAP	pReqIdMap	= CHM_OFFSET(pReqUpdateData, sizeof(PXCOM_REQ_UPDATEDATA), PPXCOM_REQ_IDMAP);
 			for(long cnt = 0; cnt < pReqUpdateData->count; ++cnt){
 				mergeidmap_t::iterator	iter = mergeidmap.find(pReqIdMap[cnt].chmpxid);
@@ -9203,14 +9203,14 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 
 		if(CHM_INVALID_CHMPXID != nextchmpxid){
 			if(!IsSafeDeptAndNextChmpxId(pComHead->dept_ids.chmpxid, nextchmpxid)){
-				// Deperture chmpx maybe DOWN!
+				// Departure chmpx maybe DOWN!
 				//
 				// [NOTICE]
-				// This case is very small case, deperture server sends this packet but that server could not
+				// This case is very small case, departure server sends this packet but that server could not
 				// be connected from in RING server.(ex. down after sending, or FQDN is wrong, etc)
 				// So we do not transfer this packet, because it could not be stopped in RING.
 				//
-				ERR_CHMPRN("Deperture chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
+				ERR_CHMPRN("Departure chmpxid(0x%016" PRIx64 ") maybe down, so stop transferring this packet.", pComHead->dept_ids.chmpxid);
 
 			}else{
 				// Make packet
@@ -9282,7 +9282,7 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 				*ppResComPkt = pResComPkt;
 			}
 		}else{
-			// there is no next chnpxid.
+			// there is no next chmpxid.
 		}
 	}
 	return true;
@@ -9350,7 +9350,7 @@ bool ChmEventSock::PxComReceiveResUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 
 	// check data
 	if(0 == pResUpdateData->length || 0 == pResUpdateData->pdata_offset){
-		ERR_CHMPRN("Received CHMPX_COM_RES_UPDATEDATA command is somthing wrong.");
+		ERR_CHMPRN("Received CHMPX_COM_RES_UPDATEDATA command is something wrong.");
 		return false;
 	}
 	unsigned char*	pdata = CHM_OFFSET(pResUpdateData, pResUpdateData->pdata_offset, unsigned char*);
@@ -9413,7 +9413,7 @@ bool ChmEventSock::PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pC
 
 	// check data
 	if(CHM_INVALID_CHMPXID == pResultUpdateData->chmpxid || !IS_PXCOM_REQ_UPDATE_RESULT(pResultUpdateData->result)){
-		ERR_CHMPRN("Received CHMPX_COM_RESULT_UPDATEDATA command is somthing wrong.");
+		ERR_CHMPRN("Received CHMPX_COM_RESULT_UPDATEDATA command is something wrong.");
 		return false;
 	}
 

@@ -36,7 +36,7 @@ using namespace	std;
 //---------------------------------------------------------
 // Symbols
 //---------------------------------------------------------
-// The MQ object is allowed making/registing many.
+// The MQ object is allowed making/registering many.
 //
 #define	EVMAP_KEY_CONF					0
 #define	EVMAP_KEY_SOCK					1
@@ -188,13 +188,13 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 	// Load configuration
 	string	confval("");
 	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, true, &confval))){
-		ERR_CHMPRN("Failed to make configration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
+		ERR_CHMPRN("Failed to make configuration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
 		Clean(bup_cfg.empty());
 		return false;
 	}
 	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
 	if(!pchmcfg){
-		ERR_CHMPRN("Failed to load configration from %s", cfgfile);
+		ERR_CHMPRN("Failed to load configuration from %s", cfgfile);
 		Clean(bup_cfg.empty());
 		return false;
 	}
@@ -273,7 +273,7 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 		evobjmap[EVMAP_KEY_SHM]		= pEventShm;
 	}
 
-	// backup configration file path.
+	// backup configuration file path.
 	bup_cfg = confval;
 
 	// rejoin mode
@@ -363,7 +363,7 @@ bool ChmCntrl::OnlyAttachInitialize(const char* cfgfile, short ctlport)
 	// Load configuration
 	string	confval("");
 	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, true, &confval))){
-		ERR_CHMPRN("Failed to make configration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
+		ERR_CHMPRN("Failed to make configuration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
 		Clean(bup_cfg.empty());
 		return false;
 	}
@@ -384,7 +384,7 @@ bool ChmCntrl::OnlyAttachInitialize(const char* cfgfile, short ctlport)
 	// Initialize client process HUP
 	pEventShm = NULL;
 
-	// backup configration file path.
+	// backup configuration file path.
 	bup_cfg = confval;
 
 	// rejoin mode
@@ -419,7 +419,7 @@ bool ChmCntrl::InitializeEventFd(void)
 //
 // This method is called from CHMConf object when configuration file changing.
 //
-bool ChmCntrl::ConfigrationUpdateNotify(void)
+bool ChmCntrl::ConfigurationUpdateNotify(void)
 {
 	if(!IsInitialized()){
 		ERR_CHMPRN("This object is not initialized yet.");
@@ -427,7 +427,7 @@ bool ChmCntrl::ConfigrationUpdateNotify(void)
 	}
 
 	// First, reload configuration for ImData data
-	if(!ImData.ReloadConfigration()){
+	if(!ImData.ReloadConfiguration()){
 		ERR_CHMPRN("Failed to reinitialize internal data for ImData.");
 		return false;
 	}
@@ -709,12 +709,12 @@ bool ChmCntrl::Receive(PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plengt
 
 		}else if(0 == eventcnt){
 			// there is no event now, check chmpx process down
-			if(!ImData.IsNeedDettach()){
+			if(!ImData.IsNeedDetach()){
 				return true;
 			}
 			MSG_CHMPRN("Found notification, Chmpx process down.");
 
-			// Dettach
+			// Detach
 			Clean(false);
 
 			// Re-join
@@ -753,7 +753,7 @@ bool ChmCntrl::Receive(PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plengt
 		// EPOLLIN, etc...
 		EVOBJTYPE	type = EVOBJ_TYPE_EVMQ;		// tmp
 		if(!GetEventBaseObjType(pEvObj, type)){
-			ERR_CHMPRN("Why? somthing wrong with event type.");
+			ERR_CHMPRN("Why? something wrong with event type.");
 			return false;
 		}
 
@@ -871,7 +871,7 @@ bool ChmCntrl::Close(msgid_t msgid)
 // [NOTICE]
 // This method access to MQ fd directly, thus not use event queue.
 // This class on "client on library" mode sets MQ fd into event queue,
-// but not use it.(be carefule)
+// but not use it.(be careful)
 //
 // [Return value]
 // true:	succeed to read / could not read event.
@@ -916,9 +916,9 @@ bool ChmCntrl::Receive(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody,
 		CanContinueWait = false;
 		if(!pEventMq->ReceiveHeadByMsgId(msgid, ppComPkt, &CanContinueWait) || NULL == (*ppComPkt)){
 			// check chmpx process down
-			if(ImData.IsNeedDettach()){
+			if(ImData.IsNeedDetach()){
 				ERR_CHMPRN("Found notification, Chmpx process down.");
-				// Dettach
+				// Detach
 				Clean(false);
 				return false;
 			}
@@ -956,7 +956,7 @@ bool ChmCntrl::Receive(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody,
 		}
 
 		// Processing COM_PX2C/COM_C2PX/etc packet, so wait next packet.
-		// and cnt is not increament.
+		// and cnt is not increment.
 		CHM_Free(*ppComPkt);
 	}
 
@@ -1004,7 +1004,7 @@ bool ChmCntrl::RawSendOnSlave(msgid_t msgid, const unsigned char* pbody, size_t 
 	}
 	if(preceivercnt){
 		if(0 > ((*preceivercnt) = PlaningReceiverCount(hash, c2ctype))){
-			ERR_CHMPRN("Could not plan reciver chmpx server count.");
+			ERR_CHMPRN("Could not plan receiver chmpx server count.");
 			return false;
 		}
 	}
@@ -1078,7 +1078,7 @@ bool ChmCntrl::RawSend(msgid_t msgid, PCOMPKT pComPkt, const unsigned char* pbod
 			return false;
 		}
 	}else{
-		// renponse message
+		// response message
 		if(!pEventMq->BuildC2CResponseHead(&(NewComPkt.head), &(pComPkt->head))){
 			ERR_CHMPRN("Could not make COMHEAD for responding message through MQ.");
 			return false;
@@ -1089,9 +1089,9 @@ bool ChmCntrl::RawSend(msgid_t msgid, PCOMPKT pComPkt, const unsigned char* pbod
 
 	if(!pEventMq->Send(&NewComPkt, pbody, blength)){
 		// check chmpx process down
-		if(ImData.IsNeedDettach()){
+		if(ImData.IsNeedDetach()){
 			MSG_CHMPRN("Found notification, Chmpx process down.");
-			// Dettach
+			// Detach
 			Clean(false);
 		}
 		return false;

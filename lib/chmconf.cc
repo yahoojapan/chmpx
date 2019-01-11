@@ -52,7 +52,7 @@ using namespace	std;
 //---------------------------------------------------------
 // Symbols
 //---------------------------------------------------------
-// Keywards
+// Keywords
 #define	CFG_GLOBAL_SEC_STR				"GLOBAL"
 #define	CFG_SVRNODE_SEC_STR				"SVRNODE"
 #define	CFG_SLVNODE_SEC_STR				"SLVNODE"
@@ -121,7 +121,7 @@ using namespace	std;
 #define	INICFG_DELIVERMODE_RANDOM_STR	"random"
 #define	INICFG_DELIVERMODE_HASH_STR		"hash"
 
-// for analizing .ini file
+// for analyzing .ini file
 #define	INICFG_INSEC_NOT				0
 #define	INICFG_INSEC_GLOBAL				1
 #define	INICFG_INSEC_SVRNODE			2
@@ -392,7 +392,7 @@ bool CHMConf::Receive(int fd)
 		is_check_file = true;
 	}
 
-	// configration file is moved or deleted
+	// configuration file is moved or deleted
 	if(is_check_file){
 		struct timespec	sleeptime;
 		SET_TIMESPEC(&sleeptime, 0, (1000 * 1000));		// 1ms
@@ -411,8 +411,8 @@ bool CHMConf::Receive(int fd)
 	// reload file & check update
 	if(is_reload){
 		if(CheckUpdate()){
-			// somthing changed, so update internal data.
-			if(!pChmCntrl->ConfigrationUpdateNotify()){
+			// something changed, so update internal data.
+			if(!pChmCntrl->ConfigurationUpdateNotify()){
 				ERR_CHMPRN("Failed to reinitialize internal data.");
 				return false;
 			}
@@ -425,7 +425,7 @@ bool CHMConf::Receive(int fd)
 
 bool CHMConf::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength)
 {
-	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement thie event in this class)");
+	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement any event in this class)");
 	return true;
 }
 
@@ -446,7 +446,7 @@ bool CHMConf::NotifyHup(int fd)
 
 bool CHMConf::Processing(PCOMPKT pComPkt)
 {
-	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement thie event in this class)");
+	MSG_CHMPRN("Nothing to do in this object for this event.(Not implement any event in this class)");
 	return true;
 }
 
@@ -476,7 +476,7 @@ uint CHMConf::CheckNotifyEvent(void)
 		return 0;
 	}
 
-	// analize event types
+	// analyze event types
 	struct inotify_event*	in_event	= NULL;
 	uint					result		= 0;
 	for(unsigned char* ptr = pevent; (ptr + sizeof(struct inotify_event)) <= (pevent + bytes); ptr += sizeof(struct inotify_event) + in_event->len){
@@ -486,16 +486,16 @@ uint CHMConf::CheckNotifyEvent(void)
 			continue;
 		}
 		if(in_event->mask & IN_CLOSE_WRITE){
-			MSG_CHMPRN("Configration file %s is wrote(%d).", cfgfile.c_str(), in_event->mask);
+			MSG_CHMPRN("Configuration file %s is wrote(%d).", cfgfile.c_str(), in_event->mask);
 			result |= IN_CLOSE_WRITE;
 		}else if(in_event->mask & IN_DELETE_SELF){
-			MSG_CHMPRN("Configration file %s is deleted(%d).", cfgfile.c_str(), in_event->mask);
+			MSG_CHMPRN("Configuration file %s is deleted(%d).", cfgfile.c_str(), in_event->mask);
 			result |= IN_DELETE_SELF;
 		}else if(in_event->mask & IN_MOVE_SELF){
-			MSG_CHMPRN("Configration file %s is moved(%d).", cfgfile.c_str(), in_event->mask);
+			MSG_CHMPRN("Configuration file %s is moved(%d).", cfgfile.c_str(), in_event->mask);
 			result |= IN_MOVE_SELF;
 		}else if(in_event->mask & IN_MODIFY){
-			MSG_CHMPRN("Configration file %s is modified(%d).", cfgfile.c_str(), in_event->mask);
+			MSG_CHMPRN("Configuration file %s is modified(%d).", cfgfile.c_str(), in_event->mask);
 			result |= IN_MODIFY;
 		}else{
 			WAN_CHMPRN("inotify event type(%u) is not handled because of waiting another event after it.", in_event->mask);
@@ -520,8 +520,8 @@ bool CHMConf::CheckUpdate(void)
 	}
 	PCHMCFGINFO	pnewinfo = new CHMCFGINFO;
 
-	// Load configration file.
-	if(!LoadConfigration(*pnewinfo)){
+	// Load configuration file.
+	if(!LoadConfiguration(*pnewinfo)){
 		ERR_CHMPRN("Failed to load configuration from %s.", cfgfile.c_str());
 		CHM_Delete(pnewinfo);
 		return false;
@@ -547,7 +547,7 @@ const CHMCFGINFO* CHMConf::GetConfiguration(bool is_check_update)
 	if(IsFileType() && !CheckConfFile()){
 		return NULL;
 	}
-	// Load & Check	configration file.
+	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
@@ -564,14 +564,14 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 		return false;
 	}
 
-	// Load & Check	configration file.
+	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
 	// change hostname to fqdn
 	string	globalname;
 	if(!ChmNetDb::Get()->GetHostname(hostname, globalname, true)){
-		MSG_CHMPRN("Could not convert hostname to global hostanme.");
+		MSG_CHMPRN("Could not convert hostname to global hostname.");
 		return false;
 	}
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
@@ -601,7 +601,7 @@ bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO&
 		return false;
 	}
 
-	// Load & Check	configration file.
+	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
@@ -642,7 +642,7 @@ bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& 
 	if(IsFileType() && !CheckConfFile()){
 		return false;
 	}
-	// Load & Check	configration file.
+	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
@@ -692,7 +692,7 @@ bool CHMConf::IsServerList(const char* hostname, string& fqdn)
 
 bool CHMConf::IsServerList(string& fqdn)
 {
-	return IsServerList("locahost", fqdn);
+	return IsServerList("localhost", fqdn);
 }
 
 bool CHMConf::GetSlaveList(strlst_t& slave_list)
@@ -726,13 +726,13 @@ bool CHMConf::IsSlaveList(const char* hostname, string& fqdn)
 
 bool CHMConf::IsSlaveList(string& fqdn)
 {
-	return IsSlaveList("locahost", fqdn);
+	return IsSlaveList("localhost", fqdn);
 }
 
 bool CHMConf::IsSsl(void) const
 {
 	if(!pchmcfginfo){
-		MSG_CHMPRN("This object does not loading configration file yet.");
+		MSG_CHMPRN("This object does not loading configuration file yet.");
 		return false;
 	}
 
@@ -813,7 +813,7 @@ bool CHMIniConf::ReadFileContents(const string& filename, strlst_t& linelst, str
 	return true;
 }
 
-bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
+bool CHMIniConf::LoadConfigurationRaw(CFGRAW& chmcfgraw) const
 {
 	if(0 == cfgfile.length()){
 		ERR_CHMPRN("Configuration file path is not set.");
@@ -825,7 +825,7 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 	strlst_t	allfiles;
 	allfiles.push_back(cfgfile);
 	if(!ReadFileContents(cfgfile, linelst, allfiles)){
-		ERR_CHMPRN("Could not load configration file(%s) contents.", cfgfile.c_str());
+		ERR_CHMPRN("Could not load configuration file(%s) contents.", cfgfile.c_str());
 		return false;
 	}
 
@@ -856,7 +856,7 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 
 		if(INICFG_INSEC_NOT == next_section && INICFG_INSEC_NOT == section){
 			// found not section keywords, but now out of section.
-			WAN_CHMPRN("cfg file(%s) invalide value(%s), no section.", cfgfile.c_str(), line.c_str());
+			WAN_CHMPRN("cfg file(%s) invalid value(%s), no section.", cfgfile.c_str(), line.c_str());
 			continue;
 		}
 
@@ -866,11 +866,11 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 				merge_strmap(chmcfgraw.global, tmpmap);
 			}else if(INICFG_INSEC_SVRNODE == section){
 				if(!sorted_insert_strmaparr(chmcfgraw.server_nodes, tmpmap, INICFG_NAME_STR, INICFG_CTLPORT_STR)){
-					WAN_CHMPRN("cfg file(%s) invalide server node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
+					WAN_CHMPRN("cfg file(%s) invalid server node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
 				}
 			}else if(INICFG_INSEC_SLVNODE == section){
 				if(!sorted_insert_strmaparr(chmcfgraw.slave_nodes, tmpmap, INICFG_NAME_STR, INICFG_CTLPORT_STR)){
-					WAN_CHMPRN("cfg file(%s) invalide slave node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
+					WAN_CHMPRN("cfg file(%s) invalid slave node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
 				}
 			}else{	// INICFG_INSEC_UNKNOWN == section
 				// Unknown section, nothing to do.
@@ -887,13 +887,13 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 				line	= trim(line.substr(0, pos));
 			}
 			if(!extract_conf_value(value) || !extract_conf_value(line)){
-				WAN_CHMPRN("cfg file(%s) invalide data, could not extract key or value.", cfgfile.c_str());
+				WAN_CHMPRN("cfg file(%s) invalid data, could not extract key or value.", cfgfile.c_str());
 			}else{
 				if(0 == line.length()){
-					WAN_CHMPRN("cfg file(%s) invalide data, key is not found.", cfgfile.c_str());
+					WAN_CHMPRN("cfg file(%s) invalid data, key is not found.", cfgfile.c_str());
 				}else{
 					if(tmpmap.end() != tmpmap.find(line)){
-						WAN_CHMPRN("cfg file(%s) invalide data, key(%s: value=%s) is already specified, and overwrited.", cfgfile.c_str(), line.c_str(), value.c_str());
+						WAN_CHMPRN("cfg file(%s) invalid data, key(%s: value=%s) is already specified, and overwritten.", cfgfile.c_str(), line.c_str(), value.c_str());
 					}
 					tmpmap[line] = value;
 				}
@@ -906,11 +906,11 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 			merge_strmap(chmcfgraw.global, tmpmap);
 		}else if(INICFG_INSEC_SVRNODE == section){
 			if(!sorted_insert_strmaparr(chmcfgraw.server_nodes, tmpmap, INICFG_NAME_STR, INICFG_CTLPORT_STR)){
-				WAN_CHMPRN("cfg file(%s) invalide server node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
+				WAN_CHMPRN("cfg file(%s) invalid server node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
 			}
 		}else if(INICFG_INSEC_SLVNODE == section){
 			if(!sorted_insert_strmaparr(chmcfgraw.slave_nodes, tmpmap, INICFG_NAME_STR, INICFG_CTLPORT_STR)){
-				WAN_CHMPRN("cfg file(%s) invalide slave node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
+				WAN_CHMPRN("cfg file(%s) invalid slave node data, probably %s is not specified.", cfgfile.c_str(), INICFG_NAME_STR);
 			}
 		}else{	// INICFG_INSEC_NOT == section
 			// before section is nothing(first section), nothing to do.
@@ -919,7 +919,7 @@ bool CHMIniConf::LoadConfigrationRaw(CFGRAW& chmcfgraw) const
 	return true;
 }
 
-bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
+bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 {
 	if(0 == cfgfile.length()){
 		ERR_CHMPRN("Configuration file path is not set.");
@@ -927,7 +927,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	CFGRAW	chmcfgraw;
-	if(!LoadConfigrationRaw(chmcfgraw)){
+	if(!LoadConfigurationRaw(chmcfgraw)){
 		ERR_CHMPRN("Failed to read configuration file(%s).", cfgfile.c_str());
 		return false;
 	}
@@ -947,7 +947,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	chmcfginfo.revision = static_cast<long>(atoi(chmcfgraw.global[INICFG_VERSION_STR].c_str()));
 
 	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_MODE_STR)){
-		WAN_CHMPRN("configuration file(%s) does not have \"%s\" in %s section, but seaching automatically by contrl port.", cfgfile.c_str(), INICFG_MODE_STR, INICFG_GLOBAL_SEC_STR);
+		WAN_CHMPRN("configuration file(%s) does not have \"%s\" in %s section, but searching automatically by control port.", cfgfile.c_str(), INICFG_MODE_STR, INICFG_GLOBAL_SEC_STR);
 	}else{
 		if(0 == strcasecmp(chmcfgraw.global[INICFG_MODE_STR].c_str(), INICFG_MODE_SERVER_STR)){
 			chmcfginfo.is_server_mode = true;
@@ -1747,7 +1747,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 	// [NOTE]
 	// The server list might have duplicate server name & port.
-	// Because the port number can not be specified in configration file, so if there is some server nodes on same server
+	// Because the port number can not be specified in configuration file, so if there is some server nodes on same server
 	// and one specifies port and the other does not specify port(using default port).
 	// On this case, the list have duplicate server.
 	//
@@ -1938,7 +1938,7 @@ bool CHMIniConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 //---------------------------------------------------------
 // Loading Yaml Utilities for CHMYamlBaseConf Class
 //---------------------------------------------------------
-static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals, short default_ctlport)
+static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals, short default_ctlport)
 {
 	// Must start yaml mapping event.
 	yaml_event_t	yevent;
@@ -2425,7 +2425,7 @@ static bool ChmYamlLoadConfigrationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO&
 	return result;
 }
 
-static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals)
+static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals)
 {
 	// Must start yaml sequence(for mapping array) -> mapping event.
 	yaml_event_t	yevent;
@@ -2822,7 +2822,7 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 		if(result){
 			// [NOTE]
 			// The server list might have duplicate server name & port.
-			// Because the port number can not be specified in configration file, so if there is some server nodes on same server
+			// Because the port number can not be specified in configuration file, so if there is some server nodes on same server
 			// and one specifies port and the other does not specify port(using default port).
 			// On this case, the list have duplicate server.
 			//
@@ -2834,7 +2834,7 @@ static bool ChmYamlLoadConfigrationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 	return result;
 }
 
-static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals)
+static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals)
 {
 	// Must start yaml sequence(for mapping array) -> mapping event.
 	yaml_event_t	yevent;
@@ -3063,7 +3063,7 @@ static bool ChmYamlLoadConfigrationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO
 	return result;
 }
 
-static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, short default_ctlport)
+static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, short default_ctlport)
 {
 	CHMYamlDataStack	other_stack;
 	CHMCONF_CCV			ccvals;
@@ -3257,7 +3257,7 @@ static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& 
 						result = false;
 					}
 				}else{
-					// Found Top Level Keywards, start to loading
+					// Found Top Level Keywords, start to loading
 					if(0 == strcasecmp(CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value))){
 						if(is_set_global){
 							MSG_CHMPRN("Got yaml scalar event in loop, but already loading %s top level. Thus stacks this event.", CFG_GLOBAL_SEC_STR);
@@ -3266,7 +3266,7 @@ static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& 
 							}
 						}else{
 							// Load GLOBAL section
-							if(!ChmYamlLoadConfigrationGlobalSec(yparser, chmcfginfo, ccvals, default_ctlport)){
+							if(!ChmYamlLoadConfigurationGlobalSec(yparser, chmcfginfo, ccvals, default_ctlport)){
 								ERR_CHMPRN("Something error occured in loading %s section.", CFG_GLOBAL_SEC_STR);
 								result = false;
 							}
@@ -3280,7 +3280,7 @@ static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& 
 							}
 						}else{
 							// Load SVRNODE section
-							if(!ChmYamlLoadConfigrationSvrnodeSec(yparser, chmcfginfo, ccvals)){
+							if(!ChmYamlLoadConfigurationSvrnodeSec(yparser, chmcfginfo, ccvals)){
 								ERR_CHMPRN("Something error occured in loading %s section.", CFG_SVRNODE_SEC_STR);
 								result = false;
 							}
@@ -3294,14 +3294,14 @@ static bool ChmYamlLoadConfigrationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& 
 							}
 						}else{
 							// Load SLVNODE section
-							if(!ChmYamlLoadConfigrationSlvnodeSec(yparser, chmcfginfo, ccvals)){
+							if(!ChmYamlLoadConfigurationSlvnodeSec(yparser, chmcfginfo, ccvals)){
 								ERR_CHMPRN("Something error occured in loading %s section.", CFG_SLVNODE_SEC_STR);
 								result = false;
 							}
 						}
 
 					}else{
-						MSG_CHMPRN("Got yaml scalar event in loop, but unknown keyward(%s) for top level target. Thus stacks this event.", reinterpret_cast<const char*>(yevent.data.scalar.value));
+						MSG_CHMPRN("Got yaml scalar event in loop, but unknown keyword(%s) for top level target. Thus stacks this event.", reinterpret_cast<const char*>(yevent.data.scalar.value));
 						if(!other_stack.add(yevent.type)){
 							result = false;
 						}
@@ -3378,7 +3378,7 @@ CHMYamlBaseConf::~CHMYamlBaseConf()
 {
 }
 
-bool CHMYamlBaseConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
+bool CHMYamlBaseConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 {
 	if(CONF_JSON != type && CONF_JSON_STR != type && CONF_YAML != type){
 		ERR_CHMPRN("Class type(%d) does not JSON/JSON_STR/YAML.", type);
@@ -3420,7 +3420,7 @@ bool CHMYamlBaseConf::LoadConfigration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// Do parsing
-	bool	result = ChmYamlLoadConfigrationTopLevel(yparser, chmcfginfo, ctlport_param);
+	bool	result = ChmYamlLoadConfigurationTopLevel(yparser, chmcfginfo, ctlport_param);
 
 	yaml_parser_delete(&yparser);
 	if(fp){

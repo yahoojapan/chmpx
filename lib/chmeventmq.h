@@ -86,7 +86,7 @@ typedef struct chm_update_data_param{
 	chmpxid_t		chmpxid;					// requester chmpx
 	struct timespec	startts;					// start time for update datas
 	struct timespec	endts;						// end time for update datas
-	chmhash_t		max_pending_hash;			// max panding hash value
+	chmhash_t		max_pending_hash;			// max pending hash value
 	chmhash_t		pending_hash;				// new(pending) hash value
 	chmhash_t		max_base_hash;				// max base hash value
 	chmhash_t		base_hash;					// base hash value
@@ -117,9 +117,9 @@ class ChmEventMq : public ChmEventBase
 		static const time_t	DEFAULT_MERGE_TIMEOUT	= 0;			// timeout value for merging(default is no timeout)
 
 	protected:
-		msgid_mq_map_t		recv_idfd_map;				// map all MQ for receiveing:			msgid -> fd
-		mq_msgid_map_t		recv_fdid_map;				// map all MQ for receiveing:			fd -> msgid
-		msgid_mq_map_t		reserve_idfd_map;			// map disactivated MQ for receiveing:	msgid -> fd
+		msgid_mq_map_t		recv_idfd_map;				// map all MQ for receiving:			msgid -> fd
+		mq_msgid_map_t		recv_fdid_map;				// map all MQ for receiving:			fd -> msgid
+		msgid_mq_map_t		reserve_idfd_map;			// map disactivated MQ for receiving:	msgid -> fd
 		msgid_mq_map_t		dest_idfd_map;				// map cache MQ for sending:			msgid -> fd
 		mq_msgid_map_t		dest_fdid_map;				// map cache MQ for sending:			fd -> msgid
 		serial_t			serial_num;					// serial number for each mq message(using autolock)
@@ -135,7 +135,7 @@ class ChmEventMq : public ChmEventBase
 		mqmparamlist_t		merge_param_list;			// update data(merge) parameter list
 		volatile bool		notify_merge_update;		// flag for running thread
 		int					retry_count;				// cache value for ChmIMData::GetMQRetryCnt()
-		long				timeout_us;					// cahce value for ChmIMData::GetMQTimeout()
+		long				timeout_us;					// cache value for ChmIMData::GetMQTimeout()
 		time_t				timeout_merge;				// cache value for ChmIMData::GetMergeTimeout()
 		bool				is_server_mode;				// cache value for ChmIMData::IsServerMode()
 		bool				use_mq_ack;					// cache value for ChmIMData::IsAckMQ()
@@ -192,8 +192,8 @@ class ChmEventMq : public ChmEventBase
 
 		int GetEventQueueFd(void);
 		virtual bool GetEventQueueFds(event_fds_t& fds);
-		virtual bool SetEventQueue(void);						// Make one MQ for reciver side and add it to event queue fd.
-		virtual bool UnsetEventQueue(void);						// Unset mqfd from event queue fd, and destry it.
+		virtual bool SetEventQueue(void);						// Make one MQ for receiver side and add it to event queue fd.
+		virtual bool UnsetEventQueue(void);						// Unset mqfd from event queue fd, and destroy it.
 		virtual bool IsEventQueueFd(int fd);
 
 		virtual bool Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength);

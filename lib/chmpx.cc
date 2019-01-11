@@ -108,7 +108,7 @@ bool chmpx_unload_hash_library(void)
 chmpx_h chmpx_create_ex(const char* conffile, bool is_on_server, bool is_auto_rejoin, chm_merge_get_cb getfp, chm_merge_set_cb setfp, chm_merge_lastts_cb lastupdatefp)
 {
 	if(CHMEMPTYSTR(conffile)){
-		ERR_CHMPRN("Configration file path is empty.");
+		ERR_CHMPRN("Configuration file path is empty.");
 		return CHM_INVALID_CHMPXHANDLE;
 	}
 

@@ -145,7 +145,7 @@ void* ChmThread::WorkerProc(void* param)
 
 		}else{
 			// finish to work normal
-			if(pchmthparam->is_onece){
+			if(pchmthparam->is_once){
 				// finish to work, so exit thread
 				while(!fullock::flck_trylock_noshared_mutex(&(pchmthparam->pchmthread->list_lockval)));			// LOCK LIST
 
@@ -164,7 +164,7 @@ void* ChmThread::WorkerProc(void* param)
 				fullock::flck_unlock_noshared_mutex(&(pchmthparam->pchmthread->list_lockval));					// UNLOCK LIST
 
 			}else if(pchmthparam->is_nosleep){
-				// next to work assp, so set work status
+				// next to work asap, so set work status
 				if(IS_CHMTHREAD_EXIT(pchmthparam->status)){
 					// exit status, so remove from working map
 					while(!fullock::flck_trylock_noshared_mutex(&(pchmthparam->pchmthread->list_lockval)));		// LOCK LIST
@@ -313,9 +313,9 @@ ChmThread::~ChmThread()
 	ExitAllThreads();
 }
 
-int ChmThread::CreateThreads(int thread_cnt, Tfp_Chm_WorkerProc work_func, Tfp_Chm_FreeParameter free_func, void* common_param, chmthparam_t wp_param, bool is_sleep_at_start, bool is_onece, bool is_nosleep, bool is_keep_evcnt)
+int ChmThread::CreateThreads(int thread_cnt, Tfp_Chm_WorkerProc work_func, Tfp_Chm_FreeParameter free_func, void* common_param, chmthparam_t wp_param, bool is_sleep_at_start, bool is_once, bool is_nosleep, bool is_keep_evcnt)
 {
-	if(thread_cnt <= 0 || !work_func || (is_onece && is_nosleep)){
+	if(thread_cnt <= 0 || !work_func || (is_once && is_nosleep)){
 		ERR_CHMPRN("Parameter are wrong.");
 		return 0;
 	}
@@ -332,7 +332,7 @@ int ChmThread::CreateThreads(int thread_cnt, Tfp_Chm_WorkerProc work_func, Tfp_C
 		pthparam->thread_name		= thread_name + string("(") + to_string(cnt) + string(")");
 		pthparam->pchmthread		= this;
 		pthparam->status			= is_sleep_at_start ? ChmThread::CHMTHCOM_SLEEP : ChmThread::CHMTHCOM_WORK;
-		pthparam->is_onece			= is_onece;
+		pthparam->is_once			= is_once;
 		pthparam->is_nosleep		= is_nosleep;
 		pthparam->is_keep_evcnt		= is_keep_evcnt;
 		pthparam->work_proc			= work_func;
