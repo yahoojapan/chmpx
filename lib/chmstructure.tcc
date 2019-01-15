@@ -1264,8 +1264,10 @@ int chmpx_lap<T>::GetSock(int type)
 		if(basic_type::pAbsPtr->socklist){
 			chmsocklistlap	tmpsocklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 			socklist_t		sockarr;
+			// cppcheck-suppress stlSize
 			if(tmpsocklist.GetAllSocks(sockarr) && 0 < sockarr.size()){
 				// return first sock.
+				// cppcheck-suppress stlSize
 				rtsock = sockarr.front();
 			}
 		}
@@ -2044,7 +2046,7 @@ bool chmpxlist_lap<T>::ToNextUpServicing(bool is_cycle, bool is_allow_same_serve
 				basic_type::pAbsPtr = startpos;		// restore
 				if(is_allow_same_server){
 					curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
-					chmpxsts_t	status = curchmpx.GetStatus();
+					status = curchmpx.GetStatus();
 					if(IS_CHMPXSTS_SERVICING(status) && (!without_suspend || IS_CHMPXSTS_NOSUP(status))){
 						return true;
 					}
@@ -2238,15 +2240,16 @@ bool chmpxlist_lap<T>::UpdateHash(int type, bool is_to_first)
 	}
 
 	st_ptr_type cur;
-	chmpxlap	curchmpx;
-	chmpxsts_t	status;
-	chmhash_t	base;
 	chmhash_t	newbase;
-	chmhash_t	pending;
 	chmhash_t	newpending;
 
 	ToFirst();
 	for(newbase = 0L, newpending = 0L, cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
+		chmpxlap	curchmpx;
+		chmpxsts_t	status;
+		chmhash_t	base;
+		chmhash_t	pending;
+
 		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
 
 		status	= curchmpx.GetStatus();
@@ -2688,8 +2691,9 @@ chmpxid_t chmpxlist_lap<T>::GetRandomChmpxId(bool is_up_servers)
 	long		pos = static_cast<long>(rand()) % basecnt;		// random position.
 
 	chmpxlap	curchmpx;
-	chmpxsts_t	status;
 	for(; 0 < pos && basic_type::pAbsPtr->next; basic_type::pAbsPtr = CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->next, st_ptr_type)){
+		chmpxsts_t	status;
+
 		curchmpx.Reset(&basic_type::pAbsPtr->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
 		status	= curchmpx.GetStatus();
 		if(IS_CHMPXSTS_BASEHASH(status) && (!is_up_servers || IS_CHMPXSTS_UP(status))){
@@ -4162,6 +4166,7 @@ bool chmlog_lap<T>::Get(PCHMLOGRAW plograwarr, long& arrsize, logtype_t dirmask,
 	// set start pos
 	bool	is_circled;
 	long	cur_pos;
+	// cppcheck-suppress nullPointer
 	if(CHMLOG_TYPE_NOTASSIGNED == abs_lograw[basic_type::pAbsPtr->max_log_count - 1L].log_type){
 		is_circled	= true;
 		cur_pos		= 0L;
@@ -4303,9 +4308,7 @@ bool cltproclist_lap<T>::Dump(std::stringstream& sstream, const char* spacer) co
 		return false;
 	}
 	std::string	tmpspacer1 = spacer ? spacer : "";
-	std::string	tmpspacer2;
 	tmpspacer1 += "  ";
-	tmpspacer2 += tmpspacer1 + "  ";
 
 	// To first
 	st_ptr_type	cur;
@@ -6012,6 +6015,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 	if(CHM_INVALID_CHMPXID != last_chmpxid){
 		basic_type::pAbsPtr->last_chmpxid = last_chmpxid;						// for random
 	}
+	// cppcheck-suppress stlSize
 	return (0 != chmpxids.size());
 }
 
@@ -6040,7 +6044,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chm
 }
 
 template<typename T>
-long chmpxman_lap<T>::GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, bool without_suspend, bool without_down) const
+long chmpxman_lap<T>::GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, bool without_down, bool without_suspend) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
@@ -6050,7 +6054,7 @@ long chmpxman_lap<T>::GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, 
 		return 0L;
 	}
 	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-	return svrchmpxlist.GetChmpxIds(list, with_pending, without_suspend, without_down);
+	return svrchmpxlist.GetChmpxIds(list, with_pending, without_down, without_suspend);
 }
 
 template<typename T>
@@ -7547,8 +7551,8 @@ msgid_t chminfo_lap<T>::AssignMsg(bool is_chmpx, bool is_activated)
 	}
 
 	// freed list
-	mqmsgheadlistlap	freed_msgs(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);		// From rel
-	PMQMSGHEADLIST		new_msghlst_ptr = freed_msgs.PopFront();										// Get abs
+	mqmsgheadlistlap	freed_msgs1(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);		// From rel
+	PMQMSGHEADLIST		new_msghlst_ptr = freed_msgs1.PopFront();										// Get abs
 	if(!new_msghlst_ptr){
 		ERR_CHMPRN("Could not get new msgheadlist.");
 		return CHM_INVALID_MSGID;
@@ -7556,7 +7560,7 @@ msgid_t chminfo_lap<T>::AssignMsg(bool is_chmpx, bool is_activated)
 	// Re-set freed list
 	//
 	basic_type::pAbsPtr->free_msg_count--;
-	basic_type::pAbsPtr->free_msgs = freed_msgs.GetFirstPtr(false);
+	basic_type::pAbsPtr->free_msgs = freed_msgs1.GetFirstPtr(false);
 
 	// Initialize new msghead list
 	mqmsgheadlistlap	new_msghlist(new_msghlst_ptr, basic_type::pShmBase);							// From abs
@@ -7574,12 +7578,12 @@ msgid_t chminfo_lap<T>::AssignMsg(bool is_chmpx, bool is_activated)
 
 		// For recovering, add freed list
 		new_mqmsghead.NotAccountMqFlag();
-		mqmsgheadlistlap	freed_msgs(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);	// From rel(allow NULL)
-		if(!freed_msgs.Push(new_msghlst_ptr, true)){
+		mqmsgheadlistlap	freed_msgs2(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);	// From rel(allow NULL)
+		if(!freed_msgs2.Push(new_msghlst_ptr, true)){
 			ERR_CHMPRN("Failed to add freed PMQMSGHEADLIST %p.", new_msghlst_ptr);
 		}else{
 			basic_type::pAbsPtr->free_msg_count++;
-			basic_type::pAbsPtr->free_msgs = freed_msgs.GetFirstPtr(false);
+			basic_type::pAbsPtr->free_msgs = freed_msgs2.GetFirstPtr(false);
 		}
 		return CHM_INVALID_MSGID;
 	}
@@ -7591,12 +7595,12 @@ msgid_t chminfo_lap<T>::AssignMsg(bool is_chmpx, bool is_activated)
 
 		// For recovering, add freed list
 		new_mqmsghead.NotAccountMqFlag();
-		mqmsgheadlistlap	freed_msgs(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);	// From rel(allow NULL)
-		if(!freed_msgs.Push(new_msghlst_ptr, true)){
+		mqmsgheadlistlap	freed_msgs3(basic_type::pAbsPtr->free_msgs, basic_type::pShmBase, false);	// From rel(allow NULL)
+		if(!freed_msgs3.Push(new_msghlst_ptr, true)){
 			ERR_CHMPRN("Failed to add freed PMQMSGHEADLIST %p.", new_msghlst_ptr);
 		}else{
 			basic_type::pAbsPtr->free_msg_count++;
-			basic_type::pAbsPtr->free_msgs	= freed_msgs.GetFirstPtr(false);
+			basic_type::pAbsPtr->free_msgs	= freed_msgs3.GetFirstPtr(false);
 		}
 		return CHM_INVALID_MSGID;
 	}

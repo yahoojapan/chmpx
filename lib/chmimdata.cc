@@ -591,8 +591,6 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 
 	// initialize data in shm
 	PCHMSHM	pChmBase = reinterpret_cast<PCHMSHM>(shmbase);
-	PCHMPX*	rel_pchmpxarr_base;
-	PCHMPX*	rel_pchmpxarr_pend;
 	{
 		PCHMPXLIST		rel_chmpxarea			= reinterpret_cast<PCHMPXLIST>(		sizeof(CHMSHM));
 		PCHMPX*			rel_pchmpxarrarea		= reinterpret_cast<PCHMPX*>(		sizeof(CHMSHM) +
@@ -615,8 +613,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 																					sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt) +
 																					sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach) +
 																					sizeof(CHMLOGRAW) * pchmcfg->max_histlog_count);
-		rel_pchmpxarr_base						= rel_pchmpxarrarea;
-		rel_pchmpxarr_pend						= CHM_OFFSET(rel_pchmpxarrarea, static_cast<off_t>(sizeof(PCHMPX) * pchmcfg->max_chmpx_count), PCHMPX*);
+		PCHMPX*			rel_pchmpxarr_base		= rel_pchmpxarrarea;
+		PCHMPX*			rel_pchmpxarr_pend		= CHM_OFFSET(rel_pchmpxarrarea, static_cast<off_t>(sizeof(PCHMPX) * pchmcfg->max_chmpx_count), PCHMPX*);
 
 		// initializing each area
 		{
@@ -1767,8 +1765,8 @@ long ChmIMData::GetServerChmpxIdByBaseHash(chmhash_t basehash, chmpxidlist_t& ch
 	tmpchminfo.GetServerChmpxIdByHashs(another_basehash, another_chmpxids, false, true, true);
 
 	// merge two list to result list.
-	bool	found;
 	for(chmpxidlist_t::const_iterator iter1 = another_chmpxids.begin(); iter1 != another_chmpxids.end(); ++iter1){
+		bool	found;
 		found = false;
 		for(chmpxidlist_t::const_iterator iter2 = chmpxids.begin(); iter2 != chmpxids.end(); ++iter2){
 			if((*iter1) == (*iter2)){

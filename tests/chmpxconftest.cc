@@ -133,27 +133,27 @@ void print_initial_datas(void)
 	printf("================================================================\n");
 	printf(" Default datas and size for SHM\n");
 	printf("----------------------------------------------------------------\n");
-	printf("CHMPX                %zd bytes\n", sizeof(CHMPX));
-	printf("CHMPXLIST            %zd bytes\n", sizeof(CHMPXLIST));
-	printf("CHMSTAT              %zd bytes\n", sizeof(CHMSTAT));
-	printf("CHMPXMAN             %zd bytes\n", sizeof(CHMPXMAN));
-	printf("MQMSGHEAD            %zd bytes\n", sizeof(MQMSGHEAD));
-	printf("MQMSGHEADLIST        %zd bytes\n", sizeof(MQMSGHEADLIST));
-	printf("CHMINFO              %zd bytes\n", sizeof(CHMINFO));
-	printf("CHMLOGRAW            %zd bytes\n", sizeof(CHMLOGRAW));
-	printf("CHMLOG               %zd bytes\n", sizeof(CHMLOG));
-	printf("CHMSHM               %zd bytes\n", sizeof(CHMSHM));
+	printf("CHMPX                %zu bytes\n", sizeof(CHMPX));
+	printf("CHMPXLIST            %zu bytes\n", sizeof(CHMPXLIST));
+	printf("CHMSTAT              %zu bytes\n", sizeof(CHMSTAT));
+	printf("CHMPXMAN             %zu bytes\n", sizeof(CHMPXMAN));
+	printf("MQMSGHEAD            %zu bytes\n", sizeof(MQMSGHEAD));
+	printf("MQMSGHEADLIST        %zu bytes\n", sizeof(MQMSGHEADLIST));
+	printf("CHMINFO              %zu bytes\n", sizeof(CHMINFO));
+	printf("CHMLOGRAW            %zu bytes\n", sizeof(CHMLOGRAW));
+	printf("CHMLOG               %zu bytes\n", sizeof(CHMLOG));
+	printf("CHMSHM               %zu bytes\n", sizeof(CHMSHM));
 	printf("\n");
-	printf("CHMPXLIST[def]       %zd bytes\n", sizeof(CHMPXLIST) * DEFAULT_CHMPX_COUNT);
-	printf("MQMSGHEADLIST[def]   %zd bytes\n", sizeof(MQMSGHEADLIST) * DEFAULT_CLIENT_MQ_CNT);
-	printf("CHMLOGRAW[def]       %zd bytes\n", sizeof(CHMLOGRAW) * DEFAULT_HISTLOG_COUNT);
+	printf("CHMPXLIST[def]       %zu bytes\n", sizeof(CHMPXLIST) * DEFAULT_CHMPX_COUNT);
+	printf("MQMSGHEADLIST[def]   %zu bytes\n", sizeof(MQMSGHEADLIST) * DEFAULT_CLIENT_MQ_CNT);
+	printf("CHMLOGRAW[def]       %zu bytes\n", sizeof(CHMLOGRAW) * DEFAULT_HISTLOG_COUNT);
 	printf("\n");
-	printf("CHMPXLIST[max]       %zd bytes\n", sizeof(CHMPXLIST) * MAX_CHMPX_COUNT);
-	printf("MQMSGHEADLIST[max]   %zd bytes\n", sizeof(MQMSGHEADLIST) * MAX_CLIENT_MQ_CNT);
-	printf("CHMLOGRAW[max]       %zd bytes\n", sizeof(CHMLOGRAW) * MAX_HISTLOG_COUNT);
+	printf("CHMPXLIST[max]       %zu bytes\n", sizeof(CHMPXLIST) * MAX_CHMPX_COUNT);
+	printf("MQMSGHEADLIST[max]   %zu bytes\n", sizeof(MQMSGHEADLIST) * MAX_CLIENT_MQ_CNT);
+	printf("CHMLOGRAW[max]       %zu bytes\n", sizeof(CHMLOGRAW) * MAX_HISTLOG_COUNT);
 	printf("\n");
-	printf("total[def]           %zd bytes\n", sizeof(CHMSHM) + sizeof(CHMPXLIST) * DEFAULT_CHMPX_COUNT + sizeof(MQMSGHEADLIST) * DEFAULT_CLIENT_MQ_CNT + sizeof(CHMLOGRAW) * DEFAULT_HISTLOG_COUNT);
-	printf("total[max]           %zd bytes\n", sizeof(CHMSHM) + sizeof(CHMPXLIST) * MAX_CHMPX_COUNT + sizeof(MQMSGHEADLIST) * MAX_CLIENT_MQ_CNT + sizeof(CHMLOGRAW) * MAX_HISTLOG_COUNT);
+	printf("total[def]           %zu bytes\n", sizeof(CHMSHM) + sizeof(CHMPXLIST) * DEFAULT_CHMPX_COUNT + sizeof(MQMSGHEADLIST) * DEFAULT_CLIENT_MQ_CNT + sizeof(CHMLOGRAW) * DEFAULT_HISTLOG_COUNT);
+	printf("total[max]           %zu bytes\n", sizeof(CHMSHM) + sizeof(CHMPXLIST) * MAX_CHMPX_COUNT + sizeof(MQMSGHEADLIST) * MAX_CLIENT_MQ_CNT + sizeof(CHMLOGRAW) * MAX_HISTLOG_COUNT);
 	printf("\n");
 
 	PCHMSHM	shm = new CHMSHM;
@@ -273,8 +273,7 @@ int main(int argc, char** argv)
 	sigprocmask(SIG_SETMASK, &sigset, NULL);
 
 	// Loop
-	bool	isloop = true;
-	while(isloop){
+	while(true){
 		struct epoll_event	events[32];
 		int					max_events	= 32;
 		int					timeout		= 1000;					// 1s (ex, another is 100ms)

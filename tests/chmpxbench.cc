@@ -146,7 +146,7 @@ static inline char* programname(char* prgpath)
 
 static bool SetStringBytes(string& str, size_t totallength, char ch)
 {
-	if(totallength <= 0){
+	if(totallength == 0){
 		return false;
 	}
 	if((str.length() + 1) == totallength){
@@ -360,7 +360,7 @@ static bool SetBenchOptions(ChmOpts& opts, BOPTS& benchopts)
 //---------------------------------------------------------
 // Common Mmap file
 //---------------------------------------------------------
-static int OpenBenchFile(const string filepath, size_t& totalsize, bool is_create)
+static int OpenBenchFile(const string& filepath, size_t& totalsize, bool is_create)
 {
 	int	fd;
 

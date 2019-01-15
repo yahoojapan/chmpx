@@ -368,9 +368,10 @@ int ChmThread::ExitThreads(int thread_cnt, bool is_wait)
 		return 0;
 	}
 
-	PCHMTHWP_PARAM	exit_pthparam;
-	int				exited_cnt;
+	int	exited_cnt;
 	for(exited_cnt = 0; exited_cnt < thread_cnt; ){
+		PCHMTHWP_PARAM	exit_pthparam;
+
 		fullock::flck_lock_noshared_mutex(&list_lockval);		// LOCK
 
 		// search sleep thread.
@@ -471,6 +472,7 @@ bool ChmThread::WaitExitThread(PCHMTHWP_PARAM thread_param)
 		thread_param->common_param	= NULL;
 		thread_param->wp_param		= 0;
 	}
+	// cppcheck-suppress uselessAssignmentPtrArg
 	CHM_Delete(thread_param);
 
 	return true;
@@ -497,9 +499,10 @@ bool ChmThread::ExitAllThreads(void)
 
 bool ChmThread::IsThreadRun(void)
 {
-	PCHMTHWP_PARAM	exit_pthparam;
-	bool			result = false;
+	bool	result = false;
 	while(true){
+		PCHMTHWP_PARAM	exit_pthparam;
+
 		while(!fullock::flck_trylock_noshared_mutex(&list_lockval));// LOCK
 
 		// search exit thread and wait for exiting it.

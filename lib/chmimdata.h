@@ -115,7 +115,7 @@ class ChmIMData
 		static void FreeDupSelfChmpxInfo(PCHMPX ptr);								// for free memory allocated by DupSelfChmpxInfo()
 		static bool IsSafeCHMINFO(const PCHMINFO pchminfo);
 
-		ChmIMData(bool is_chmpx_proc = true);
+		explicit ChmIMData(bool is_chmpx_proc = true);
 		virtual ~ChmIMData();
 
 		bool Close(void);
@@ -216,6 +216,7 @@ class ChmIMData
 		bool GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const;
 		bool GetServerSocks(chmpxid_t chmpxid, socklist_t& socklist, int& ctlsock) const;
 		bool GetServerSock(chmpxid_t chmpxid, socklist_t& socklist) const { int tmp; return GetServerSocks(chmpxid, socklist, tmp); }
+		// cppcheck-suppress stlSize
 		bool IsConnectServer(chmpxid_t chmpxid) const { socklist_t tmpsocklist; return (GetServerSock(chmpxid, tmpsocklist) && 0 < tmpsocklist.size()); }
 		bool GetServerCtlSock(chmpxid_t chmpxid, int& ctlsock) const { socklist_t tmplist; return GetServerSocks(chmpxid, tmplist, ctlsock); }
 		bool GetServerHash(chmpxid_t chmpxid, chmhash_t& base, chmhash_t& pending) const;
@@ -238,6 +239,7 @@ class ChmIMData
 		long GetSlaveChmpxIds(chmpxidlist_t& list) const;
 		bool GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const;
 		bool GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const;
+		// cppcheck-suppress stlSize
 		bool IsConnectSlave(chmpxid_t chmpxid) const { socklist_t tmplist; return (GetSlaveSock(chmpxid, tmplist) && 0 < tmplist.size()); }
 		chmpxsts_t GetSlaveStatus(chmpxid_t chmpxid) const;
 

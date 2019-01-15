@@ -221,7 +221,7 @@ CHMConf::CHMConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport
 
 CHMConf::~CHMConf()
 {
-	Clean();
+	CHMConf::Clean();
 }
 
 bool CHMConf::Clean(void)
@@ -326,6 +326,8 @@ bool CHMConf::UnsetEventQueue(void)
 		}
 		CHM_CLOSE(inotifyfd);
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress redundantAssignment
 	inotifyfd	= CHM_INVALID_HANDLE;
 	watchfd		= CHM_INVALID_HANDLE;
 
@@ -901,6 +903,8 @@ bool CHMIniConf::LoadConfigurationRaw(CFGRAW& chmcfgraw) const
 		}
 	}
 
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlSize
 	if(0 < tmpmap.size()){
 		if(INICFG_INSEC_GLOBAL == section){
 			merge_strmap(chmcfgraw.global, tmpmap);
@@ -3408,6 +3412,8 @@ bool CHMYamlBaseConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		// open configuration file
 		if(NULL == (fp = fopen(cfgfile.c_str(), "r"))){
 			ERR_CHMPRN("Could not open configuration file(%s). errno = %d", cfgfile.c_str(), errno);
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress resourceLeak
 			return false;
 		}
 

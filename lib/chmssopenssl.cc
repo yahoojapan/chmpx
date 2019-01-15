@@ -323,8 +323,8 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 	is_close = false;
 
 	bool	result = true;
-	int		werr;
 	if(action_result <= 0){
+		int	werr;
 		int	ssl_result = SSL_get_error(ssl, action_result);
 		switch(ssl_result){
 			case	SSL_ERROR_NONE:
@@ -583,10 +583,11 @@ ChmSSSession ChmSecureSock::HandshakeSSL(ChmSSCtx ctx, int sock, bool is_accept,
 	SSL_set_fd(ssl, sock);
 
 	// accept/connect
-	bool	is_retry;
 	bool	is_close = false;	// Not used this value.
 	long	action_result;
 	for(int tmp_retrycnt = con_retrycnt; 0 < tmp_retrycnt; --tmp_retrycnt){
+		bool	is_retry;
+
 		// accept
 		if(is_accept){
 			action_result = SSL_accept(ssl);
@@ -637,10 +638,11 @@ bool ChmSecureSock::ShutdownSSL(int sock, ChmSSSession sslsession, int con_retry
 		con_waittime = ChmEventSock::DEFAULT_WAIT_CONNECT;
 	}
 
-	bool	is_retry;
-	long	action_result;
 	bool	is_close = false;		// Not used this value.
 	for(int tmp_retrycnt = con_retrycnt; 0 < tmp_retrycnt; --tmp_retrycnt){
+		bool	is_retry;
+		long	action_result;
+
 		// accept
 		action_result	= SSL_shutdown(ssl);
 		is_retry		= true;
