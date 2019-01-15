@@ -78,6 +78,7 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 		WAN_CHMPRN("Failed to get pid list.");
 		return true;	// finish.
 	}
+	// cppcheck-suppress stlSize
 	if(0 == pidlist.size()){
 		// why?(nothing to do)
 		return true;
@@ -92,6 +93,7 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 				down_pids.push_back(*iter);
 			}
 		}
+		// cppcheck-suppress stlSize
 		if(0 != down_pids.size()){
 			break;
 		}
@@ -177,7 +179,7 @@ ChmEventShm::~ChmEventShm()
 	if(!checkthread.ExitAllThreads()){
 		ERR_CHMPRN("Failed to exit thread for checking.");
 	}
-	Clean();
+	ChmEventShm::Clean();
 }
 
 bool ChmEventShm::Clean(void)
@@ -267,6 +269,8 @@ bool ChmEventShm::UnsetEventQueue(void)
 		}
 		CHM_CLOSE(inotifyfd);
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress redundantAssignment
 	inotifyfd	= CHM_INVALID_HANDLE;
 	watchfd		= CHM_INVALID_HANDLE;
 

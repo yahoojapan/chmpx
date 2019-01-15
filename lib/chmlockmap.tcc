@@ -52,16 +52,17 @@ class chm_lock_map
 
 	protected:
 		// do not use this
+		// cppcheck-suppress uninitMemberVar
 		chm_lock_map(void) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(NULL), pbaseparam(NULL) {}
 
 	public:
-		chm_lock_map(val_type initval, chm_lock_map_erase_cb pfunc = NULL, void* pparam = NULL) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(pfunc), pbaseparam(pparam), emptyval(initval) {}
+		chm_lock_map(const val_type& initval, chm_lock_map_erase_cb pfunc = NULL, void* pparam = NULL) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(pfunc), pbaseparam(pparam), emptyval(initval) {}
 		virtual ~chm_lock_map(void) { clear(); }
 
 		inline size_t count(void);
 		inline val_type operator[](const key_type& key);
 		inline val_type get(const key_type& key);
-		inline bool set(const key_type& key, val_type val, bool allow_ow = false);
+		inline bool set(const key_type& key, const val_type& val, bool allow_ow = false);
 		inline bool find(const key_type& key);
 		inline void get_keys(st_key_list& list);
 		inline bool erase(const key_type& key);
@@ -123,7 +124,7 @@ inline val_type chm_lock_map<key_type, val_type>::get(const key_type& key)
 }
 
 template<typename key_type, typename val_type>
-inline bool chm_lock_map<key_type, val_type>::set(const key_type& key, val_type val, bool allow_ow)
+inline bool chm_lock_map<key_type, val_type>::set(const key_type& key, const val_type& val, bool allow_ow)
 {
 	while(!fullock::flck_trylock_noshared_mutex(&lockval));
 

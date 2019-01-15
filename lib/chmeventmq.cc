@@ -158,6 +158,7 @@ bool ChmEventMq::InitializeMaxMqSystemSize(long maxmsg)
 		}
 		long	current = static_cast<long>(atoi(pbuff));
 		CHM_Free(pbuff);
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 
 		if(current < maxmsg){
@@ -187,11 +188,12 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	MSG_CHMPRN("Start merge thread in client(MQ).");
 
 	// Loop
-	chmpx_h				handle = reinterpret_cast<chmpx_h>(pThis->pChmCntrl);
-	PCHM_UPDATA_PARAM	pUpdateDataParam;
-	bool				result;
-	time_t				start_time;
+	chmpx_h	handle = reinterpret_cast<chmpx_h>(pThis->pChmCntrl);
 	while(pThis->notify_merge_update){
+		PCHM_UPDATA_PARAM	pUpdateDataParam;
+		time_t				start_time;
+		bool				result;
+
 		// get parameter
 		while(!fullock::flck_trylock_noshared_mutex(&(pThis->mparam_list_lockval)));	// LOCK
 		pUpdateDataParam = NULL;
@@ -381,14 +383,14 @@ ChmEventMq::ChmEventMq(int eventqfd, ChmCntrl* pcntrl, chm_merge_get_cb mgetfp, 
 	// [NOTE]
 	// ChmEventMq must be initialized after initialize ChmIMData
 	//
-	if(!UpdateInternalData()){
+	if(!ChmEventMq::UpdateInternalData()){
 		ERR_CHMPRN("Could not initialize cache data for ImData, but continue...");
 	}
 }
 
 ChmEventMq::~ChmEventMq()
 {
-	Clean();
+	ChmEventMq::Clean();
 }
 
 //---------------------------------------------------------
@@ -887,7 +889,7 @@ bool ChmEventMq::FreeReserveMsgIds(void)
 	long	to_close_cnt;
 	{
 		long	activated_cnt	= static_cast<long>(recv_idfd_map.count() - reserve_idfd_map.count());
-		long	lest_cnt		= ((activated_cnt / mqcnt_per_attach) * mqcnt_per_attach) + (0 == activated_cnt % mqcnt_per_attach ? 0 : 1L);
+		long	lest_cnt		= ((activated_cnt / mqcnt_per_attach) * mqcnt_per_attach) + ((0 == (activated_cnt % mqcnt_per_attach)) ? 0 : 1L);
 		to_close_cnt			= static_cast<long>(recv_idfd_map.count()) - lest_cnt;
 		if(static_cast<long>(reserve_idfd_map.count()) < to_close_cnt){
 			to_close_cnt = static_cast<long>(reserve_idfd_map.count());	// why?
@@ -1387,7 +1389,9 @@ bool ChmEventMq::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blengt
 	DUMPCOM_PXCLT("MQ::Send", CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt));
 
 	// Make priority
-	unsigned int	priority = COM_C2C == pComPkt->head.type ? MQ_PRIORITY_MSG : MQ_PRIORITY_NOTICE;
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress duplicateValueTernary
+	unsigned int	priority = ((COM_C2C == pComPkt->head.type) ? MQ_PRIORITY_MSG : MQ_PRIORITY_NOTICE);
 
 	// Get k2hash & key names
 	K2HShm*	pK2hash = pImData->GetK2hashObj();
