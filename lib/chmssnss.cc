@@ -105,7 +105,7 @@ typedef struct chm_nss_ss_context{
 		strServerKey(CHMEMPTYSTR(pServer) ? "" : pServer), CERT_OBJ_server(cert_server), PKEY_OBJ_server(pkey_server), strSlaveKey(CHMEMPTYSTR(pSlave) ? "" : pSlave), CERT_OBJ_slave(cert_slave), PKEY_OBJ_slave(pkey_slave)
 	{
 	}
-	chm_nss_ss_context(const struct chm_nss_ss_context* other) :
+	explicit chm_nss_ss_context(const struct chm_nss_ss_context* other) :
 		strServerKey(other ? other->strServerKey : ""), CERT_OBJ_server(other ? other->CERT_OBJ_server : NULL), PKEY_OBJ_server(other ? other->PKEY_OBJ_server : NULL), strSlaveKey(other ? other->strSlaveKey : ""), CERT_OBJ_slave(other ? other->CERT_OBJ_slave : NULL), PKEY_OBJ_slave(other ? other->PKEY_OBJ_slave : NULL)
 	{
 	}
@@ -234,6 +234,8 @@ inline void move_pk11objlist(chmpk11list_t& srclist, chmpk11list_t& destlist)
 // [NOTE]
 // ChmSSSession is a pointer type casted void* to ChmSSSessionEnt structure.
 //
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress noCopyConstructor
 typedef struct chm_nss_session{
 	ChmSSCtx		SSCtx;
 	PRFileDesc*		SSSession;
@@ -241,6 +243,9 @@ typedef struct chm_nss_session{
 
 	chm_nss_session(ChmSSCtx ctx = NULL, PRFileDesc* session = NULL, chmpk11list_t* ppk11objs = NULL) : SSCtx(NULL), SSSession(session)
 	{
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress noOperatorEq
+		// cppcheck-suppress noCopyConstructor
 		SSCtx = new ChmSSCtxEnt(ctx);
 		if(ppk11objs){
 			set(*ppk11objs);
@@ -733,8 +738,7 @@ bool ChmSecureSock::LoadCACerts(chmpk11list_t& pk11objlist)
 		}
 	}
 	if(!ChmSecureSock::GetCAPath().empty()){
-		PRDirEntry*	entry;
-		PRDir*		dir;
+		PRDir*	dir;
 		if(NULL == (dir = PR_OpenDir(ChmSecureSock::GetCAPath().c_str()))){
 			WAN_CHMPRN("Could not open CA path(%s) directory, but continue...", ChmSecureSock::GetCAPath().c_str());
 		}else{
@@ -746,6 +750,7 @@ bool ChmSecureSock::LoadCACerts(chmpk11list_t& pk11objlist)
 			//
 			// AND WE NEED TO CHECK FILE EXTENSION OR FORMAT BEFORE CALLING PK11 FUNCTION.
 			//
+			PRDirEntry*	entry;
 			while(NULL != (entry = PR_ReadDir(dir, PR_SKIP_BOTH))){
 				if(0 == strcmp(entry->name, ".") || 0 == strcmp(entry->name, "..")){
 					continue;
@@ -1053,6 +1058,9 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 	//ChmSSSessionEnt*	session = reinterpret_cast<ChmSSSessionEnt*>(sslsession);		// not used
 
 	if(CHMEVENTSOCK_RETRY_DEFAULT == retrycnt){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress uselessAssignmentPtrArg
+		// cppcheck-suppress uselessAssignmentArg
 		retrycnt = ChmEventSock::DEFAULT_RETRYCNT;
 		waittime = ChmEventSock::DEFAULT_WAIT_SOCKET;
 	}
@@ -1835,6 +1843,8 @@ void ChmSecureSock::FreeSSLSessionEx(ChmSSSession sslsession)
 //------------------------------------------------------
 // Methods
 //------------------------------------------------------
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress uninitMemberVar
 ChmSecureSock::ChmSecureSock(const char* CApath, const char* CAfile, bool is_verify_peer) : nss_ctx(NULL)
 {
 	if(!ChmSecureSock::InitLibrary(&nss_ctx, CApath, CAfile, is_verify_peer)){

@@ -629,8 +629,9 @@ bool ChmEventSock::RawReceiveAny(int sock, bool& is_closed, unsigned char* pbuff
 	is_closed = false;
 
 	// receive
-	ssize_t	onerecv;
 	while(true){
+		ssize_t	onerecv;
+
 		if(!is_blocking){
 			int	werr = ChmEventSock::WaitForReady(sock, WAIT_READ_FD, retrycnt, false, waittime);		// not check SO_ERROR
 			if(0 != werr){
@@ -820,6 +821,7 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 		}
 		return false;
 	}
+	// cppcheck-suppress unreadVariable
 	CHM_CLOSESOCK(ctlsock);
 
 	strResult = szReceive;
@@ -1209,8 +1211,10 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 	// the socket is left. Thus we must read more until EAGAIN. Otherwise we lost data.
 	// So we checked socket for rest data here.
 	//
-	bool		is_closed;
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress nullPointerRedundantCheck
 	suseconds_t	waittime = pSockObj->sock_wait_time;
+	bool		is_closed;
 	int			werr;
 	while(0 == (werr = ChmEventSock::WaitForReady(sock, WAIT_READ_FD, 0, false, waittime))){		// check rest data & return assap
 		// Processing
@@ -1290,6 +1294,8 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	// Make communication datas
 	//---------------------------------
 	// check target chmpxid map
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlSize
 	if(0 == pThis->mergeidmap.size()){
 		ERR_CHMPRN("There is no merge chmpxids.");
 		pThis->is_run_merge = false;
@@ -1613,6 +1619,9 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 		if(!pImData->GetSelfSsl(ssldata)){
 			ERR_CHMPRN("Failed to get SSL structure from self chmpx, but continue...");
 		}else{
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress noOperatorEq
+			// cppcheck-suppress noCopyConstructor
 			pSecureSock = new ChmSecureSock((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.verify_peer);
 
 			// Set SSL/TLS minimum version
@@ -1632,7 +1641,7 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 	// [NOTE]
 	// ChmEventSock must be initialized after initialize ChmIMData
 	//
-	if(!UpdateInternalData()){
+	if(!ChmEventSock::UpdateInternalData()){
 		ERR_CHMPRN("Could not initialize cache data for ImData, but continue...");
 	}
 }
@@ -1640,7 +1649,7 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 ChmEventSock::~ChmEventSock()
 {
 	// clear all
-	Clean();
+	ChmEventSock::Clean();
 }
 
 bool ChmEventSock::Clean(void)
@@ -1904,7 +1913,9 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != ctlsock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, ctlsock, NULL);
 		}
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(ctlsock);
 		return false;
 	}
@@ -2252,8 +2263,8 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 	}
 
 	// loop
-	size_t	slv_sockcnt	= 0;
 	for(sock = CHM_INVALID_SOCK; CHM_INVALID_SOCK == sock; ){
+		size_t	slv_sockcnt;
 		slv_sockcnt	= 0;
 
 		// at first, server socket
@@ -2352,6 +2363,7 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 					// can connect new sock
 					if(!RawConnectServer(chmpxid, sock, false, true) && CHM_INVALID_SOCK == sock){
 
+						// cppcheck-suppress stlSize
 						if(0 == socklist.size() && 0 == slv_sockcnt){
 							// no server socket and could not connect, and no slave socket, so no more try.
 							WAN_CHMPRN("Could not connect to server chmpxid(0x%016" PRIx64 ").", chmpxid);
@@ -2399,6 +2411,8 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 	bool	is_pack = false;
 	if(pbody && 0L < blength){
 		if(NULL == (pPacked = reinterpret_cast<PCOMPKT>(malloc(sizeof(COMPKT) + blength)))){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress invalidPrintfArgType_sint
 			ERR_CHMPRN("Could not allocate memory as %zd length.", sizeof(COMPKT) + blength);
 			return false;
 		}
@@ -2488,7 +2502,6 @@ bool ChmEventSock::Receive(int fd)
 		// the socket is left. Thus we must read more until EAGAIN. Otherwise we lost data.
 		// So we checked socket for rest data here.
 		//
-		bool		is_closed;
 		int			rtcode		= 0;
 		chmpxid_t	tgchmpxid	= GetAssociateChmpxid(fd);
 		chmpxid_t	chmpxid		= tgchmpxid;
@@ -2496,6 +2509,8 @@ bool ChmEventSock::Receive(int fd)
 		string		achname		= tgachname;
 		suseconds_t	waittime	= sock_wait_time;
 		do{
+			bool	is_closed;
+
 			chmpxid = GetAssociateChmpxid(fd);
 			achname	= GetAssociateAcceptHostName(fd);
 			if(tgchmpxid != chmpxid || tgachname != achname){
@@ -2985,6 +3000,7 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 	// check server socket count
 	socklist_t	socklist;
 	int			ctlsock = CHM_INVALID_SOCK;
+	// cppcheck-suppress stlSize
 	if(pImData->GetServerSocks(chmpxid, socklist, ctlsock) && 0 < socklist.size()){
 		MSG_CHMPRN("Caught Server Down notify(HUP) for chmpxid(0x%016" PRIx64 "), but this server still has some socket from this.", chmpxid);
 		return true;
@@ -3255,6 +3271,9 @@ bool ChmEventSock::CloseSSL(int sock, bool with_sock)
 		sslmap.erase(sock);
 	}
 	if(with_sock){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress uselessAssignmentPtrArg
+		// cppcheck-suppress uselessAssignmentArg
 		CHM_CLOSESOCK(sock);
 	}
 	return true;
@@ -3498,7 +3517,6 @@ bool ChmEventSock::ConnectServers(void)
 	for(chmpxpos_t pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, CHM_INVALID_CHMPXLISTPOS, false, false); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, pos, false, false)){
 		// get base information
 		string		name;
-		socklist_t	socklist;
 		short		port;
 		short		ctlport;
 		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
@@ -3719,11 +3737,12 @@ bool ChmEventSock::CheckRechainRing(chmpxid_t newchmpxid, bool& is_rechain)
 	}
 
 	chmpxpos_t	pos = selfpos;	// Start at self pos
-	string		name;
-	chmpxid_t	chmpxid;
-	short		port;
-	short		ctlport;
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
+		string		name;
+		chmpxid_t	chmpxid;
+		short		port;
+		short		ctlport;
+
 		chmpxid	= CHM_INVALID_CHMPXID;
 		port	= CHM_INVALID_PORT;
 		ctlport	= CHM_INVALID_PORT;
@@ -3789,10 +3808,11 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 	}
 
 	chmpxpos_t	pos = selfpos;	// Start at self pos
-	string		name;
-	short		port;
-	short		ctlport;
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
+		string	name;
+		short	port;
+		short	ctlport;
+
 		chmpxid	= CHM_INVALID_CHMPXID;
 		port	= CHM_INVALID_PORT;
 		ctlport	= CHM_INVALID_PORT;
@@ -3844,11 +3864,12 @@ bool ChmEventSock::IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t ne
 	}
 
 	chmpxpos_t	pos = selfpos;	// Start at self pos
-	string		name;
-	chmpxid_t	chmpxid;
-	short		port;
-	short		ctlport;
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
+		string		name;
+		chmpxid_t	chmpxid;
+		short		port;
+		short		ctlport;
+
 		chmpxid	= CHM_INVALID_CHMPXID;
 		port	= CHM_INVALID_PORT;
 		ctlport	= CHM_INVALID_PORT;
@@ -4755,12 +4776,14 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 		}
 
 		// Send
-		chmpxid_t	tmpchmpxid;
+		// cppcheck-suppress stlSize
 		while(0 < ex_chmpxids.size()){
+			chmpxid_t	tmpchmpxid;
+			PCOMPKT		pTmpPkt;
+			bool		is_duplicate;
+
 			tmpchmpxid = ex_chmpxids.front();
 
-			PCOMPKT	pTmpPkt;
-			bool	is_duplicate;
 			if(1 < ex_chmpxids.size()){
 				if(NULL == (pTmpPkt = ChmEventSock::DuplicateComPkt(pComPkt))){
 					ERR_CHMPRN("Could not duplicate COMPKT.");
@@ -4884,6 +4907,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	strlst_t	cmdarray;
+	// cppcheck-suppress stlSize
 	if(!str_paeser(pCommand, cmdarray) || 0 == cmdarray.size()){
 		ERR_CHMPRN("Something wrong %s command, because could not parse it.", pCommand);
 		return false;
@@ -4960,6 +4984,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SERVICE_OUT)){
 		// Service OUT(status is changed to delete pending)
 		//
+		// cppcheck-suppress stlSize
 		if(0 == cmdarray.size()){
 			ERR_CHMPRN("%s command must have parameter for server name/port.", strCommand.c_str());
 			strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
@@ -5012,6 +5037,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_TRACE_SET)){
 		// Trace dis/enable
 		//
+		// cppcheck-suppress stlSize
 		if(0 == cmdarray.size()){
 			ERR_CHMPRN("%s command must have parameter for enable/disable.", strCommand.c_str());
 			strResponse = CTL_RES_ERROR_TRACE_SET_PARAM;
@@ -5048,12 +5074,15 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			logtype_t	dirmask = CHMLOG_TYPE_UNKOWN;
 			logtype_t	devmask = CHMLOG_TYPE_UNKOWN;
 
+			// cppcheck-suppress stlSize
 			if(0 == cmdarray.size()){
 				MSG_CHMPRN("%s command does not have parameter, so use default value(dir=all, dev=all, count=all trace count).", strCommand.c_str());
 			}else{
+				// cppcheck-suppress stlSize
 				for(string strTmp = ""; 0 < cmdarray.size(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
+					// cppcheck-suppress stlIfStrFind
 					if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DIR));
 
@@ -5068,6 +5097,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 							isError	= true;
 							break;
 						}
+					// cppcheck-suppress stlIfStrFind
 					}else if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DEV));
 
@@ -5695,6 +5725,8 @@ bool ChmEventSock::MergeStart(void)
 				mergeidmap[*iter] = CHMPX_COM_REQ_UPDATE_INIVAL;
 			}
 		}
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress stlSize
 		if(0 == mergeidmap.size()){
 			// there is no server, so set status "DONE" here.
 			fullock::flck_unlock_noshared_mutex(&mergeidmap_lockval);		// UNLOCK

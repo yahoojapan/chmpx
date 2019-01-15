@@ -988,7 +988,7 @@ bool ChmCntrl::GetAllReplicateChmHashs(chmhash_t hash, chmhashlist_t& basehashs,
 {
 	if(!IsInitialized()){
 		ERR_CHMPRN("This object is not initialized yet.");
-		return -1L;
+		return false;
 	}
 	return ImData.GetServerChmHashsByHashs(hash, basehashs, with_pending, without_down, without_suspend);
 }

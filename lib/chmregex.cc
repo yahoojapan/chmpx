@@ -154,6 +154,7 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 	strlst_t	simple_regex_lst;
 	string		one_simple_regex;
 
+	// cppcheck-suppress stlSize
 	for(simple_regex_lst.push_back(trim(simple_regex)); 0 < simple_regex_lst.size(); ){
 		one_simple_regex = simple_regex_lst.front();
 		simple_regex_lst.pop_front();
@@ -237,6 +238,7 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 	string	strhost = hostname;
 
 	expand_lst.clear();
+	// cppcheck-suppress stlSize
 	if(!expand_simple_regex(strhost, expand_lst) || 0 == expand_lst.size()){
 		ERR_CHMPRN("Failed to expand simple regex.");
 		return false;

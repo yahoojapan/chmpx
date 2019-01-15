@@ -40,7 +40,7 @@ ChmEventBase::ChmEventBase(int eventqfd, ChmCntrl* pcntrl) : eqfd(eventqfd), pCh
 
 ChmEventBase::~ChmEventBase()
 {
-	Clean();
+	ChmEventBase::Clean();
 }
 
 bool ChmEventBase::Clean(void)

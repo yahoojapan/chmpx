@@ -116,9 +116,9 @@ class LapTime
 		struct timeval	start;
 
 	public:
-		static bool Toggle(void) { return LapTime::Set(!LapTime::isEnable); }
-		static bool Enable(void) { return LapTime::Set(true); }
-		static bool Disable(void) { return LapTime::Set(false); }
+		static bool Toggle(void) { return Set(!LapTime::isEnable); }
+		static bool Enable(void) { return Set(true); }
+		static bool Disable(void) { return Set(false); }
 		static bool IsEnable(void) { return isEnable; }
 
 		LapTime();
@@ -1029,6 +1029,7 @@ static bool ExecOptionParser(int argc, char** argv, option_t& opts, string& prgn
 		return false;
 	}
 	prgname = basename(argv[0]);
+	// cppcheck-suppress stlIfStrFind
 	if(0 == prgname.find("lt-")){
 		// cut "lt-"
 		prgname = prgname.substr(3);
@@ -1064,7 +1065,6 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 			if(isQuart){
 				// pattern: "...."
 				if('\"' == *pPos){
-					isQuart = false;
 					if(0 == isspace(*(pPos + sizeof(char))) && '\0' != *(pPos + sizeof(char))){
 						ERR("Quart is not matching.");
 						return false;
@@ -1104,7 +1104,6 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 			if(0 == isspace(*pPos)){
 				strParameter.clear();
 				isMakeParameter	= true;
-				isQuart			= false;
 
 				if('\"' == *pPos){
 					isQuart		= true;
@@ -1634,7 +1633,6 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 	}
 
 	char	byReceive[RECEIVE_LENGTH];
-	ssize_t	onerecv		= 0;
 	char*	pTotalBuff	= NULL;
 	size_t	totallength = RECEIVE_LENGTH * 2;
 	ssize_t	pos			= 0;
@@ -1646,6 +1644,8 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 
 	// receive
 	while(true){
+		ssize_t	onerecv;
+
 		if(-1 == (onerecv = recv(sock, byReceive, RECEIVE_LENGTH, 0))){
 			if(EINTR == errno){
 				MSG("Interrupted signal during receiving from sock(%d), errno=%d(EINTR).", sock, errno);
@@ -1702,7 +1702,7 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 				return false;
 			}
 			pTotalBuff	= pTmp;
-			totallength = static_cast<size_t>(pos + 1);
+			//totallength = static_cast<size_t>(pos + 1);
 		}
 		pTotalBuff[pos]	= '\0';
 	}
@@ -2076,7 +2076,6 @@ static void* SendDumpCommandThread(void* param)
 	//
 	// Loop
 	//
-	string	strResult;
 	for(pdumpnodereslist_t::iterator iter = pThParam->presults.begin(); *(pThParam->pis_run) && iter != pThParam->presults.end(); ++iter){
 		PDUMPNODERES	pnoderes = *iter;
 		if(!SendCommandToControlPort(pnoderes->hostname.c_str(), pnoderes->ctrlport, "DUMP", pnoderes->strResult)){
@@ -2099,6 +2098,7 @@ static void* SendDumpCommandThread(void* param)
 //
 static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 {
+	// cppcheck-suppress stlSize
 	if(0 == nodes.size()){
 		ERR("Parameter is wrong.");
 		return false;
@@ -2130,6 +2130,8 @@ static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 
 	if(0 == nThreadCount){
 		// This case is no thread mode, then call function directly.
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		is_run = true;
 		SendDumpCommandThread(&pthparam[0]);
 	}
@@ -2191,9 +2193,6 @@ static string ReplaceString(const string& strBase, const string& strOrg, const s
 static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& strParsed, bool is_server, bool& is_error)
 {
 	string				strInput = strParsed;
-	string				name;
-	string				strctrlport;
-	short				ctrlport;
 	string::size_type	pos;
 
 	is_error = false;
@@ -2207,8 +2206,14 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
+	// cppcheck-suppress stlIfStrFind
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
+		string	name;
+		string	strctrlport;
+		short	ctrlport;
+
 		// "[XX]={\n"
+		// cppcheck-suppress stlIfStrFind
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
@@ -2279,6 +2284,7 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 			return strInput;
 		}
 	}
+	// cppcheck-suppress stlIfStrFind
 	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		is_error = true;
@@ -2420,7 +2426,7 @@ static long GetCountFromSockString(const string& sockval)
 //
 // parse NODEUNITDATA from dump result
 //
-static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& excepthost, short exceptport, bool is_in_array, bool is_sock_from, bool& is_found_except, bool is_error, const string& strDump)
+static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& excepthost, short exceptport, bool is_in_array, bool is_sock_from, bool& is_found_except, bool& is_error, const string& strDump)
 {
 	string				strInput = strDump;
 	string				name;
@@ -2589,7 +2595,6 @@ static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& 
 static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& unitdatas, const string& excepthost, short exceptport, bool is_sock_from, const string& strDump)
 {
 	string				strInput = strDump;
-	string				name;
 	string::size_type	pos;
 
 	// must start with "{\n"
@@ -2600,8 +2605,10 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
+	// cppcheck-suppress stlIfStrFind
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
+		// cppcheck-suppress stlIfStrFind
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
@@ -2628,6 +2635,7 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 		string		hostport= MakeHostCtrlport(unitdata.hostname, unitdata.ctrlport);
 		unitdatas[hostport]	= unitdata;
 	}
+	// cppcheck-suppress stlIfStrFind
 	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		return strInput;
@@ -3564,6 +3572,8 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 
 		// Get Server Name as "VerifyPeer="
 		string	strIsVerify;
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress stlIfStrFind
 		if(isSSL && 0 == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
 			strInput = strInput.substr(pos + strlen(ALLSTATUS_KEY_ISVERIFY));
 			if(string::npos == (pos = strInput.find(ALLSTATUS_KEY_CR))){
@@ -3715,33 +3725,25 @@ static string MakeNodeStatusResult(const string& status, const CHKRESULT_PART& c
 	if(strStatusPart == "SLAVE"){
 		if(CHKRESULT_NOERR == checkresult.result_status_ring){
 			strOutput += string("[") + GREEN("SLAVE")				+ string("]      ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_ring){
-			strOutput += string("[") + BG_GREEN("SLAVE", true, true)+ string("]      ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_ring
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_ring
 			strOutput += string("[") + BG_GREEN("SLAVE", true, true)+ string("]      ");
 		}
 	}else if(strStatusPart == "SERVICEOUT"){
 		if(CHKRESULT_NOERR == checkresult.result_status_ring){
 			strOutput += string("[") + RED("SERVICE OUT")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_ring){
-			strOutput += string("[") + BG_RED("SERVICE OUT", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_ring
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_ring
 			strOutput += string("[") + BG_RED("SERVICE OUT", true, true)+ string("]");
 		}
 	}else if(strStatusPart == "SERVICEIN"){
 		if(CHKRESULT_NOERR == checkresult.result_status_ring){
 			strOutput += string("[") + GREEN("SERVICE IN")					+ string("] ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_ring){
-			strOutput += string("[") + BG_GREEN("SERVICE IN", true, true)	+ string("] ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_ring
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_ring
 			strOutput += string("[") + BG_GREEN("SERVICE IIN", true, true)	+ string("] ");
 		}
 	}else{
 		if(CHKRESULT_NOERR == checkresult.result_status_ring){
 			strOutput += string("[") + RED("UNKNOWN")				+ string("]    ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_ring){
-			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]    ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_ring
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_ring
 			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]    ");
 		}
 	}
@@ -3750,25 +3752,19 @@ static string MakeNodeStatusResult(const string& status, const CHKRESULT_PART& c
 	if(strStatusPart == "UP"){
 		if(CHKRESULT_NOERR == checkresult.result_status_live){
 			strOutput += string("[") + GREEN("UP")					+ string("]    ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_live){
-			strOutput += string("[") + BG_GREEN("UP", true, true)	+ string("]    ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_live
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_live
 			strOutput += string("[") + BG_GREEN("UP", true, true)	+ string("]    ");
 		}
 	}else if(strStatusPart == "DOWN"){
 		if(CHKRESULT_NOERR == checkresult.result_status_live){
 			strOutput += string("[") + RED("DOWN")					+ string("]  ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_live){
-			strOutput += string("[") + BG_RED("DOWN", true, true)	+ string("]  ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_live
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_live
 			strOutput += string("[") + BG_RED("DOWN", true, true)	+ string("]  ");
 		}
 	}else{
 		if(CHKRESULT_NOERR == checkresult.result_status_live){
 			strOutput += string("[") + RED("UNKNOWN")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_live){
-			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_live
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_live
 			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
 		}
 	}
@@ -3777,33 +3773,25 @@ static string MakeNodeStatusResult(const string& status, const CHKRESULT_PART& c
 	if(strStatusPart == "n/a"){
 		if(CHKRESULT_NOERR == checkresult.result_status_act){
 			strOutput += string("[") + GREEN("n/a")					+ string("]    ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_act){
-			strOutput += string("[") + BG_GREEN("n/a", true, true)	+ string("]    ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_act
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_act
 			strOutput += string("[") + BG_GREEN("n/a", true, true)	+ string("]    ");
 		}
 	}else if(strStatusPart == "ADD"){
 		if(CHKRESULT_NOERR == checkresult.result_status_act){
 			strOutput += string("[") + YELLOW("ADD")				+ string("]    ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_act){
-			strOutput += string("[") + BG_YELLOW("ADD", true, true)	+ string("]    ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_act
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_act
 			strOutput += string("[") + BG_YELLOW("ADD", true, true)	+ string("]    ");
 		}
 	}else if(strStatusPart == "DELETE"){
 		if(CHKRESULT_NOERR == checkresult.result_status_act){
 			strOutput += string("[") + YELLOW("DELETE")					+ string("]  ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_act){
-			strOutput += string("[") + BG_YELLOW("DELETE", true, true)	+ string("]  ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_act
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_act
 			strOutput += string("[") + BG_YELLOW("DELETE", true, true)	+ string("]  ");
 		}
 	}else{
 		if(CHKRESULT_NOERR == checkresult.result_status_act){
 			strOutput += string("[") + RED("UNKNOWN")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_act){
-			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_act
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_act
 			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
 		}
 	}
@@ -3812,41 +3800,31 @@ static string MakeNodeStatusResult(const string& status, const CHKRESULT_PART& c
 	if(strStatusPart == "Nothing"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + GREEN("Nothing")					+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_GREEN("Nothing", true, true)	+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_GREEN("Nothing", true, true)	+ string("]");
 		}
 	}else if(strStatusPart == "Pending"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + MAGENTA("Pending")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_MAGENTA("Pending", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_MAGENTA("Pending", true, true)+ string("]");
 		}
 	}else if(strStatusPart == "Doing"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + YELLOW("Doing")					+ string("]  ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_YELLOW("Doing", true, true)	+ string("]  ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_YELLOW("Doing", true, true)	+ string("]  ");
 		}
 	}else if(strStatusPart == "Done"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + BLUE("Done")					+ string("]   ");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_BLUE("Done", true, true)	+ string("]   ");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_BLUE("Done", true, true)	+ string("]   ");
 		}
 	}else{
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + RED("UNKNOWN")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_RED("UNKNOWN", true, true)+ string("]");
 		}
 	}
@@ -3855,25 +3833,19 @@ static string MakeNodeStatusResult(const string& status, const CHKRESULT_PART& c
 	if(strStatusPart == "Suspend"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + RED("Suspend")					+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_RED("Suspend", true, true)	+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_RED("Suspend", true, true)	+ string("]");
 		}
 	}else if(strStatusPart == "NoSuspend"){
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + GREEN("NoSuspend")				+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_GREEN("NoSuspend", true, true)+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_GREEN("NoSuspend", true, true)+ string("]");
 		}
 	}else{
 		if(CHKRESULT_NOERR == checkresult.result_status_opr){
 			strOutput += string("[") + RED("UNKNOWN")					+ string("]");
-		}else if(CHKRESULT_WARN == checkresult.result_status_opr){
-			strOutput += string("[") + BG_RED("UNKNOWN", true, true)	+ string("]");
-		}else{	// CHKRESULT_ERR == checkresult.result_status_opr
+		}else{	// CHKRESULT_WARN or CHKRESULT_ERR == checkresult.result_status_opr
 			strOutput += string("[") + BG_RED("UNKNOWN", true, true)	+ string("]");
 		}
 	}
@@ -3999,15 +3971,6 @@ static string CvtOneNodeStatusResults(nodechkresults_t& results)
 	// servers
 	nodesunits_t::const_iterator	iter_unit;
 	for(iter_unit = iter->second.all.servers.begin(); iter_unit != iter->second.all.servers.end(); ++iter_unit){
-		// head
-		string	strTmpHead;
-		if(CHKRESULT_NOERR == iter_unit->second.checkresult.summarize()){
-			strTmpHead = BG_GREEN("OK") + string("   ");
-		}else if(CHKRESULT_WARN == iter_unit->second.checkresult.summarize()){
-			strTmpHead = BG_YELLOW("WARN", true, true) + string(" ");
-		}else{	// CHKRESULT_ERR == iter_unit->second.checkresult.summarize()
-			strTmpHead = BG_RED("ERR", true, true) + string("  ");
-		}
 		// one node
 		strOutput += string("  ") + BOLD(iter_unit->first) + string(" = {\n");
 		strOutput += string("    status            = ") + MakeNodeStatusResult(iter_unit->second.status, iter_unit->second.checkresult) + string("\n");
@@ -4019,15 +3982,6 @@ static string CvtOneNodeStatusResults(nodechkresults_t& results)
 
 	// servers
 	for(iter_unit = iter->second.all.slaves.begin(); iter_unit != iter->second.all.slaves.end(); ++iter_unit){
-		// head
-		string	strTmpHead;
-		if(CHKRESULT_NOERR == iter_unit->second.checkresult.summarize()){
-			strTmpHead = BG_GREEN("OK") + string("   ");
-		}else if(CHKRESULT_WARN == iter_unit->second.checkresult.summarize()){
-			strTmpHead = BG_YELLOW("WARN", true, true) + string(" ");
-		}else{	// CHKRESULT_ERR == iter_unit->second.checkresult.summarize()
-			strTmpHead = BG_RED("ERR", true, true) + string("  ");
-		}
 		// one node
 		strOutput += string("  ") + BOLD(iter_unit->first) + string(" = {\n");
 		strOutput += string("    status            = ") + MakeNodeStatusResult(iter_unit->second.status, iter_unit->second.checkresult) + string("\n");
@@ -4050,11 +4004,11 @@ static string CvtOneNodeStatusResults(nodechkresults_t& results)
 //
 static bool ReadLine(int fd, string& line)
 {
-	char	szBuff;
-	ssize_t	readlength;
-
 	line.erase();
 	while(true){
+		char	szBuff;
+		ssize_t	readlength;
+
 		szBuff = '\0';
 		// read one character
 		if(-1 == (readlength = read(fd, &szBuff, 1))){
@@ -4514,7 +4468,6 @@ static bool ServiceOutCommand(params_t& params)
 
 	// send "SERVICEOUT" command to all host
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
-		string	strResult;
 		if(!SendCommandToControlPort(iter->hostname.c_str(), iter->ctrlport, strCommand.c_str(), strResult)){
 			WAN("Failed to send SERVICEOUT command to %s:%d, but retry to send another node.", iter->hostname.c_str(), iter->ctrlport);
 		}else{
@@ -4746,6 +4699,7 @@ static bool VersionCommand(params_t& params)
 	get_chmpx_nodes(is_dyna_nodes ? TargetNodes : InitialAllNodes, slvnodes, false);
 
 	PRN(" Chmpx server nodes             : %zu", svrnodes.size());
+	// cppcheck-suppress stlSize
 	if(0 < svrnodes.size()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = svrnodes.begin(); iter != svrnodes.end(); ++iter){
@@ -4755,6 +4709,7 @@ static bool VersionCommand(params_t& params)
 		PRN(" }");
 	}
 	PRN(" Chmpx slave nodes              : %zu", slvnodes.size());
+	// cppcheck-suppress stlSize
 	if(0 < slvnodes.size()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = slvnodes.begin(); iter != slvnodes.end(); ++iter){
@@ -4928,6 +4883,7 @@ static bool HistoryCommand(ConsoleInput& InputIF)
 	const strarr_t&	history = InputIF.GetAllHistory();
 
 	int	nCnt = 1;
+	// cppcheck-suppress postfixOperator
 	for(strarr_t::const_iterator iter = history.begin(); iter != history.end(); iter++, nCnt++){
 		PRN(" %d  %s", nCnt, iter->c_str());
 	}
@@ -5144,6 +5100,7 @@ static bool SaveCommand(ConsoleInput& InputIF, params_t& params)
 	}
 
 	const strarr_t&	history = InputIF.GetAllHistory();
+	// cppcheck-suppress postfixOperator
 	for(strarr_t::const_iterator iter = history.begin(); iter != history.end(); iter++){
 		// check except command for writing file
 		if(	0 == strncasecmp(iter->c_str(), "his",		strlen("his"))		||
@@ -5353,6 +5310,8 @@ static bool CommandStringHandle(ConsoleInput& InputIF, const char* pCommand, boo
 	if(!LineOptionParser(pCommand, opts)){
 		return true;	// for continue.
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlSize
 	if(0 == opts.size()){
 		return true;
 	}
