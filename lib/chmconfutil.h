@@ -73,7 +73,7 @@ typedef struct chm_yaml_data_pair_type{
 	yaml_event_type_t	first;
 	yaml_event_type_t	second;
 
-	chm_yaml_data_pair_type(yaml_event_type_t first_type = YAML_NO_EVENT) : first(first_type), second(YAML_NO_EVENT) {}
+	explicit chm_yaml_data_pair_type(yaml_event_type_t first_type = YAML_NO_EVENT) : first(first_type), second(YAML_NO_EVENT) {}
 
 }CHM_YAML_DATAPAIR;
 

@@ -117,7 +117,7 @@ class ChmThread
 		bool WaitExitThread(PCHMTHWP_PARAM thread_param);
 
 	public:
-		ChmThread(const char* pname = NULL);
+		explicit ChmThread(const char* pname = NULL);
 		virtual ~ChmThread();
 
 		bool HasThread(void) const { return (0 < chmthlist.size()); }

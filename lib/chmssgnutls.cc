@@ -64,7 +64,7 @@ typedef struct chm_gnutls_ss_context{
 		strServerCert(CHMEMPTYSTR(pServerCert) ? "" : pServerCert), strServerPKey(CHMEMPTYSTR(pServerPKey) ? "" : pServerPKey), strSlaveCert(CHMEMPTYSTR(pSlaveCert) ? "" : pSlaveCert), strSlavePKey(CHMEMPTYSTR(pSlavePKey) ? "" : pSlavePKey)
 	{
 	}
-	chm_gnutls_ss_context(const struct chm_gnutls_ss_context* other) :
+	explicit chm_gnutls_ss_context(const struct chm_gnutls_ss_context* other) :
 		strServerCert(other ? other->strServerCert : ""), strServerPKey(other ? other->strServerPKey : ""), strSlaveCert(other ? other->strSlaveCert : ""), strSlavePKey(other ? other->strSlavePKey : "")
 	{
 	}
@@ -103,6 +103,9 @@ typedef struct chm_gnutls_ss_context{
 // variables but it is not used now. If you do not use default, you can set
 // gnutls_priority_t value.
 //
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress noOperatorEq
+// cppcheck-suppress noCopyConstructor
 typedef struct chm_gnutls_session{
 	bool								is_server;
 	ChmSSCtx							SSCtx;
@@ -113,6 +116,9 @@ typedef struct chm_gnutls_session{
 	chm_gnutls_session(bool is_svr = false, ChmSSCtx ctx = NULL, gnutls_certificate_credentials_t cert = NULL, gnutls_session_t ses = NULL, gnutls_priority_t pricache = NULL) :
 		is_server(is_svr), SSCtx(NULL), cert_cred(cert), session(ses), priority_cache(pricache)
 	{
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress noOperatorEq
+		// cppcheck-suppress noCopyConstructor
 		SSCtx = new ChmSSCtxEnt(ctx);
 	}
 
@@ -431,6 +437,9 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 	ChmSSSessionEnt*	ssl = reinterpret_cast<ChmSSSessionEnt*>(sslsession);
 
 	if(CHMEVENTSOCK_RETRY_DEFAULT == retrycnt){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress uselessAssignmentPtrArg
+		// cppcheck-suppress uselessAssignmentArg
 		retrycnt = ChmEventSock::DEFAULT_RETRYCNT;
 		waittime = ChmEventSock::DEFAULT_WAIT_SOCKET;
 	}

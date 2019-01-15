@@ -117,18 +117,18 @@ static bool TestServerSide(ChmCntrl& chmobj)
 	string		strVal;
 	string		strRVal;
 	string		strRVal8192;
-	char		buff;
-	int			ival;
-	long		lval;
-	bool		is_reply;
-	bool		is_error;
 	for(int cnt = 0; cnt < 256; ++cnt){
 		strRVal8192 += STREAM_VAL32_STR;
 	}
 
 	while(true){
+		char	buff;
+		int		ival;
+		long	lval;
+		bool	is_reply;
+		bool	is_error;
+
 		is_error = false;
-		is_reply = false;
 		buff	= '\0';
 		ival	= -1;
 		lval	= -1;
