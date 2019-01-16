@@ -9,7 +9,7 @@
  * library.
  * CHMPX transfers messages between the client and the server/
  * slave. CHMPX based servers are dispersed by consistent
- * hashing and are automatically layouted. As a result, it
+ * hashing and are automatically laid out. As a result, it
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view

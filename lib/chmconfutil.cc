@@ -9,7 +9,7 @@
  * library.
  * CHMPX transfers messages between the client and the server/
  * slave. CHMPX based servers are dispersed by consistent
- * hashing and are automatically layouted. As a result, it
+ * hashing and are automatically laid out. As a result, it
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
@@ -294,7 +294,7 @@ CHMCONFTYPE check_chmconf_type_ex(const char* config, const char* env_conf_name,
 														YAML_SCALAR_EVENT			== type ? YAML_SCALAR_EVENT			: \
 														YAML_ALIAS_EVENT			== type ? YAML_ALIAS_EVENT			: YAML_NO_EVENT	)
 
-#define	CHMYAML_STACK_CEHCK_SYMMETRY_TYPE(type1, type2)	(type1 == CHMYAML_STACK_GET_SYMMETRY_TYPE(type2))
+#define	CHMYAML_STACK_CHECK_SYMMETRY_TYPE(type1, type2)	(type1 == CHMYAML_STACK_GET_SYMMETRY_TYPE(type2))
 
 #define	CHMYAML_STACK_IS_EMPTY							(0 >= stack.size())
 #define	CHMYAML_STACK_FIRST								(stack[stack.size() - 1].first)
@@ -319,7 +319,7 @@ bool CHMYamlDataStack::add(const yaml_event_type_t& type)
 				ERR_CHMPRN("Yaml parser stack : there is no start section before end section type.")
 				return false;
 			}else{
-				if(CHMYAML_STACK_CEHCK_SYMMETRY_TYPE(type, CHMYAML_STACK_FIRST)){
+				if(CHMYAML_STACK_CHECK_SYMMETRY_TYPE(type, CHMYAML_STACK_FIRST)){
 					ERR_CHMPRN("Yaml parser stack : there is no symmetry section for type.")
 					return false;
 				}
@@ -361,7 +361,7 @@ bool CHMYamlDataStack::add(const yaml_event_type_t& type)
 				return false;
 
 			}else if(!CHMYAML_STACK_IS_NOTYPE(CHMYAML_STACK_SECOND)){
-				if(CHMYAML_STACK_CEHCK_SYMMETRY_TYPE(type, CHMYAML_STACK_SECOND)){
+				if(CHMYAML_STACK_CHECK_SYMMETRY_TYPE(type, CHMYAML_STACK_SECOND)){
 					stack.pop_back();
 
 				}else if(CHMYAML_STACK_IS_CLOSED_TYPE(CHMYAML_STACK_SECOND)){
@@ -374,7 +374,7 @@ bool CHMYamlDataStack::add(const yaml_event_type_t& type)
 					return false;
 				}
 			}else{												// CHMYAML_STACK_SECOND is empty
-				if(CHMYAML_STACK_CEHCK_SYMMETRY_TYPE(type, CHMYAML_STACK_FIRST)){
+				if(CHMYAML_STACK_CHECK_SYMMETRY_TYPE(type, CHMYAML_STACK_FIRST)){
 					CHMYAML_STACK_SET_FIRST(type);
 
 				}else if(CHMYAML_STACK_IS_CLOSED_TYPE(CHMYAML_STACK_FIRST)){
