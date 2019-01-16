@@ -10,11 +10,11 @@ CHMPX is made for the purpose of the construction of original
 messaging system and the offer of the client library. CHMPX
 transfers messages between the client and the server/slave. CHMPX
 based servers are dispersed by consistent hashing and are automatically
-layouted. As a result, it provides a high performance, a high
+laid out. As a result, it provides a high performance, a high
 scalability.
 
 ### CHMPX is following specifications.
-  - Build up cluster with uniq name by some servers.
+  - Build up cluster with unique name by some servers.
   - Layouts servers in cluster by consistent hashing.
   - Supports interprocess communication across the servers.
   - Supports synchronous/asynchronous communication.
