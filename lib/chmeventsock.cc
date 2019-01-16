@@ -9,7 +9,7 @@
  * library.
  * CHMPX transfers messages between the client and the server/
  * slave. CHMPX based servers are dispersed by consistent
- * hashing and are automatically layouted. As a result, it
+ * hashing and are automatically laid out. As a result, it
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
@@ -5396,7 +5396,7 @@ bool ChmEventSock::MergeDone(void)
 		}
 	}
 
-	// if the mode for merge is automatical, do complete here.
+	// if the mode is automatically merging, do complete here.
 	if(IsAutoMerge()){
 		if(!RequestMergeComplete()){
 			ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, DO COMPMERGE BY MANUAL!");

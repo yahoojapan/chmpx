@@ -9,7 +9,7 @@
  * library.
  * CHMPX transfers messages between the client and the server/
  * slave. CHMPX based servers are dispersed by consistent
- * hashing and are automatically layouted. As a result, it
+ * hashing and are automatically laid out. As a result, it
  * provides a high performance, a high scalability.
  *
  * For the full copyright and license information, please view
@@ -501,7 +501,7 @@ void chmpx_print_version(FILE* stream)
 		"messaging system and the offer of the client library. CHMPX\n"
 		"transfers messages between the client and the server/slave. CHMPX\n"
 		"based servers are dispersed by consistent hashing and are\n"
-		"automatically layouted. As a result, it provides a high performance,\n"
+		"automatically laid out. As a result, it provides a high performance,\n"
 		"a high scalability.\n"
 		"\n";
 	fprintf(stream, format, VERSION, chmpx_commit_hash, ChmSecureSock::LibraryName());
