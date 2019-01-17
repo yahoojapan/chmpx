@@ -1,3 +1,11 @@
+chmpx (1.0.67) unstable; urgency=low
+
+  * Fixed misspelling, and etc - #20
+  * Added check using cppcheck - #19
+  * Reflected the spelling check result for all sources - #18
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 17 Jan 2019 10:06:43 +0900
+
 chmpx (1.0.66) unstable; urgency=low
 
   * Fixed build warning about comparison of pointer with integer
