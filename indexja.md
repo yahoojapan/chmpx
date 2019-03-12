@@ -17,7 +17,9 @@ arrow_link_tools: <a href="toolsja.html" class="link-title"><span class="arrow-b
 
 # **CHMPX**
 **CHMPX** (**C**onsistent **H**ashing **M**q in**P**rocess data e**X**change) は、ネットワークを跨ぐプロセス間におけるバイナリ通信を行うための通信ミドルウエアです。
-**CHMPX** は、Yahoo! JAPANがオープンソースとして公開するプロダクト [AntPickax](https://antpick.ax/indexja.html) のひとつです。
+**CHMPX** は、Yahoo! JAPANがオープンソースとして公開するプロダクト [AntPickax](https://antpick.ax/indexja.html) のひとつです。  
+
+![CHMPX](images/top_chmpx.png)
 
 ## {{ page.arrow_link_overview }}
 **CHMPX** の[概要](homeja.html)について説明します。  
