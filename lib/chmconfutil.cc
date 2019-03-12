@@ -296,7 +296,7 @@ CHMCONFTYPE check_chmconf_type_ex(const char* config, const char* env_conf_name,
 
 #define	CHMYAML_STACK_CHECK_SYMMETRY_TYPE(type1, type2)	(type1 == CHMYAML_STACK_GET_SYMMETRY_TYPE(type2))
 
-#define	CHMYAML_STACK_IS_EMPTY							(0 >= stack.size())
+#define	CHMYAML_STACK_IS_EMPTY							stack.empty()
 #define	CHMYAML_STACK_FIRST								(stack[stack.size() - 1].first)
 #define	CHMYAML_STACK_SECOND							(stack[stack.size() - 1].second)
 #define	CHMYAML_STACK_SET_FIRST(type)					stack[stack.size() - 1].first	= type

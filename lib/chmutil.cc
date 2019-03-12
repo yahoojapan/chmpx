@@ -252,7 +252,7 @@ unsigned char* chm_read(int fd, size_t* psize)
 
 	size_t			buffsize = DEFAULT_READ_BUFF_SIZE;
 	unsigned char*	pbuff;
-	if(NULL == (pbuff = reinterpret_cast<unsigned char*>(malloc(buffsize * sizeof(unsigned char))))){
+	if(NULL == (pbuff = reinterpret_cast<unsigned char*>(malloc(DEFAULT_READ_BUFF_SIZE * sizeof(unsigned char))))){
 		ERR_CHMPRN("Could not allocation memory.");
 		return NULL;
 	}
