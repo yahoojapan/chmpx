@@ -158,6 +158,7 @@ bool ChmEventMq::InitializeMaxMqSystemSize(long maxmsg)
 		}
 		long	current = static_cast<long>(atoi(pbuff));
 		CHM_Free(pbuff);
+		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 
@@ -789,9 +790,9 @@ msgid_t ChmEventMq::ActivatedMsgId(void)
 	while(!fullock::flck_trylock_noshared_mutex(&actmq_lockval));	// LOCK
 
 	// does have reserve MQ?
-	if(0 >= reserve_idfd_map.count()){
+	if(0 == reserve_idfd_map.count()){
 		// get reserve MQ
-		if(!SetEventQueue() || 0 >= reserve_idfd_map.count()){
+		if(!SetEventQueue() || 0 == reserve_idfd_map.count()){
 			ERR_CHMPRN("Failed to increase reserve MQ.");
 			fullock::flck_unlock_noshared_mutex(&actmq_lockval);	// UNLOCK
 			return CHM_INVALID_MSGID;
@@ -2864,7 +2865,11 @@ bool ChmEventMq::PxCltSendJoinNotify(pid_t pid)
 	PPXCLT_JOIN_NOTIFY	pJoinNotify	= CVT_CLTPTR_JOIN_NOTIFY(pCltAll);
 	SET_PXCLTPKT(pComPkt, pChmCntrl->IsChmpxType(), CHMPX_CLT_JOIN_NOTIFY, dept_msgid, term_msgid, GetSerialNumber(), 0);
 
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress redundantAssignment
 	pComPkt->head.dept_ids.chmpxid	= selfchmpxid;					// do not case for this value.
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress redundantAssignment
 	pComPkt->head.term_ids.chmpxid	= selfchmpxid;
 	pJoinNotify->head.type			= CHMPX_CLT_JOIN_NOTIFY;
 	pJoinNotify->head.length		= SIZEOF_CHMPX_CLT(CHMPX_CLT_JOIN_NOTIFY);
