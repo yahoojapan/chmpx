@@ -11,14 +11,13 @@ CHMPX
 CHMPX - Consistent Hashing Mq inProcess data eXchange
 
 ### Overview
-CHMPX is inprocess data exchange by MQ with consistent hashing system,
-and libraries for clients by Yahoo! JAPAN.
-CHMPX is made for the purpose of the construction of original
-messaging system and the offer of the client library. CHMPX
-transfers messages between the client and the server/slave. CHMPX
-based servers are dispersed by consistent hashing and are automatically
-laid out. As a result, it provides a high performance, a high
-scalability.
+CHMPX is inprocess data exchange by MQ with consistent hashing system, and libraries for clients by Yahoo! JAPAN.  
+CHMPX is made for the purpose of the construction of original messaging system and the offer of the client library.  
+CHMPX transfers messages between the client and the server/slave.  
+CHMPX based servers are dispersed by consistent hashing and are automatically laid out.  
+As a result, it provides a high performance, a high scalability.  
+
+![CHMPX](https://chmpx.antpick.ax/images/top_chmpx.png)
 
 ### Feature
   - Build up cluster with unique name by some servers.
