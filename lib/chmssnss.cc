@@ -1057,13 +1057,13 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 	}
 	//ChmSSSessionEnt*	session = reinterpret_cast<ChmSSSessionEnt*>(sslsession);		// not used
 
+	// Now not use these value
+	/*
 	if(CHMEVENTSOCK_RETRY_DEFAULT == retrycnt){
-		// cppcheck-suppress unmatchedSuppression
-		// cppcheck-suppress uselessAssignmentPtrArg
-		// cppcheck-suppress uselessAssignmentArg
 		retrycnt = ChmEventSock::DEFAULT_RETRYCNT;
 		waittime = ChmEventSock::DEFAULT_WAIT_SOCKET;
 	}
+	*/
 
 	bool	result = true;
 	if(action_result < 0){

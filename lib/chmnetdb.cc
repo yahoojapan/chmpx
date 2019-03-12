@@ -330,8 +330,7 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, string& strhostname, strin
 	hints.ai_socktype	= SOCK_STREAM;
 
 	// target -> addrinfo
-	if(0 != (result = getaddrinfo(target, NULL, &hints, &res_info)) || !res_info){				// port is NULL
-		//MSG_CHMPRN("Could not get addrinfo from %s, errno=%d.", target, result);
+	if(0 != getaddrinfo(target, NULL, &hints, &res_info) || !res_info){				// port is NULL
 		return false;
 	}
 
