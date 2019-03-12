@@ -17,7 +17,7 @@ next_string:
 CHMPX has the following tools for managing CHMPX processes and clusters.
 
 ## chmpxstatus
-This tool is a tool for checking the status of all CHMPX server nodes and slave nodes including CHPX process itself.  
+This tool is a tool for checking the status of all CHMPX server nodes and slave nodes including CHMPX process itself.  
 CHMPX stores the state of all the CHMPX nodes of the process in shared memory.  
 This tool is a tool for getting state from this shared memory, without affecting the CHMPX process.  
 This tool can display the status of the CHMPX process itself(default) or the status of all other CHMPX processes connected by this CHMPX process.  

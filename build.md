@@ -53,7 +53,7 @@ This section instructs how to install each dependent library and the header file
 
 **Note**: Skip reading this section if you have installed each dependent library and the header files from [GitHub](https://github.com/yahoojapan) in the previous section.
 
-**Note**: As I descripbed in the previous section, [K2HASH Build](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
+**Note**: As I described in the previous section, [K2HASH Build](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
 
 For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
 ```bash
@@ -110,13 +110,13 @@ After successfully installing **CHMPX**, you will see the **CHMPX** help text:
 ```bash
 $ chmpx -h
 [Usage]
-chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]
+chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
 chmpx [ -h | -v ]
 
 [option]
-  -conf <path>         specify the configration file(.ini .yaml .json) path
-  -json <json string>  specify the configration json string
-  -ctlport <port>      specify the self contrl port(*)
+  -conf <path>         specify the configuration file(.ini .yaml .json) path
+  -json <json string>  specify the configuration json string
+  -ctlport <port>      specify the self control port(*)
   -d <param>           specify the debugging output mode:
                         silent - no output
                         err    - output error level
@@ -135,5 +135,5 @@ chmpx [ -h | -v ]
 
 (*) if ctlport option is specified, chmpx searches same ctlport in configuration
     file and ignores "CTLPORT" directive in "GLOBAL" section. and chmpx will
-    start in the mode indicated by the server entry that has beed detected.
+    start in the mode indicated by the server entry that has been detected.
 ```

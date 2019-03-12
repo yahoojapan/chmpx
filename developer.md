@@ -203,7 +203,7 @@ if(!chmpx_destroy(handle)){
 - bool chmpx_svr_broadcast_ex(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool chmpx_svr_replicate(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash)
 - bool chmpx_svr_replicate_ex(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
-- bool chmpx_svr_recieve(chmpx_h handle, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms, bool no_giveup_rejoin)
+- bool chmpx_svr_receive(chmpx_h handle, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms, bool no_giveup_rejoin)
 
 #### Description
 - chmpx_svr_send  
@@ -216,7 +216,7 @@ if(!chmpx_destroy(handle)){
   It sends data to all servers.(Refer to the note)
 - chmpx_svr_replicate / chmpx_svr_replicate_ex  
   It sends data to the server equivalent to the specified HASH (taking into consideration the replication and merge status).(Refer to the note)
-- chmpx_svr_recieve  
+- chmpx_svr_receive  
   Receive data.
 
 #### Parameters
@@ -272,7 +272,7 @@ if(CHM_INVALID_HANDLE == (handle = chmpx_create("myconffile", true, true))){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_svr_recieve(handle, &pckthandle, &pbody, &length, 100, true)){
+if(!chmpx_svr_receive(handle, &pckthandle, &pbody, &length, 100, true)){
     chmpx_destroy(handle);
     return false;
 }
@@ -295,12 +295,12 @@ if(!chmpx_destroy(handle)){
 
 - msgid_t chmpx_open(chmpx_h handle, bool no_giveup_rejoin)
 - bool chmpx_close(chmpx_h handle, msgid_t msgid)
-- bool chmpx_msg_send(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt, bool is_routing)
-- bool chmpx_msg_send_kvp(chmpx_h handle, msgid_t msgid, const PCHMKVP pkvp, long* precievercnt, bool is_routing)
-- bool chmpx_msg_send_kv(chmpx_h handle, msgid_t msgid, unsigned char* pkey, size_t keylen, unsigned char* pval, size_t vallen, long* precievercnt, bool is_routing)
-- bool chmpx_msg_broadcast(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt)
+- bool chmpx_msg_send(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_send_kvp(chmpx_h handle, msgid_t msgid, const PCHMKVP pkvp, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_send_kv(chmpx_h handle, msgid_t msgid, unsigned char* pkey, size_t keylen, unsigned char* pval, size_t vallen, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_broadcast(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt)
 - bool chmpx_msg_replicate(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt)
-- bool chmpx_msg_recieve(chmpx_h handle, msgid_t msgid, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms)
+- bool chmpx_msg_receive(chmpx_h handle, msgid_t msgid, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms)
 
 #### Description
 - chmpx_open  
@@ -317,7 +317,7 @@ if(!chmpx_destroy(handle)){
   Broadcast data transmission.
 - chmpx_msg_replicate  
   It sends data to the server equivalent to the specified HASH (taking into consideration the replication and merge status).
-- chmpx_msg_recieve  
+- chmpx_msg_receive  
   Receive data.
    
 #### Parameters
@@ -333,7 +333,7 @@ if(!chmpx_destroy(handle)){
   Specify the transmission data length.
 - hash  
   Specify HASH value of transmission data.
-- precievercnt  
+- preceivercnt  
   Returns the number of receiving nodes when data is transmitted.
 - is_routing  
   When true is specified, it means that the cluster of CHMPX is HASH type and will be sent to multiple destinations in multiplexed configuration (number of replicas is 1 or more).
@@ -377,8 +377,8 @@ if(CHM_INVALID_MSGID == (msgid = chmpx_open(handle, true))){
 unsigned char    body[]    = ....;
 size_t        blength    = sizeof(body);
 chmhash_t    hash    = 0x.....;
-long        recievercnt;
-if(!chmpx_msg_send(handle, msgid, body, blength, hash, &recievercnt, true)){
+long        receivercnt;
+if(!chmpx_msg_send(handle, msgid, body, blength, hash, &receivercnt, true)){
     chmpx_close(handle, msgid);
     chmpx_destroy(handle);
     return false;
@@ -386,7 +386,7 @@ if(!chmpx_msg_send(handle, msgid, body, blength, hash, &recievercnt, true)){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_msg_recieve(handle, msgid, &pckthandle, &pbody, &length, 100)){
+if(!chmpx_msg_receive(handle, msgid, &pckthandle, &pbody, &length, 100)){
     chmpx_close(handle, msgid);
     chmpx_destroy(handle);
     return false;
@@ -460,7 +460,7 @@ if(CHM_INVALID_HANDLE == (handle = chmpx_create("myconffile", true, true))){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_svr_recieve(handle, &pckthandle, &pbody, &length, 100, true)){
+if(!chmpx_svr_receive(handle, &pckthandle, &pbody, &length, 100, true)){
     chmpx_destroy(handle);
     return false;
 }
@@ -712,16 +712,16 @@ When the operation is completed, close the message handle and destroy this objec
 - bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT)
 - bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT)
 <br /><br />
-- bool Recieve(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
+- bool Receive(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
 - bool Send(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool Broadcast(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool Replicate(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self = true)
 <br /><br /> 
 - msgid_t Open(bool no_giveup_rejoin = false)
 - bool Close(msgid_t msgid)
-- bool Recieve(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plength, int timeout_ms = 0)
-- bool Send(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt = NULL, bool is_routing = true)
-- bool Broadcast(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt = NULL)
+- bool Receive(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plength, int timeout_ms = 0)
+- bool Send(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL, bool is_routing = true)
+- bool Broadcast(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL)
 - bool Replicate(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL)
 <br /><br /> 
 - bool Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength)
@@ -742,7 +742,7 @@ Initialize the CHMPX object for the client process on the slave node. Specify th
 - ChmCntrl::OnlyAttachInitialize  
 Initializes the CHMPX object according to the specified configuration (file specification, JSON string specification, environment variable specification) and control port. 
 Initialization is done by attaching to CHMSHM (management SHM of chmpx). The initialized CHMPX object can only be used with the method (DupAllChmInfo, DupSelfChmpxInfo) which obtains the status (status) of chmpx.
-- ChmCntrl::Recieve  
+- ChmCntrl::Receive  
 Receive method for client process on server node. It receives a COMPKT pointer, a pointer to binary data, and a binary data length. You can specify a timeout. You can also specify whether to wait for a reboot if the CHMPX process has stopped. Release the received ppComPkt pointer and body data with CHM_Free () etc.
 - ChmCntrl::Send  
   The sending method for the client process on the server node. Specify binary data string, length, HASH value.
@@ -754,14 +754,14 @@ Receive method for client process on server node. It receives a COMPKT pointer, 
   It is a client process use on a slave node and opens a message handle. You can specify whether to wait for a reboot if the CHMPX process has stopped.
 - ChmCntrl::Close  
   It is a client process usage on the slave node and closes the message handle. Specify the message handle to close.
-- ChmCntrl::Recieve  
+- ChmCntrl::Receive  
   Receive method for client process on slave node. It receives a COMPKT pointer, a pointer to binary data, and a binary data length. You can specify a timeout. Release the received ppComPkt pointer and body data with CHM_Free () etc.
 - ChmCntrl::Send  
   The sending method for the client process on the slave node.
-Specify binary data string, length, HASH value. If precievercnt is specified, it is also possible to obtain the number of CHMPX of the destination.
+Specify binary data string, length, HASH value. If preceivercnt is specified, it is also possible to obtain the number of CHMPX of the destination.
   When the cluster of CHMPX is HASH type and multiplexed configuration (number of replicas is 1 or more), you can specify whether or not to send to multiple destinations.
 - ChmCntrl::Broadcast  
-  Broadcast send method for client process on slave node. Specify binary data string, length, HASH value. If precievercnt is specified, it is also possible to obtain the number of CHMPX of the destination.
+  Broadcast send method for client process on slave node. Specify binary data string, length, HASH value. If preceivercnt is specified, it is also possible to obtain the number of CHMPX of the destination.
 - ChmCntrl::Replicate  
   It is a sending method to servers (depending on the replication setting and merge status) according to the specified HASH value for the client process on the slave node. Specify binary data string, length, HASH value.
 - ChmCntrl::Send  
@@ -794,7 +794,7 @@ if(!pchmpx->InitializeOnServer("myconffile", true)){
 PCOMPKT        pComPkt;
 unsigned char*    pbody;
 size_t        length;
-if(!pchmpx->Recieve(&pComPkt, &pbody, &length, 0, true)){
+if(!pchmpx->Receive(&pComPkt, &pbody, &length, 0, true)){
     CHM_Delete(pchmpx);
     return false;
 }
@@ -827,8 +827,8 @@ if(CHM_INVALID_MSGID == (msgid = pchmpx->Open(true))){
 unsigned char    body[] = ....;
 size_t        blength = sizeof(body);
 chmhash_t    hash = 0x....;
-long        recievercnt;
-if(!pchmpx->Send(msgid, body, blength, hash, &recievercnt, true)){
+long        receivercnt;
+if(!pchmpx->Send(msgid, body, blength, hash, &receivercnt, true)){
     pchmpx->Close(msgid);
     CHM_Delete(pchmpx);
     return false;
@@ -839,7 +839,7 @@ if(!pchmpx->Send(msgid, body, blength, hash, &recievercnt, true)){
 PCOMPKT        pComPkt;
 unsigned char*    pbody;
 size_t        length;
-if(!pchmpx->Recieve(&pComPkt, &pbody, &length, 0){
+if(!pchmpx->Receive(&pComPkt, &pbody, &length, 0){
     pchmpx->Close(msgid);
     CHM_Delete(pchmpx);
     return false;
