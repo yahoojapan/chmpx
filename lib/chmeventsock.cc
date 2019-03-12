@@ -450,7 +450,7 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool& is
 	}
 	//DUMPCOM_COMPKT("Sock::RawSend", pComPkt);
 
-	if(length <= 0L){
+	if(0L == length){
 		ERR_CHMPRN("Length(%zu) in PCOMPKT is wrong.", length);
 		return false;
 	}
@@ -462,7 +462,7 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool& is
 
 bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, const unsigned char* pbydata, size_t length, bool& is_closed, bool is_blocking, int retrycnt, suseconds_t waittime)
 {
-	if(CHM_INVALID_SOCK == sock || !pbydata || length <= 0L){
+	if(CHM_INVALID_SOCK == sock || !pbydata || 0L == length){
 		ERR_CHMPRN("Parameters are wrong.");
 		return false;
 	}
@@ -470,12 +470,11 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, const unsigned char* pbyd
 	// send
 	ssize_t	onesent = 0;
 	size_t	totalsent;
-	bool	is_retry = true;
 	for(totalsent = 0; totalsent < length; totalsent += static_cast<size_t>(onesent)){
 		if(ssl){
 			// SSL
+			bool is_retry 		= true;
 			onesent				= 0;
-			is_retry 			= true;
 			int	write_result	= ChmSecureSock::Write(ssl, &pbydata[totalsent], length - totalsent);
 
 			if(ChmSecureSock::CheckResultSSL(sock, ssl, write_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
@@ -545,12 +544,11 @@ bool ChmEventSock::RawReceiveByte(int sock, ChmSSSession ssl, bool& is_closed, u
 	// receive
 	ssize_t	onerecv = 0;
 	size_t	totalrecv;
-	bool	is_retry = true;
 	for(totalrecv = 0; totalrecv < length; totalrecv += static_cast<size_t>(onerecv)){
 		if(ssl){
 			// SSL
+			bool is_retry 	= true;
 			onerecv			= 0;
-			is_retry 		= true;
 			int	read_result	= ChmSecureSock::Read(ssl, &pbuff[totalrecv], length - totalrecv);
 
 			if(ChmSecureSock::CheckResultSSL(sock, ssl, read_result, CHKRESULTSSL_TYPE_RW, is_retry, is_closed, retrycnt, waittime)){
@@ -821,6 +819,7 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 		}
 		return false;
 	}
+	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress unreadVariable
 	CHM_CLOSESOCK(ctlsock);
 
@@ -1913,8 +1912,10 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != ctlsock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, ctlsock, NULL);
 		}
+		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
+		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(ctlsock);
 		return false;
@@ -2825,7 +2826,7 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 			}
 			return false;
 		}
-		if(RecLength <= 0L){
+		if(0L == RecLength){
 			MSG_CHMPRN("Receive null command on control port from ctlsock(%d)", fd);
 			if(!RawNotifyHup(fd)){
 				ERR_CHMPRN("Failed to closing \"from control socket\" for chmpxid(0x%016" PRIx64 "), but continue...", chmpxid);

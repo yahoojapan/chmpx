@@ -5540,7 +5540,6 @@ chmpxid_t chmpxman_lap<T>::GetNextRingChmpxId(chmpxid_t chmpxid) const
 		// start self
 		// [NOTICE] self is in servers list.
 		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative
-		chmpxid = GetSelfChmpxId();
 	}else{
 		svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);// From Relative
 		if(!svrchmpxlist.Find(chmpxid)){
@@ -5876,10 +5875,6 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 	// normalize for target hash
 	chmpxid_t		last_chmpxid		= CHM_INVALID_CHMPXID;		// for set last used chmpxid
 	chmhash_t		hash_maxval			= 0;						// count of chmpx has base/pending hash value
-	chmhash_t		target_start_hash	= CHM_INVALID_CHMPXID;		// target hash value for base hash count from hash parameter
-	chmhash_t		target_repl_hash	= CHM_INVALID_HASHVAL;		// target hash value for pending hash count from hash parameter
-	chmhash_t		chmpx_base_hash		= CHM_INVALID_HASHVAL;		// chmpx base hash value
-	chmhash_t		chmpx_pending_hash	= CHM_INVALID_HASHVAL;		// chmpx pending hash value
 	chmpxidmap_t	chmpxidmap;										// for the prevention of duplicate registration
 	chmhashmap_t	chmhashmap;										// for the prevention of duplicate registration
 	chmpxlistlap	svrchmpxlist;
@@ -5892,8 +5887,12 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 	if(0 == hash_maxval){
 		ERR_CHMPRN("There is no up servers for base hash.");
 	}else{
-		target_start_hash = hash % hash_maxval;
+		chmhash_t	target_start_hash	= hash % hash_maxval;		// target hash value for base hash count from hash parameter
 		for(long cnt = 0; cnt < (basic_type::pAbsPtr->replica_count + 1); cnt++){
+			chmhash_t	target_repl_hash;							// target hash value for pending hash count from hash parameter
+			chmhash_t	chmpx_base_hash;							// chmpx base hash value
+			chmhash_t	chmpx_pending_hash;							// chmpx pending hash value
+
 			target_repl_hash = (target_start_hash + static_cast<chmhash_t>(cnt)) % hash_maxval;
 
 			// get chmpx by base hash value
@@ -5916,6 +5915,8 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 				ERR_CHMPRN("Base hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_repl_hash);
 				continue;
 			}
+			chmpx_base_hash		= CHM_INVALID_HASHVAL;
+			chmpx_pending_hash	= CHM_INVALID_HASHVAL;
 			if(!svrchmpx.Get(chmpx_base_hash, chmpx_pending_hash) || CHM_INVALID_HASHVAL == chmpx_base_hash){
 				//MSG_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_repl_hash);
 				continue;
@@ -5957,8 +5958,12 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 		if(0 == hash_maxval){
 			ERR_CHMPRN("There is no up servers for pending hash.");
 		}else{
-			target_start_hash = hash % hash_maxval;
+			chmhash_t	target_start_hash	= hash % hash_maxval;		// target hash value for base hash count from hash parameter
 			for(long cnt = 0; cnt < (basic_type::pAbsPtr->replica_count + 1); cnt++){
+				chmhash_t	target_repl_hash;							// target hash value for pending hash count from hash parameter
+				chmhash_t	chmpx_base_hash;							// chmpx base hash value
+				chmhash_t	chmpx_pending_hash;							// chmpx pending hash value
+
 				target_repl_hash = (target_start_hash + static_cast<chmhash_t>(cnt)) % hash_maxval;
 
 				// get chmpx by pending hash value
@@ -5981,6 +5986,8 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 					ERR_CHMPRN("Pending hash(0x%016" PRIx64 ") object does not have chmpxid(not initialized).", target_repl_hash);
 					continue;
 				}
+				chmpx_base_hash		= CHM_INVALID_HASHVAL;
+				chmpx_pending_hash	= CHM_INVALID_HASHVAL;
 				if(!svrchmpx.Get(chmpx_base_hash, chmpx_pending_hash) || CHM_INVALID_HASHVAL == chmpx_pending_hash){
 					//MSG_CHMPRN("Failed to get base and pending hash value for Base hash(0x%016" PRIx64 ") object.", target_repl_hash);
 					continue;
@@ -7772,9 +7779,11 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 			}
 			if(0L < basic_type::pAbsPtr->activated_msg_count){
 				basic_type::pAbsPtr->activated_msg_count--;
-			}
-			if(0L < basic_type::pAbsPtr->activated_msg_count){
-				basic_type::pAbsPtr->activated_msgs = msg_list.GetFirstPtr(false);
+				if(0L < basic_type::pAbsPtr->activated_msg_count){
+					basic_type::pAbsPtr->activated_msgs = msg_list.GetFirstPtr(false);
+				}else{
+					basic_type::pAbsPtr->activated_msgs = NULL;
+				}
 			}else{
 				basic_type::pAbsPtr->activated_msgs = NULL;
 			}
@@ -7808,9 +7817,11 @@ bool chminfo_lap<T>::SetMqFlagStatus(msgid_t msgid, bool is_assigned, bool is_ac
 			}
 			if(0L < basic_type::pAbsPtr->assigned_msg_count){
 				basic_type::pAbsPtr->assigned_msg_count--;
-			}
-			if(0L < basic_type::pAbsPtr->assigned_msg_count){
-				basic_type::pAbsPtr->assigned_msgs = msg_list.GetFirstPtr(false);
+				if(0L < basic_type::pAbsPtr->assigned_msg_count){
+					basic_type::pAbsPtr->assigned_msgs = msg_list.GetFirstPtr(false);
+				}else{
+					basic_type::pAbsPtr->assigned_msgs = NULL;
+				}
 			}else{
 				basic_type::pAbsPtr->assigned_msgs = NULL;
 			}

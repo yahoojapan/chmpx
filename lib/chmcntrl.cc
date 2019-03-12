@@ -264,14 +264,10 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 
 	if(CHMCHNTL_TYPE_CHMPXPROC == chmcntrltype){
 		evobjmap[EVMAP_KEY_CONF]	= pConfObj;
-	}
-	evobjmap[EVOBJ_TYPE_EVMQ]		= pEventMq;
-	if(CHMCHNTL_TYPE_CHMPXPROC == chmcntrltype){
 		evobjmap[EVMAP_KEY_SOCK]	= pEventSock;
-	}
-	if(CHMCHNTL_TYPE_CHMPXPROC == chmcntrltype){
 		evobjmap[EVMAP_KEY_SHM]		= pEventShm;
 	}
+	evobjmap[EVOBJ_TYPE_EVMQ]		= pEventMq;
 
 	// backup configuration file path.
 	bup_cfg = confval;
