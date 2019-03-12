@@ -18,7 +18,7 @@ next_string: Usage
 The options of the CHMPX program are summarized below.
 
 - -h(help)  
-display help for the optsions of CHMPX program
+display help for the options of CHMPX program
 - -v(version)  
 display version of CHMPX program
 - -conf <path>  
@@ -35,14 +35,14 @@ Specify the level of output message. The level value is silent, err, wan, info o
 - -dfile <path>  
 Specify the file path which the output message puts.
 
-_You can see [configration files in directory]({{ site.github.repository_url }}/tree/master/tests) for sample(the file formatted by INI/YAML/JSON, and string of JSON)._  
+_You can see [configuration files in directory]({{ site.github.repository_url }}/tree/master/tests) for sample(the file formatted by INI/YAML/JSON, and string of JSON)._  
 _If you do not specify both -conf and -json option, CHMPX checks CHMCONFFILE or CHMJSONCONF environments._  
 _If there is not any option and environment for configuration, you can not run CHMPX program with error._
 
 ## Start CHMPX program
 To start the CHMPX program, do as follows.
 ```
-chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]
+chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
 ```
 
 The following is an example.

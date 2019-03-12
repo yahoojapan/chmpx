@@ -111,13 +111,13 @@ $ sudo make install
 ```bash
 $ chmpx -h
 [Usage]
-chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]
+chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
 chmpx [ -h | -v ]
 
 [option]
-  -conf <path>         specify the configration file(.ini .yaml .json) path
-  -json <json string>  specify the configration json string
-  -ctlport <port>      specify the self contrl port(*)
+  -conf <path>         specify the configuration file(.ini .yaml .json) path
+  -json <json string>  specify the configuration json string
+  -ctlport <port>      specify the self control port(*)
   -d <param>           specify the debugging output mode:
                         silent - no output
                         err    - output error level
@@ -136,5 +136,5 @@ chmpx [ -h | -v ]
 
 (*) if ctlport option is specified, chmpx searches same ctlport in configuration
     file and ignores "CTLPORT" directive in "GLOBAL" section. and chmpx will
-    start in the mode indicated by the server entry that has beed detected.
+    start in the mode indicated by the server entry that has been detected.
 ```

@@ -72,7 +72,7 @@ In the CHMPX program, it is possible to set the number of threads to handle tran
 ## Queuing Communication Data
 The CHMPX program can queue sent and received data.  
 As a result, CHMPX can continue to provide functions without problem.  
-Please take care, if the failure period is too long, probabry the communication data will overflow.
+Please take care, if the failure period is too long, probably the communication data will overflow.
 
 ## Multi-Processes and Multi-Threads
 CHMPX library can be linked from the server/client program which is for multi processes program and multi threads program.  

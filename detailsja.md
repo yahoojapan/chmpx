@@ -42,7 +42,7 @@ _オプション、環境変数のいずれにもコンフィグレーション�
 ## CHMPXプログラムの起動
 CHMPXプログラムを起動するには以下のようにします。
 ```
-chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [slient|err|wan|msg|dump]] [-dfile <debug file path>]
+chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
 ```
 
 以下は起動例です。

@@ -203,7 +203,7 @@ if(!chmpx_destroy(handle)){
 - bool chmpx_svr_broadcast_ex(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool chmpx_svr_replicate(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash)
 - bool chmpx_svr_replicate_ex(chmpx_h handle, const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
-- bool chmpx_svr_recieve(chmpx_h handle, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms, bool no_giveup_rejoin)
+- bool chmpx_svr_receive(chmpx_h handle, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms, bool no_giveup_rejoin)
 
 #### 説明
 - chmpx_svr_send  
@@ -216,7 +216,7 @@ if(!chmpx_destroy(handle)){
   サーバ全台にデータを送信します。（注意参照）
 - chmpx_svr_replicate / chmpx_svr_replicate_ex  
   指定したHASHと同等（レプリケーション、マージ状態を考慮して）のサーバにデータを送信します。（注意参照）
-- chmpx_svr_recieve  
+- chmpx_svr_receive  
   データを受信します。
 
 #### パラメータ
@@ -272,7 +272,7 @@ if(CHM_INVALID_HANDLE == (handle = chmpx_create("myconffile", true, true))){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_svr_recieve(handle, &pckthandle, &pbody, &length, 100, true)){
+if(!chmpx_svr_receive(handle, &pckthandle, &pbody, &length, 100, true)){
     chmpx_destroy(handle);
     return false;
 }
@@ -295,12 +295,12 @@ if(!chmpx_destroy(handle)){
 
 - msgid_t chmpx_open(chmpx_h handle, bool no_giveup_rejoin)
 - bool chmpx_close(chmpx_h handle, msgid_t msgid)
-- bool chmpx_msg_send(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt, bool is_routing)
-- bool chmpx_msg_send_kvp(chmpx_h handle, msgid_t msgid, const PCHMKVP pkvp, long* precievercnt, bool is_routing)
-- bool chmpx_msg_send_kv(chmpx_h handle, msgid_t msgid, unsigned char* pkey, size_t keylen, unsigned char* pval, size_t vallen, long* precievercnt, bool is_routing)
-- bool chmpx_msg_broadcast(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt)
+- bool chmpx_msg_send(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_send_kvp(chmpx_h handle, msgid_t msgid, const PCHMKVP pkvp, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_send_kv(chmpx_h handle, msgid_t msgid, unsigned char* pkey, size_t keylen, unsigned char* pval, size_t vallen, long* preceivercnt, bool is_routing)
+- bool chmpx_msg_broadcast(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt)
 - bool chmpx_msg_replicate(chmpx_h handle, msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt)
-- bool chmpx_msg_recieve(chmpx_h handle, msgid_t msgid, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms)
+- bool chmpx_msg_receive(chmpx_h handle, msgid_t msgid, chmpx_pkt_h* ppckthandle, unsigned char** ppbody, size_t* plength, int timeout_ms)
 
 #### 説明
 - chmpx_open  
@@ -317,7 +317,7 @@ if(!chmpx_destroy(handle)){
   データをブロードキャスト送信します。
 - chmpx_msg_replicate  
   指定したHASHと同等（レプリケーション、マージ状態を考慮して）のサーバにデータを送信します。
-- chmpx_msg_recieve  
+- chmpx_msg_receive  
   データを受信します。
 
 #### パラメーター
@@ -333,7 +333,7 @@ if(!chmpx_destroy(handle)){
   送信データ長を指定します。
 - hash  
   送信データのHASH値を指定します。
-- precievercnt  
+- preceivercnt  
   データが送信された際の、受け取り側のノード数を返します。
 - is_routing  
   true を指定した場合には、CHMPXのクラスタが、HASHタイプであり、多重化された構成（レプリカ数が1以上）では複数のあて先に送付されることを意味します。
@@ -377,8 +377,8 @@ if(CHM_INVALID_MSGID == (msgid = chmpx_open(handle, true))){
 unsigned char    body[]    = ....;
 size_t        blength    = sizeof(body);
 chmhash_t    hash    = 0x.....;
-long        recievercnt;
-if(!chmpx_msg_send(handle, msgid, body, blength, hash, &recievercnt, true)){
+long        receivercnt;
+if(!chmpx_msg_send(handle, msgid, body, blength, hash, &receivercnt, true)){
     chmpx_close(handle, msgid);
     chmpx_destroy(handle);
     return false;
@@ -386,7 +386,7 @@ if(!chmpx_msg_send(handle, msgid, body, blength, hash, &recievercnt, true)){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_msg_recieve(handle, msgid, &pckthandle, &pbody, &length, 100)){
+if(!chmpx_msg_receive(handle, msgid, &pckthandle, &pbody, &length, 100)){
     chmpx_close(handle, msgid);
     chmpx_destroy(handle);
     return false;
@@ -460,7 +460,7 @@ if(CHM_INVALID_HANDLE == (handle = chmpx_create("myconffile", true, true))){
 chmpx_pkt_h    pckthandle;
 unsigned char*    pbody;
 size_t        length;
-if(!chmpx_svr_recieve(handle, &pckthandle, &pbody, &length, 100, true)){
+if(!chmpx_svr_receive(handle, &pckthandle, &pbody, &length, 100, true)){
     chmpx_destroy(handle);
     return false;
 }
@@ -709,16 +709,16 @@ CHMPXオブジェクトのクラスです。
 - bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT)
 - bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT)
 <br /><br />
-- bool Recieve(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
+- bool Receive(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
 - bool Send(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool Broadcast(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
 - bool Replicate(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self = true)
 <br /><br /> 
 - msgid_t Open(bool no_giveup_rejoin = false)
 - bool Close(msgid_t msgid)
-- bool Recieve(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plength, int timeout_ms = 0)
-- bool Send(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt = NULL, bool is_routing = true)
-- bool Broadcast(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* precievercnt = NULL)
+- bool Receive(msgid_t msgid, PCOMPKT* ppComPkt, unsigned char** ppbody, size_t* plength, int timeout_ms = 0)
+- bool Send(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL, bool is_routing = true)
+- bool Broadcast(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL)
 - bool Replicate(msgid_t msgid, const unsigned char* pbody, size_t blength, chmhash_t hash, long* preceivercnt = NULL)
 <br /><br /> 
 - bool Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blength)
@@ -739,7 +739,7 @@ CHMPXオブジェクトのクラスです。
   CHMPXオブジェクトをスレーブノード上のクライアントプロセス用に初期化します。CHMPXプロセスを起動したときと同じコンフィグレーションと同じものを指定してください。これは、コンフィグレーションファイル（.ini/.yaml/.json）もしくは、JSON文字列を指定します。 コンフィグレーションのパラメータが、NULLもしくは、空文字列を指定した場合には、環境変数 CHMCONFFILE もしくは CHMJSONCONF が参照され、適切に設定値が読み込まれます。C++インターフェースの場合には、ctlport引数（chmpx起動時の-ctlportと同じ仕様）があります。
 - ChmCntrl::OnlyAttachInitialize  
   指定されたコンフィグレーション（ファイル指定、JSON文字列指定、環境変数指定のいずれか）および制御ポートに応じて、CHMPXオブジェクトを初期化します。初期化は、CHMSHM（chmpxの管理SHM）にアタッチすることで行われます。 初期化されたCHMPXオブジェクトは、chmpxの状態（ステータス）を取得するメソッド（DupAllChmInfo、DupSelfChmpxInfo）でのみ利用できます。
-- ChmCntrl::Recieve  
+- ChmCntrl::Receive  
   サーバノード上のクライアントプロセス用の受信メソッドです。 COMPKTポインタ、バイナリデータへのポインタ、バイナリデータ長を受け取ります。タイムアウトの指定が出来ます。またCHMPXプロセスが停止していた場合に再起動を待つかどうか指定できます。 受け取ったppComPktポインタ、ボディデータは、CHM_Free()  などで開放してください。
 - ChmCntrl::Send  
   サーバノード上のクライアントプロセス用の送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。
@@ -751,12 +751,12 @@ CHMPXオブジェクトのクラスです。
   スレーブノード上のクライアントプロセス用途であり、メッセージハンドルをオープンします。 CHMPXプロセスが停止していた場合に再起動を待つかどうか指定できます。
 - ChmCntrl::Close  
   スレーブノード上のクライアントプロセス用途であり、メッセージハンドルをクローズします。 クローズするメッセージハンドルを指定します。
-- ChmCntrl::Recieve  
+- ChmCntrl::Receive  
   スレーブノード上のクライアントプロセス用の受信メソッドです。 COMPKTポインタ、バイナリデータへのポインタ、バイナリデータ長を受け取ります。タイムアウトの指定が出来ます。 受け取ったppComPktポインタ、ボディデータは、CHM_Free() などで開放してください。
 - ChmCntrl::Send  
-  スレーブノード上のクライアントプロセス用の送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。 precievercnt を指定した場合には、送信先のCHMPX数を取得することもできます。 CHMPXのクラスタが、HASHタイプであり、多重化された構成（レプリカ数が1以上）のとき、複数のあて先に送付するか否かを指定できます。
+  スレーブノード上のクライアントプロセス用の送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。 preceivercnt を指定した場合には、送信先のCHMPX数を取得することもできます。 CHMPXのクラスタが、HASHタイプであり、多重化された構成（レプリカ数が1以上）のとき、複数のあて先に送付するか否かを指定できます。
 - ChmCntrl::Broadcast  
-  スレーブノード上のクライアントプロセス用のブロードキャスト送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。 precievercnt を指定した場合には、送信先のCHMPX数を取得することもできます。
+  スレーブノード上のクライアントプロセス用のブロードキャスト送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。 preceivercnt を指定した場合には、送信先のCHMPX数を取得することもできます。
 - ChmCntrl::Replicate  
   スレーブノード上のクライアントプロセス用の指定したHASH値に応じた（レプリケーション設定およびマージ状態を考慮した）サーバ群への送信メソッドです。 バイナリデータ列、および長さ、HASH値を指定します。
 - ChmCntrl::Send  
@@ -789,7 +789,7 @@ if(!pchmpx->InitializeOnServer("myconffile", true)){
 PCOMPKT        pComPkt;
 unsigned char*    pbody;
 size_t        length;
-if(!pchmpx->Recieve(&pComPkt, &pbody, &length, 0, true)){
+if(!pchmpx->Receive(&pComPkt, &pbody, &length, 0, true)){
     CHM_Delete(pchmpx);
     return false;
 }
@@ -822,8 +822,8 @@ if(CHM_INVALID_MSGID == (msgid = pchmpx->Open(true))){
 unsigned char    body[] = ....;
 size_t        blength = sizeof(body);
 chmhash_t    hash = 0x....;
-long        recievercnt;
-if(!pchmpx->Send(msgid, body, blength, hash, &recievercnt, true)){
+long        receivercnt;
+if(!pchmpx->Send(msgid, body, blength, hash, &receivercnt, true)){
     pchmpx->Close(msgid);
     CHM_Delete(pchmpx);
     return false;
@@ -834,7 +834,7 @@ if(!pchmpx->Send(msgid, body, blength, hash, &recievercnt, true)){
 PCOMPKT        pComPkt;
 unsigned char*    pbody;
 size_t        length;
-if(!pchmpx->Recieve(&pComPkt, &pbody, &length, 0){
+if(!pchmpx->Receive(&pComPkt, &pbody, &length, 0){
     pchmpx->Close(msgid);
     CHM_Delete(pchmpx);
     return false;

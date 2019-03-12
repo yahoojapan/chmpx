@@ -17,7 +17,9 @@ arrow_link_tools: <a href="tools.html" class="link-title"><span class="arrow-bas
 
 # **CHMPX**
 **CHMPX** (**C**onsistent **H**ashing **M**q in**P**rocess data e**X**change) is communication middleware over the network for sending binary data.
-**CHMPX** is one of [AntPickax](https://antpick.ax/)'s open source product by Yahoo! JAPAN.
+**CHMPX** is one of [AntPickax](https://antpick.ax/)'s open source product by Yahoo! JAPAN.  
+
+![CHMPX](images/top_chmpx.png)
 
 ## {{ page.arrow_link_overview }}
 [Overview](home.html) about **CHMPX** library and component.
