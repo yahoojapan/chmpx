@@ -34,6 +34,17 @@
 using namespace std;
 
 //---------------------------------------------------------
+// Symbols
+//---------------------------------------------------------
+#define	CHMPXSTATUS_LIVE_UP_STR			"UP"
+#define	CHMPXSTATUS_LIVE_DOWN_STR		"DOWN"
+#define	CHMPXSTATUS_RING_SVRIN_STR		"SERVICEIN"
+#define	CHMPXSTATUS_RING_SVROUT_STR		"SERVICEOUT"
+#define	CHMPXSTATUS_RING_SLAVE_STR		"SLAVE"
+
+#define	CHMPXSTATUS_WAIT_INTERVAL		1
+
+//---------------------------------------------------------
 // Utility Functions
 //---------------------------------------------------------
 static inline void PRN(const char* format, ...)
@@ -106,6 +117,7 @@ static void Help(char* progname)
 {
 	PRN("");
 	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] [-self] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
+	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] -wait -live [down|up] -ring [serviceout|servicein|slave] -(no)suspend [-timeout <second>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
 	PRN("Usage: %s -h", progname ? programname(progname) : "program");
 	PRN("");
 	PRN("Option");
@@ -113,12 +125,22 @@ static void Help(char* progname)
 	PRN("  -json <json>         configuration JSON string\n");
 	PRN("  -ctlport <port>      specify the self control port(*)");
 	PRN("  -self                print only self chmpx");
+	PRN("  -wait                to wait until the state changes to the specified value");
+	PRN("  -live <param>        Specify live status by waiting mode");
+	PRN("                        up         - chmpx process up");
+	PRN("                        down       - chmpx process down");
+	PRN("  -ring <param>        specify ring status by waiting mode");
+	PRN("                        servicein  - server chmpx joined ring");
+	PRN("                        serviceout - server chmpx NOT joined ring");
+	PRN("                        slave      - slave chmpx");
+	PRN("  -suspend             specify suspend status by waiting mode");
+	PRN("  -nosuspend           specify nosuspend status by waiting mode");
 	PRN("  -d <param>           specify the debugging output mode:");
-	PRN("                        silent - no output");
-	PRN("                        err    - output error level");
-	PRN("                        wan    - output warning level");
-	PRN("                        msg    - output debug(message) level");
-	PRN("                        dump   - output communication debug level");
+	PRN("                        silent     - no output");
+	PRN("                        err        - output error level");
+	PRN("                        wan        - output warning level");
+	PRN("                        msg        - output debug(message) level");
+	PRN("                        dump       - output communication debug level");
 	PRN("  -dfile <path>        specify the file path which is put output");
 	PRN("  -h(help)             display this usage.");
 	PRN("");
@@ -459,6 +481,55 @@ static bool PrintSelfInfo(ChmCntrl* pchmobj)
 }
 
 //---------------------------------------------------------
+// Wait up mode
+//---------------------------------------------------------
+static bool StatusWait(ChmCntrl* pchmobj, chmpxsts_t targetsts, time_t timeout)
+{
+	if(!pchmobj){
+		return false;
+	}
+	string	strTargetsts = STR_CHMPXSTS_FULL(targetsts);
+
+	// set timeout value
+	bool			is_notimeout = (0L == timeout);
+	struct timespec	sleeptime;
+	SET_TIMESPEC(&sleeptime, CHMPXSTATUS_WAIT_INTERVAL, 0);
+
+	int	cnt;
+	for(cnt = 0; 0 < timeout || is_notimeout; ++cnt, timeout -= std::min(timeout, static_cast<time_t>(CHMPXSTATUS_WAIT_INTERVAL))){
+		PCHMPX	pInfo;
+
+		// Get information
+		if(NULL == (pInfo = pchmobj->DupSelfChmpxInfo())){
+			ERR("Something error occurred in getting information.");
+			MSG_CHMPRN("[%d * %d(sec)] WAIT -> Could not set status info", cnt, CHMPXSTATUS_WAIT_INTERVAL);
+
+		}else{
+			// Compare status
+			if(	(pInfo->status & CHMPXSTS_MASK_LIVE)	== (targetsts & CHMPXSTS_MASK_LIVE)		&&
+				(pInfo->status & CHMPXSTS_MASK_RING)	== (targetsts & CHMPXSTS_MASK_RING)		&&
+				(pInfo->status & CHMPXSTS_MASK_SUSPEND)	== (targetsts & CHMPXSTS_MASK_SUSPEND)	)
+			{
+				// Found!
+				ChmCntrl::FreeDupSelfChmpxInfo(pInfo);
+				MSG_CHMPRN("[%d * %d(sec)] BREAK WAITING -> Status(%s) is as same as %s", cnt, CHMPXSTATUS_WAIT_INTERVAL, STR_CHMPXSTS_FULL(pInfo->status).c_str(), strTargetsts.c_str());
+				PRN("SUCCEED");
+				return true;
+			}
+
+			// not same status, thus sleep
+			ChmCntrl::FreeDupSelfChmpxInfo(pInfo);
+			MSG_CHMPRN("[%d * %d(sec)] WAIT -> Status(%s) is not as same as %s", cnt, CHMPXSTATUS_WAIT_INTERVAL, STR_CHMPXSTS_FULL(pInfo->status).c_str(), strTargetsts.c_str());
+		}
+		// sleep
+		nanosleep(&sleeptime, NULL);
+	}
+	MSG_CHMPRN("[%d * %d(sec)] TIMEOUT -> Status was not %s", cnt, CHMPXSTATUS_WAIT_INTERVAL, strTargetsts.c_str());
+	PRN("FAILED");
+	return false;
+}
+
+//---------------------------------------------------------
 // Main
 //---------------------------------------------------------
 int main(int argc, char** argv)
@@ -513,9 +584,6 @@ int main(int argc, char** argv)
 		}
 	}
 
-	// only self
-	bool	is_only_self = opts.Find("self");
-
 	// Initialize
 	ChmCntrl	chmobj;
 	if(!chmobj.OnlyAttachInitialize(config.c_str(), ctlport)){
@@ -524,12 +592,85 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	// Main processing
+	// check wait/print(self or all) mode
+	bool	is_wait_mode = opts.Find("wait");
+	bool	is_only_self = opts.Find("self");
+
 	bool	result;
-	if(!is_only_self){
-		result = PrintAllInfo(&chmobj);
+	if(is_wait_mode){
+		// wait mode
+		if(!opts.Find("live") || !opts.Find("ring") || (!opts.Find("nosuspend") && !opts.Find("suspend"))){
+			ERR("wait mode(-wait) needs -live, -ring and -nosuspend(or -suspend) option.");
+			chmobj.Clean();
+			exit(EXIT_FAILURE);
+		}
+		string		strTmp;
+		chmpxsts_t	targetsts = (CHMPXSTS_VAL_NOACT | CHMPXSTS_VAL_NOTHING);
+		time_t		timeout;
+
+		// live
+		if(!opts.Get("live", strTmp)){
+			ERR("\"-live\" option needs parameter(up or down).");
+			chmobj.Clean();
+			exit(EXIT_FAILURE);
+		}else{
+			if(0 == strcasecmp(CHMPXSTATUS_LIVE_UP_STR, strTmp.c_str())){
+				targetsts |= CHMPXSTS_VAL_UP;
+			}else if(0 == strcasecmp(CHMPXSTATUS_LIVE_DOWN_STR, strTmp.c_str())){
+				targetsts |= CHMPXSTS_VAL_DOWN;
+			}else{
+				ERR("wrong parameter(%s) is specified for \"-live\" option.", strTmp.c_str());
+				chmobj.Clean();
+				exit(EXIT_FAILURE);
+			}
+		}
+		// ring
+		if(!opts.Get("ring", strTmp)){
+			ERR("\"-ring\" option needs parameter(servicein or serviceout or slave).");
+			chmobj.Clean();
+			exit(EXIT_FAILURE);
+		}else{
+			if(0 == strcasecmp(CHMPXSTATUS_RING_SVRIN_STR, strTmp.c_str())){
+				targetsts |= CHMPXSTS_VAL_SRVIN;
+			}else if(0 == strcasecmp(CHMPXSTATUS_RING_SVROUT_STR, strTmp.c_str())){
+				targetsts |= CHMPXSTS_VAL_SRVOUT;
+			}else if(0 == strcasecmp(CHMPXSTATUS_RING_SLAVE_STR, strTmp.c_str())){
+				targetsts |= CHMPXSTS_VAL_SLAVE;
+			}else{
+				ERR("wrong parameter(%s) is specified for \"-ring\" option.", strTmp.c_str());
+				chmobj.Clean();
+				exit(EXIT_FAILURE);
+			}
+		}
+		// suspend or nosuspend
+		if(opts.Find("nosuspend")){
+			targetsts |= CHMPXSTS_VAL_NOSUP;
+		}else{	// opts.Find("suspend")
+			targetsts |= CHMPXSTS_VAL_SUSPEND;
+		}
+		// timeout
+		if(opts.Find("timeout")){
+			string	strTimeout;
+			if(!opts.Get("timeout", strTimeout)){
+				ERR("\"-timeout\" option specified for \"-wait\", but argument(second) is not specified.");
+				chmobj.Clean();
+				exit(EXIT_FAILURE);
+			}
+			timeout = static_cast<time_t>(atoi(strTimeout.c_str()));
+		}else{
+			timeout = 0L;
+		}
+
+		// do wait
+		result = StatusWait(&chmobj, targetsts, timeout);
+
 	}else{
-		result = PrintSelfInfo(&chmobj);
+		// print mode
+		if(!is_only_self){
+			result = PrintAllInfo(&chmobj);
+		}else{
+			result = PrintSelfInfo(&chmobj);
+		}
 	}
 	chmobj.Clean();
 
