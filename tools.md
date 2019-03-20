@@ -24,7 +24,11 @@ This tool can display the status of the CHMPX process itself(default) or the sta
 
 ### How to use
 Please refer to man page.
-Alternatively, if you start with **-h(help)** option specified, help will be displayed.
+Alternatively, if you start with **-h(help)** option specified, help will be displayed.  
+
+chmpxstatus specifies the status (status) of the chmpx process and has a mode to wait until it changes to that status.  
+With this standby mode, it is possible to wait for chmpx initialization to complete immediately after chmpx startup and to wait for normal startup.  
+This command's standby mode can be used to start up continuous processes or to test using chmpx.
 
 ### Options
 #### -h
@@ -39,6 +43,22 @@ Specify the control port specified when starting CHMPX process.
 #### -self
 Only the status (status) of the CHMPX process itself is displayed.  
 If this option is not specified, the status of all CHMPX processes connected by the CHMPX process including itself is displayed.
+#### -wait
+When this option is specified, it operates as a mode to wait until the state of chmpx changes to the specified value.
+#### -live [UP | DOWN]
+If chmpxstatus is started in the standby mode (when the -wait option is specified), this option must also be specified.  
+Specify UP(running) or DOWN(not running) as the process status of chmpx.  
+This is part of the chmpx state.
+#### -ring [SERVICEIN | SERVICEOUT | SLAVE]
+If chmpxstatus is started in the standby mode (when the -wait option is specified), this option must also be specified.  
+Specify a value indicating the participation status of the chmpx process in RING.  
+Possible values are SERVICEIN(server node and participating in RING), SERVICEOUT(server node and not participating in RING), and SLAVE(indicating slave nodes).  
+This is part of the chmpx state.
+#### -suspend or -nosuspend
+If chmpxstatus is started in standby mode (when the -wait option is specified), one of these options must be specified.  
+Specify nosuspend to specify the state in which the process that has joined to chmpx exists.  
+Specify nosuspend if there is no process that has joined to chmpx.  
+This is a part of the state of chmpx.
 #### -d [level]
 Specify the level of debugging information of this tool. (ERR, WAN, INFO, DUMP)
 #### -dfile [file]
