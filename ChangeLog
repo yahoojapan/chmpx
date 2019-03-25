@@ -1,3 +1,10 @@
+chmpx (1.0.69) unstable; urgency=low
+
+  * Updated chmpxstatus man page - #28
+  * Added status wait mode to chmpxstatus command - #27
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 25 Mar 2019 09:08:31 +0900
+
 chmpx (1.0.68) unstable; urgency=low
 
   * Fixed codes for cppcheck 1.87 - #23
