@@ -182,7 +182,7 @@ bool chmpx_svr_send_kvp_ex(chmpx_h handle, const PCHMKVP pkvp, bool is_routing, 
 		return false;
 	}
 
-	ChmKVPair		kvpair(pkvp);
+	ChmKVPair		kvpair(pkvp, false);
 	unsigned char*	pbody;
 	size_t			length = 0L;
 	if(NULL == (pbody = kvpair.Put(length))){
@@ -316,7 +316,7 @@ bool chmpx_msg_send_kvp(chmpx_h handle, msgid_t msgid, const PCHMKVP pkvp, long*
 		ERR_CHMPRN("Invalid chmpx handle.");
 		return false;
 	}
-	ChmKVPair		kvpair(pkvp);
+	ChmKVPair		kvpair(pkvp, false);
 	unsigned char*	pbody;
 	size_t			length = 0L;
 	if(NULL == (pbody = kvpair.Put(length))){
@@ -425,7 +425,7 @@ bool chmpx_msg_reply_kvp(chmpx_h handle, chmpx_pkt_h pckthandle, const PCHMKVP p
 		return false;
 	}
 
-	ChmKVPair		kvpair(pkvp);
+	ChmKVPair		kvpair(pkvp, false);
 	unsigned char*	pbody;
 	size_t			length = 0L;
 	if(NULL == (pbody = kvpair.Put(length))){
