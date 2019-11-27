@@ -289,13 +289,17 @@ int ChmEventSock::Listen(const char* hostname, short port)
 		}
 
 	}else{
-		struct addrinfo*	paddrinfo = NULL;
-		if(!ChmNetDb::Get()->GetAddrInfo(hostname, port, &paddrinfo, true)){		// if "localhost", convert fqdn.
+		addrinfolist_t	addrinfos;
+		if(!ChmNetDb::Get()->GetAddrInfoList(hostname, port, addrinfos, true)){		// if "localhost", convert fqdn.
 			ERR_CHMPRN("Failed to get addrinfo for %s:%d.", hostname, port);
 			return CHM_INVALID_SOCK;
 		}
-		sockfd = ChmEventSock::RawListen(paddrinfo);
-		freeaddrinfo(paddrinfo);
+		sockfd = CHM_INVALID_SOCK;
+		for(addrinfolist_t::const_iterator iter = addrinfos.begin(); addrinfos.end() != iter && CHM_INVALID_SOCK == sockfd; ++iter){
+			struct addrinfo*	paddrinfo	= *iter;
+			sockfd = ChmEventSock::RawListen(paddrinfo);
+		}
+		ChmNetDb::FreeAddrInfoList(addrinfos);
 	}
 
 	if(CHM_INVALID_SOCK == sockfd){
@@ -370,58 +374,60 @@ int ChmEventSock::Connect(const char* hostname, short port, bool is_blocking, in
 		return CHM_INVALID_SOCK;
 	}
 
-	// Get addrinfo
-	struct addrinfo*	paddrinfo = NULL;
-	if(!ChmNetDb::Get()->GetAddrInfo(hostname, port, &paddrinfo, true)){			// if "localhost", convert fqdn.
+	// Get addrinfo list
+	addrinfolist_t	addrinfos;
+	if(!ChmNetDb::Get()->GetAddrInfoList(hostname, port, addrinfos, true)){		// if "localhost", convert fqdn.
 		ERR_CHMPRN("Failed to get addrinfo for %s:%d.", hostname, port);
 		return CHM_INVALID_SOCK;
 	}
 
 	// make socket, bind, listen
 	int	sockfd = CHM_INVALID_SOCK;
-	for(struct addrinfo* ptmpaddrinfo = paddrinfo; ptmpaddrinfo && CHM_INVALID_SOCK == sockfd; ptmpaddrinfo = ptmpaddrinfo->ai_next){
-		if(IPPROTO_TCP != ptmpaddrinfo->ai_protocol){
-			MSG_CHMPRN("protocol in addrinfo which is made from %s:%d does not TCP, so check next addrinfo...", hostname, port);
-			continue;
-		}
-		// socket
-		if(-1 == (sockfd = socket(ptmpaddrinfo->ai_family, ptmpaddrinfo->ai_socktype, ptmpaddrinfo->ai_protocol))){
-			ERR_CHMPRN("Failed to make socket for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
-			// sockfd = CHM_INVALID_SOCK;
-			continue;
-		}
-
-		// options
-		setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPIDLE), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPINTERVAL), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPCOUNT), sizeof(int));
-		if(!is_blocking){
-			ChmEventSock::SetNonblocking(sockfd);	// NONBLOCKING
-		}
-
-		// connect
-		if(-1 == connect(sockfd, ptmpaddrinfo->ai_addr, ptmpaddrinfo->ai_addrlen)){
-			if(is_blocking || EINPROGRESS != errno){
-				ERR_CHMPRN("Failed to connect for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
-				CHM_CLOSESOCK(sockfd);
+	for(addrinfolist_t::const_iterator iter = addrinfos.begin(); addrinfos.end() != iter && CHM_INVALID_SOCK == sockfd; ++iter){
+		struct addrinfo*	paddrinfo = *iter;
+		for(struct addrinfo* ptmpaddrinfo = paddrinfo; ptmpaddrinfo && CHM_INVALID_SOCK == sockfd; ptmpaddrinfo = ptmpaddrinfo->ai_next){
+			if(IPPROTO_TCP != ptmpaddrinfo->ai_protocol){
+				MSG_CHMPRN("protocol in addrinfo which is made from %s:%d does not TCP, so check next addrinfo...", hostname, port);
 				continue;
-			}else{
-				// wait connected...(non blocking & EINPROGRESS)
-				int	werr = ChmEventSock::WaitForReady(sockfd, WAIT_WRITE_FD, con_retrycnt, true, con_waittime);		// check SO_ERROR
-				if(0 != werr){
-					MSG_CHMPRN("Failed to connect for %s:%d by errno=%d.", hostname, port, werr);
+			}
+			// socket
+			if(CHM_INVALID_SOCK == (sockfd = socket(ptmpaddrinfo->ai_family, ptmpaddrinfo->ai_socktype, ptmpaddrinfo->ai_protocol))){
+				ERR_CHMPRN("Failed to make socket for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
+				continue;
+			}
+
+			// options
+			setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPIDLE), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPINTERVAL), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<const void*>(&ChmEventSock::DEFAULT_KEEPCOUNT), sizeof(int));
+			if(!is_blocking){
+				ChmEventSock::SetNonblocking(sockfd);	// NONBLOCKING
+			}
+
+			// connect
+			if(-1 == connect(sockfd, ptmpaddrinfo->ai_addr, ptmpaddrinfo->ai_addrlen)){
+				if(is_blocking || EINPROGRESS != errno){
+					ERR_CHMPRN("Failed to connect for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
 					CHM_CLOSESOCK(sockfd);
 					continue;
+				}else{
+					// wait connected...(non blocking & EINPROGRESS)
+					int	werr = ChmEventSock::WaitForReady(sockfd, WAIT_WRITE_FD, con_retrycnt, true, con_waittime);		// check SO_ERROR
+					if(0 != werr){
+						MSG_CHMPRN("Failed to connect for %s:%d by errno=%d.", hostname, port, werr);
+						CHM_CLOSESOCK(sockfd);
+						continue;
+					}
 				}
 			}
-		}
-		if(CHM_INVALID_SOCK != sockfd){
-			break;
+			if(CHM_INVALID_SOCK != sockfd){
+				break;
+			}
 		}
 	}
-	freeaddrinfo(paddrinfo);
+	ChmNetDb::FreeAddrInfoList(addrinfos);
 
 	if(CHM_INVALID_SOCK == sockfd){
 		MSG_CHMPRN("Could not make socket and connect %s:%d.", hostname, port);
@@ -1293,9 +1299,7 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	// Make communication datas
 	//---------------------------------
 	// check target chmpxid map
-	// cppcheck-suppress unmatchedSuppression
-	// cppcheck-suppress stlSize
-	if(0 == pThis->mergeidmap.size()){
+	if(pThis->mergeidmap.empty()){
 		ERR_CHMPRN("There is no merge chmpxids.");
 		pThis->is_run_merge = false;
 		return true;			// keep running thread for next request
@@ -2363,9 +2367,7 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 				if(fullock::flck_trylock_noshared_mutex(&dyna_sockfd_lockval)){			// LOCK(dynamic)
 					// can connect new sock
 					if(!RawConnectServer(chmpxid, sock, false, true) && CHM_INVALID_SOCK == sock){
-
-						// cppcheck-suppress stlSize
-						if(0 == socklist.size() && 0 == slv_sockcnt){
+						if(socklist.empty() && 0 == slv_sockcnt){
 							// no server socket and could not connect, and no slave socket, so no more try.
 							WAN_CHMPRN("Could not connect to server chmpxid(0x%016" PRIx64 ").", chmpxid);
 							fullock::flck_unlock_noshared_mutex(&dyna_sockfd_lockval);	// UNLOCK(dynamic)
@@ -3001,8 +3003,7 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 	// check server socket count
 	socklist_t	socklist;
 	int			ctlsock = CHM_INVALID_SOCK;
-	// cppcheck-suppress stlSize
-	if(pImData->GetServerSocks(chmpxid, socklist, ctlsock) && 0 < socklist.size()){
+	if(pImData->GetServerSocks(chmpxid, socklist, ctlsock) && !socklist.empty()){
 		MSG_CHMPRN("Caught Server Down notify(HUP) for chmpxid(0x%016" PRIx64 "), but this server still has some socket from this.", chmpxid);
 		return true;
 	}
@@ -3928,9 +3929,8 @@ bool ChmEventSock::Accept(int sock)
 		return false;
 	}
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
-		ERR_CHMPRN("Failed to convert FQDN from %s.", stripaddress.c_str());
-		CHM_CLOSESOCK(newsock);
-		return false;
+		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
+		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
 	}
 
 	// add tempolary accepting socket mapping.(before adding epoll for multi threading)
@@ -4054,11 +4054,8 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 		return false;
 	}
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
-		ERR_CHMPRN("Failed to convert FQDN from %s.", stripaddress.c_str());
-		if(!NotifyHup(newctlsock)){
-			ERR_CHMPRN("Failed to closing \"from control socket\" for chmpxid(0x%016" PRIx64 "), but continue...", CHM_INVALID_CHMPXID);
-		}
-		return false;
+		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
+		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
 	}
 
 	// check ACL
@@ -4777,8 +4774,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 		}
 
 		// Send
-		// cppcheck-suppress stlSize
-		while(0 < ex_chmpxids.size()){
+		while(!ex_chmpxids.empty()){
 			chmpxid_t	tmpchmpxid;
 			PCOMPKT		pTmpPkt;
 			bool		is_duplicate;
@@ -4908,8 +4904,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	strlst_t	cmdarray;
-	// cppcheck-suppress stlSize
-	if(!str_paeser(pCommand, cmdarray) || 0 == cmdarray.size()){
+	if(!str_paeser(pCommand, cmdarray) || cmdarray.empty()){
 		ERR_CHMPRN("Something wrong %s command, because could not parse it.", pCommand);
 		return false;
 	}
@@ -4985,8 +4980,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_SERVICE_OUT)){
 		// Service OUT(status is changed to delete pending)
 		//
-		// cppcheck-suppress stlSize
-		if(0 == cmdarray.size()){
+		if(cmdarray.empty()){
 			ERR_CHMPRN("%s command must have parameter for server name/port.", strCommand.c_str());
 			strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
 		}else{
@@ -5038,8 +5032,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_TRACE_SET)){
 		// Trace dis/enable
 		//
-		// cppcheck-suppress stlSize
-		if(0 == cmdarray.size()){
+		if(cmdarray.empty()){
 			ERR_CHMPRN("%s command must have parameter for enable/disable.", strCommand.c_str());
 			strResponse = CTL_RES_ERROR_TRACE_SET_PARAM;
 		}else{
@@ -5075,16 +5068,13 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			logtype_t	dirmask = CHMLOG_TYPE_UNKOWN;
 			logtype_t	devmask = CHMLOG_TYPE_UNKOWN;
 
-			// cppcheck-suppress stlSize
-			if(0 == cmdarray.size()){
+			if(cmdarray.empty()){
 				MSG_CHMPRN("%s command does not have parameter, so use default value(dir=all, dev=all, count=all trace count).", strCommand.c_str());
 			}else{
-				// cppcheck-suppress stlSize
-				for(string strTmp = ""; 0 < cmdarray.size(); cmdarray.pop_front()){
+				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
-					// cppcheck-suppress stlIfStrFind
-					if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
+					if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DIR));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_IN)){
@@ -5098,8 +5088,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 							isError	= true;
 							break;
 						}
-					// cppcheck-suppress stlIfStrFind
-					}else if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
+					}else if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DEV));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_SOCK)){
@@ -5726,9 +5715,7 @@ bool ChmEventSock::MergeStart(void)
 				mergeidmap[*iter] = CHMPX_COM_REQ_UPDATE_INIVAL;
 			}
 		}
-		// cppcheck-suppress unmatchedSuppression
-		// cppcheck-suppress stlSize
-		if(0 == mergeidmap.size()){
+		if(mergeidmap.empty()){
 			// there is no server, so set status "DONE" here.
 			fullock::flck_unlock_noshared_mutex(&mergeidmap_lockval);		// UNLOCK
 
