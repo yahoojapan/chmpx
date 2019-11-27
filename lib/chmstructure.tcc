@@ -37,6 +37,7 @@
 #include "chmstructure.h"
 #include "chmconf.h"
 #include "chmhash.h"
+#include "chmnetdb.h"
 
 //---------------------------------------------------------
 // Typedefs
@@ -877,6 +878,36 @@ bool chmpx_lap<T>::Initialize(const char* hostname, const char* group, CHMPXMODE
 		return false;
 	}
 
+	// [NOTE]
+	// Hostname may be set to something other than an IP address string or FQDN.
+	// Therefore, we need to convert it to FQDN as much as possible here.
+	//
+	// [TODO]
+	// This function will be added or changed in the future.
+	// That is especially to deal with cases such as server node hidden in firewall.
+	//
+	strlst_t	expandlist;
+	if(!ChmNetDb::Get()->GetHostnameList(hostname, expandlist, true) || expandlist.empty()){
+		MSG_CHMPRN("Not found any hostname for %s, then try to get a normalized IP addresses.", hostname);
+
+		if(!ChmNetDb::Get()->GetIpAddressStringList(hostname, expandlist, true) || expandlist.empty()){
+			MSG_CHMPRN("Not found any hostname for %s, then try to get another hostanme allowed localhost.", hostname);
+
+			if(!ChmNetDb::Get()->GetAllHostList(hostname, expandlist, false) || expandlist.empty()){	// last, allow localhost
+				MSG_CHMPRN("Not found any IP address for %s, then set this value as is.", hostname);
+			}else{
+				MSG_CHMPRN("convert host(%s) to host(%s) and register as Slave Node.", hostname, expandlist.front().c_str());
+				hostname = expandlist.front().c_str();
+			}
+		}else{
+			MSG_CHMPRN("convert host(%s) to IP address(%s) and register as Slave Node.", hostname, expandlist.front().c_str());
+			hostname = expandlist.front().c_str();
+		}
+	}else{
+		MSG_CHMPRN("convert host(%s) to hostname(%s) and register as Slave Node.", hostname, expandlist.front().c_str());
+		hostname = expandlist.front().c_str();
+	}
+
 	strcpy(basic_type::pAbsPtr->name,			hostname);
 	strcpy(basic_type::pAbsPtr->capath,			ssl.capath);
 	strcpy(basic_type::pAbsPtr->server_cert,	ssl.server_cert);
@@ -1264,10 +1295,8 @@ int chmpx_lap<T>::GetSock(int type)
 		if(basic_type::pAbsPtr->socklist){
 			chmsocklistlap	tmpsocklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 			socklist_t		sockarr;
-			// cppcheck-suppress stlSize
-			if(tmpsocklist.GetAllSocks(sockarr) && 0 < sockarr.size()){
+			if(tmpsocklist.GetAllSocks(sockarr) && !sockarr.empty()){
 				// return first sock.
-				// cppcheck-suppress stlSize
 				rtsock = sockarr.front();
 			}
 		}
@@ -1449,6 +1478,8 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 			ERR_CHMPRN("name(%s - %s) or chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ") is different.", basic_type::pAbsPtr->name, chmpxsvr->name, basic_type::pAbsPtr->chmpxid, chmpxsvr->chmpxid);
 			return false;
 		}
+		bool	is_overwrite_port	= false;
+		bool	is_overwrite_ctlport= false;
 		if(basic_type::pAbsPtr->port != chmpxsvr->port){
 			if(basic_type::pAbsPtr->socklist){
 				ERR_CHMPRN("port(%d) is opened yet.", basic_type::pAbsPtr->port);
@@ -1458,6 +1489,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 				ERR_CHMPRN("port(%d) is opened(selfsock:%d) yet.", basic_type::pAbsPtr->port, basic_type::pAbsPtr->selfsock);
 				return false;
 			}
+			is_overwrite_port = true;
 		}
 		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport){
 			if(CHM_INVALID_SOCK != basic_type::pAbsPtr->ctlsock){
@@ -1468,11 +1500,12 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 				ERR_CHMPRN("ctlport(%d) is opened(selfctlsock:%d) yet.", basic_type::pAbsPtr->ctlport, basic_type::pAbsPtr->selfctlsock);
 				return false;
 			}
+			is_overwrite_ctlport = true;
 		}
-		if(basic_type::pAbsPtr->port != chmpxsvr->port){
+		if(is_overwrite_port){
 			basic_type::pAbsPtr->port = chmpxsvr->port;
 		}
-		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport){
+		if(is_overwrite_ctlport){
 			basic_type::pAbsPtr->ctlport = chmpxsvr->ctlport;
 		}
 	}
@@ -6022,8 +6055,7 @@ bool chmpxman_lap<T>::GetServerChmpxIdAndBaseHashByHashs(chmhash_t hash, chmpxid
 	if(CHM_INVALID_CHMPXID != last_chmpxid){
 		basic_type::pAbsPtr->last_chmpxid = last_chmpxid;						// for random
 	}
-	// cppcheck-suppress stlSize
-	return (0 != chmpxids.size());
+	return (!chmpxids.empty());
 }
 
 //

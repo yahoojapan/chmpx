@@ -78,8 +78,7 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 		WAN_CHMPRN("Failed to get pid list.");
 		return true;	// finish.
 	}
-	// cppcheck-suppress stlSize
-	if(0 == pidlist.size()){
+	if(pidlist.empty()){
 		// why?(nothing to do)
 		return true;
 	}
@@ -93,8 +92,7 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 				down_pids.push_back(*iter);
 			}
 		}
-		// cppcheck-suppress stlSize
-		if(0 != down_pids.size()){
+		if(!down_pids.empty()){
 			break;
 		}
 		// no down process

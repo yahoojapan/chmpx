@@ -570,14 +570,13 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
-	// change hostname to fqdn
-	string	globalname;
-	if(!ChmNetDb::Get()->GetHostname(hostname, globalname, true)){
-		MSG_CHMPRN("Could not convert hostname to global hostname.");
-		return false;
-	}
+
+	string		globalname;
+	strlst_t	server_list;
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
-		if(globalname == iter->name){
+		server_list.clear();
+		server_list.push_back(iter->name);
+		if(IsInHostnameList(hostname, server_list, globalname, true)){
 			if(CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport){
 				// found
 				svrnodeinfo = *iter;
@@ -585,6 +584,8 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 			}
 		}
 	}
+	MSG_CHMPRN("Not found host(%s) in server node list.", hostname);
+
 	return false;
 }
 
@@ -903,9 +904,7 @@ bool CHMIniConf::LoadConfigurationRaw(CFGRAW& chmcfgraw) const
 		}
 	}
 
-	// cppcheck-suppress unmatchedSuppression
-	// cppcheck-suppress stlSize
-	if(0 < tmpmap.size()){
+	if(!tmpmap.empty()){
 		if(INICFG_INSEC_GLOBAL == section){
 			merge_strmap(chmcfgraw.global, tmpmap);
 		}else if(INICFG_INSEC_SVRNODE == section){
@@ -1472,8 +1471,16 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		return false;
 	}
 
-	string	localhost_hostname;
-	ChmNetDb::GetLocalHostname(localhost_hostname);
+	strlst_t	localhost_list;
+	ChmNetDb::GetLocalHostList(localhost_list);
+	if(CHMDBG_MSG <= GetChmDbgMode()){
+		MSG_CHMPRN("local hostnames / IP addresses = {");
+		for(strlst_t::const_iterator diter = localhost_list.begin(); localhost_list.end() != diter; ++diter){
+			MSG_CHMPRN("  %s", diter->c_str());
+		}
+		MSG_CHMPRN("}");
+	}
+
 	for(strmaparr_t::iterator iter = chmcfgraw.server_nodes.begin(); iter != chmcfgraw.server_nodes.end(); ++iter){
 		CHMNODE_CFGINFO	svrnode;
 
@@ -1695,15 +1702,42 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			MSG_CHMPRN("Failed to expand server node name(%s).", svrnode.name.c_str());
 			return false;
 		}
+		if(CHMDBG_MSG <= GetChmDbgMode()){
+			MSG_CHMPRN("target host(%s) hostnames / IP addresses = {", svrnode.name.c_str());
+			for(strlst_t::const_iterator diter2 = expand_svrnodes.begin(); expand_svrnodes.end() != diter2; ++diter2){
+				MSG_CHMPRN("  %s", diter2->c_str());
+			}
+			MSG_CHMPRN("}");
+		}
 
 		// Add each expanded server node name.
 		for(strlst_t::const_iterator svrnodeiter = expand_svrnodes.begin(); svrnodeiter != expand_svrnodes.end(); ++svrnodeiter){
-			svrnode.name = (*svrnodeiter);
+			strlst_t	nodehost_list;
+			nodehost_list.clear();
+			if(!ChmNetDb::Get()->GetAllHostList(svrnodeiter->c_str(), nodehost_list, true)){
+				// if not found hostname/IP addresses for server node, add the original hostname
+				nodehost_list.push_back(*svrnodeiter);
+			}
+			// set first hostname
+			svrnode.name = nodehost_list.front();
 			chmcfginfo.servers.push_back(svrnode);
 
 			// whichever server mode or not?
-			if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport && 0 == strcasecmp(svrnode.name.c_str(), localhost_hostname.c_str())){
-				ccvals.is_server_by_ctlport = true;
+			if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport){
+				bool	is_break_loop = false;
+				for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
+					for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
+						if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
+							MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());
+							ccvals.is_server_by_ctlport	= true;
+							is_break_loop				= true;
+							break;
+						}
+					}
+					if(is_break_loop){
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -2268,7 +2302,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 							}
 						}
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_CAPATH_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_CAPATH_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else{
 							ccvals.capath = reinterpret_cast<const char*>(yevent.data.scalar.value);
@@ -2281,7 +2315,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 							ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
 							result = false;
 						}else if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2302,7 +2336,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 							ERR_CHMPRN("Found %s in %s section with value(%s), but %s is OFF.", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_SSL_STR);
 							result = false;
 						}else if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2320,7 +2354,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 				}else if(0 == strcasecmp(INICFG_SLAVE_CERT_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2338,7 +2372,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 				}else if(0 == strcasecmp(INICFG_SLAVE_PRIKEY_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2372,7 +2406,7 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 				}else if(0 == strcasecmp(INICFG_NSSDB_DIR_STR, key.c_str())){
 					if(0 != strcasecmp(INICFG_STRING_NULL, reinterpret_cast<const char*>(yevent.data.scalar.value))){		// set only when value is not "NULL"
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_NSSDB_DIR_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_NSSDB_DIR_STR, CFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 
 						}else if(is_dir_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2454,8 +2488,16 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 
 	// temporary data
 	CHMNODE_CFGINFO	svrnode;
-	string			localhost_hostname;
-	ChmNetDb::GetLocalHostname(localhost_hostname);
+	strlst_t		localhost_list;
+	ChmNetDb::GetLocalHostList(localhost_list);
+
+	if(CHMDBG_MSG <= GetChmDbgMode()){
+		MSG_CHMPRN("local hostnames / IP addresses = {");
+		for(strlst_t::const_iterator diter = localhost_list.begin(); localhost_list.end() != diter; ++diter){
+			MSG_CHMPRN("  %s", diter->c_str());
+		}
+		MSG_CHMPRN("}");
+	}
 
 	// Loading
 	string	key("");
@@ -2574,18 +2616,45 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 					result = false;
 
 				}else{
+					if(CHMDBG_MSG <= GetChmDbgMode()){
+						MSG_CHMPRN("target host(%s) hostnames / IP addresses = {", svrnode.name.c_str());
+						for(strlst_t::const_iterator diter2 = expand_svrnodes.begin(); expand_svrnodes.end() != diter2; ++diter2){
+							MSG_CHMPRN("  %s", diter2->c_str());
+						}
+						MSG_CHMPRN("}");
+					}
+
 					// Add each expanded server node name.
 					for(strlst_t::const_iterator svrnodeiter = expand_svrnodes.begin(); svrnodeiter != expand_svrnodes.end(); ++svrnodeiter){
-						svrnode.name = (*svrnodeiter);
+						strlst_t	nodehost_list;
+						nodehost_list.clear();
+						if(!ChmNetDb::Get()->GetAllHostList(svrnodeiter->c_str(), nodehost_list, true)){
+							// if not found hostname/IP addresses for server node, add the original hostname
+							nodehost_list.push_back(*svrnodeiter);
+						}
+						// set first hostname
+						svrnode.name = nodehost_list.front();
 						chmcfginfo.servers.push_back(svrnode);
 
 						// whichever server mode or not?
-						if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport && 0 == strcasecmp(svrnode.name.c_str(), localhost_hostname.c_str())){
-							ccvals.is_server_by_ctlport = true;
+						if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport){
+							bool	is_break_loop = false;
+							for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
+								for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
+									if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
+										MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());
+										ccvals.is_server_by_ctlport	= true;
+										is_break_loop				= true;
+										break;
+									}
+								}
+								if(is_break_loop){
+									break;
+								}
+							}
 						}
 					}
 				}
-
 				in_mapping = false;
 			}
 
@@ -2658,7 +2727,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 							}
 						}
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_CAPATH_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_CAPATH_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else{
 							svrnode.capath = reinterpret_cast<const char*>(yevent.data.scalar.value);
@@ -2670,7 +2739,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						svrnode.server_cert = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SERVER_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2690,7 +2759,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						svrnode.server_prikey = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SERVER_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2710,7 +2779,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						svrnode.slave_cert = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2730,7 +2799,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						svrnode.slave_prikey = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -2993,7 +3062,7 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 							}
 						}
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_CAPATH_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_CAPATH_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else{
 							slvnode.capath = reinterpret_cast<const char*>(yevent.data.scalar.value);
@@ -3005,7 +3074,7 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						slvnode.slave_cert = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_CERT_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
@@ -3025,7 +3094,7 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						slvnode.slave_prikey = "";
 					}else{
 						if(CHM_MAX_PATH_LEN <= strlen(reinterpret_cast<const char*>(yevent.data.scalar.value))){
-							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zd) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+							ERR_CHMPRN("Found %s in %s section with value %s, but its length(%zu) is over max length(1024).", INICFG_SLAVE_PRIKEY_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value), strlen(reinterpret_cast<const char*>(yevent.data.scalar.value)));
 							result = false;
 						}else if(!ChmSecureSock::IsCertAllowName()){
 							if(!is_file_safe_exist(reinterpret_cast<const char*>(yevent.data.scalar.value))){
