@@ -998,17 +998,17 @@ typedef struct com_packet{
 		if(chm_debug_mode >= CHMDBG_DUMP){ \
 			if(COM_PX2PX == (pComPkt)->head.type){ \
 				PPXCOM_ALL	pComAll = CVT_COM_ALL_PTR_PXCOMPKT((pComPkt)); \
-				MSG_CHMPRN("%s COMPKT type(%s) : PXCOM_ALL type(%s).", action ? action : "", STRCOMTYPE((pComPkt)->head.type), STRPXCOMTYPE(pComAll->val_head.type)); \
+				MSG_CHMPRN("%s COMPKT type(%s) : PXCOM_ALL type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type), STRPXCOMTYPE(pComAll->val_head.type)); \
 			}else if(COM_C2C == (pComPkt)->head.type){ \
-				MSG_CHMPRN("%s COMPKT type(%s) : COM_C2C type(%s).", action ? action : "", STRCOMTYPE((pComPkt)->head.type), STRCOMC2CTYPE((pComPkt)->head.c2ctype)); \
+				MSG_CHMPRN("%s COMPKT type(%s) : COM_C2C type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type), STRCOMC2CTYPE((pComPkt)->head.c2ctype)); \
 			}else{ \
-				MSG_CHMPRN("%s COMPKT type(%s).", action ? action : "", STRCOMTYPE((pComPkt)->head.type)); \
+				MSG_CHMPRN("%s COMPKT type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type)); \
 			} \
 		}
 
 #define	DUMPCOM_COMPKT(headmsg, pComPkt)	\
 		if(chm_debug_mode >= CHMDBG_DUMP){ \
-			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "DUMP COMPKT(%s) = {\n",					headmsg ? headmsg : "notag"); \
+			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "DUMP COMPKT(%s) = {\n",					(CHMEMPTYSTR(headmsg) ? "notag" : headmsg)); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "  head              = {\n"); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "    version         = 0x%016" PRIx64 "\n",	(pComPkt)->head.version); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "    type            = 0x%016" PRIx64 "\n",	(pComPkt)->head.type); \
@@ -1037,7 +1037,7 @@ typedef struct com_packet{
 
 #define	DUMPCOM_PXCLT(headmsg, pCltAll)	\
 		if(chm_debug_mode >= CHMDBG_DUMP){ \
-			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "DUMP PXCTL(%s) = {\n",						headmsg ? headmsg : "notag"); \
+			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "DUMP PXCTL(%s) = {\n",						(CHMEMPTYSTR(headmsg) ? "notag" : headmsg)); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "  val_head          = {\n"); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "    type            = 0x%016" PRIx64 "\n",	(pCltAll)->val_head.type); \
 			fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "    length          = 0x%016" PRIx64 "\n",	(pCltAll)->val_head.length); \

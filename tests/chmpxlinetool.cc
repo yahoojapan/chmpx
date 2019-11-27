@@ -34,6 +34,8 @@
 #include <termios.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/utsname.h>
+#include <ifaddrs.h>
 #include <map>
 #include <list>
 
@@ -1029,8 +1031,7 @@ static bool ExecOptionParser(int argc, char** argv, option_t& opts, string& prgn
 		return false;
 	}
 	prgname = basename(argv[0]);
-	// cppcheck-suppress stlIfStrFind
-	if(0 == prgname.find("lt-")){
+	if(string::npos == prgname.find("lt-")){
 		// cut "lt-"
 		prgname = prgname.substr(3);
 	}
@@ -1141,6 +1142,220 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 	if(1 < opts.size()){
 		ERR("Too many option parameter.");
 		return false;
+	}
+	return true;
+}
+
+//---------------------------------------------------------
+// Utilities for hostname/IP address/localhost from chmnetdb.cc
+//---------------------------------------------------------
+// [NOTE]
+// This function is copied from chmnetdb.cc: add_uniquestring_StringToList()
+//
+static void AddUniqueStringToList(const string& str, strlst_t& list)
+{
+	if(str.empty()){
+		return;
+	}
+	for(strlst_t::const_iterator iter = list.begin(); iter != list.end(); ++iter){
+		if((*iter) == str){
+			// already has same string.
+			return;
+		}
+	}
+	list.push_back(str);
+}
+
+// [NOTE]
+// This function is as same as ChmNetDb::GetNoZoneIndexIpAddress() in chmnetdb.cc
+// This function is copied from chmnetdb.cc: add_uniquestring_StringToList()
+//
+string GetNoZoneIndexIpAddress(const string& ipaddr)
+{
+	string::size_type	pos;
+	if(string::npos != (pos = ipaddr.find('%'))){
+		return ipaddr.substr(0, pos);
+	}
+	return ipaddr;
+}
+
+// [NOTE]
+// This function is as same as ChmNetDb::InitializeLocalHostIpAddresses() in chmnetdb.cc
+//
+bool GetLocalHostIpAddresses(strlst_t& ipaddresses)
+{
+	struct ifaddrs*	ifaddr;
+	char			ipaddr[NI_MAXHOST];
+
+	// get ip addresses on interface
+	memset(&ipaddr, 0, sizeof(ipaddr));
+	if(-1 == getifaddrs(&ifaddr)){
+		ERR("Could not get local interface addresses by getifaddrs : errno=%d", errno);
+		return false;
+	}
+
+	// get all ip addresses
+	for(struct ifaddrs* tmp_ifaddr = ifaddr; NULL != tmp_ifaddr; tmp_ifaddr = tmp_ifaddr->ifa_next){
+		if(NULL == tmp_ifaddr->ifa_addr){
+			continue;
+		}
+		if(AF_INET == tmp_ifaddr->ifa_addr->sa_family || AF_INET6 == tmp_ifaddr->ifa_addr->sa_family){
+			memset(ipaddr, 0, sizeof(ipaddr));
+			socklen_t	salen	= (AF_INET == tmp_ifaddr->ifa_addr->sa_family) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
+			int			result	= getnameinfo(tmp_ifaddr->ifa_addr, salen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
+			if(0 == result){
+				if(!CHMEMPTYSTR(ipaddr)){
+					MSG("Found local interface IP address : %s", ipaddr);
+					AddUniqueStringToList(string(ipaddr), ipaddresses);
+				}else{
+					WAN("Found local interface IP address, but it is empty.");
+				}
+			}else{
+				WAN("Failed to get local interface IP address by getnameinfo : %s", gai_strerror(result));
+			}
+		}
+	}
+	freeifaddrs(ifaddr);
+
+	return true;
+}
+
+// [NOTE]
+// This function is as same as ChmNetDb::InitializeLocalHostnames() in chmnetdb.cc
+//
+bool GetLocalHostnames(strlst_t& hostnames)
+{
+	struct addrinfo		hints;
+	struct addrinfo*	res_info = NULL;
+	struct addrinfo*	tmpaddrinfo;
+	struct utsname		buf;
+	string				localname;
+	int					result;
+
+	// Get local hostname by uname
+	if(-1 == uname(&buf) || CHMEMPTYSTR(buf.nodename)){
+		ERR("Failed to get own host(node) name.");
+		return false;
+	}
+	// got local hostame
+	localname = buf.nodename;
+	AddUniqueStringToList(localname, hostnames);
+
+	// local hostname -> addrinfo
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags		= AI_CANONNAME;
+	hints.ai_family		= AF_UNSPEC;
+	hints.ai_socktype	= SOCK_STREAM;
+	if(0 != (result = getaddrinfo(buf.nodename, NULL, &hints, &res_info)) || !res_info){				// port is NULL
+		MSG("Could not get addrinfo from %s, errno=%d.", buf.nodename, result);
+		if(res_info){
+			freeaddrinfo(res_info);
+		}
+	}else{
+		// addrinfo(list) -> hostname
+		char	hostname[NI_MAXHOST];
+		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
+			memset(hostname, 0, sizeof(hostname));
+			if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
+				if(!CHMEMPTYSTR(hostname)){
+					// When local hostname without domain name is set in /etc/hosts, "hostname" is short name.
+					// (if other server name is set, this class do not care it.)
+					//
+					if(0 != strcmp(localname.c_str(), hostname)){
+						MSG("Found another local hostname : %s", hostname);
+						AddUniqueStringToList(string(hostname), hostnames);
+					}
+				}else{
+					WAN("Found another local hostname, but it is empty.");
+				}
+			}else{
+				MSG("Failed to get another local hostname %s, errno=%d.", buf.nodename, result);
+			}
+		}
+		freeaddrinfo(res_info);
+	}
+	return true;
+}
+
+bool GetLocalHostInfo(strlst_t& hostnames, strlst_t& ipaddresses)
+{
+	if(!GetLocalHostIpAddresses(ipaddresses)){
+		WAN("Obtaining the IP address of the local interfaces may have failed, but continue...");
+	}
+	if(!GetLocalHostnames(hostnames)){
+		WAN("Obtaining the local hostnames may have failed, but continue...");
+	}
+	return true;
+}
+
+bool ExpandLocalHostInfo(const char* host, strlst_t& hostnames, strlst_t& ipaddresses)
+{
+	if(CHMEMPTYSTR(host)){
+		ERR("Parameter host is empty.");
+		return false;
+	}
+	if(	0 == strcmp(host, "localhost")	||
+		0 == strcmp(host, "127.0.0.1")	||
+		0 == strcmp(host, "::1")		||
+		0 == strncmp(host, "::1%", 4)	)
+	{
+		return GetLocalHostInfo(hostnames, ipaddresses);
+	}
+	return false;
+}
+
+// [NOTE]
+// This function is as same as ChmNetDb::GetHostAddressInfo() in chmnetdb.cc
+//
+static bool GetAllHostInfos(const char* host, strlst_t& hostnames, strlst_t& ipaddresses)
+{
+
+	if(CHMEMPTYSTR(host)){
+		ERR("Parameter host is empty.");
+		return false;
+	}
+
+	// if localhost, only expand for it
+	if(ExpandLocalHostInfo(host, hostnames, ipaddresses)){
+		MSG("host(%s) is localhost, expading all host information.");
+	}else{
+		struct addrinfo		hints;
+		struct addrinfo*	res_info = NULL;
+		struct addrinfo*	tmpaddrinfo;
+		char				hostname[NI_MAXHOST];
+		char				ipaddr[NI_MAXHOST];
+		int					result;
+
+		// host -> addrinfo
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_flags		= AI_CANONNAME;
+		hints.ai_family		= AF_UNSPEC;
+		hints.ai_socktype	= SOCK_STREAM;
+		if(0 != getaddrinfo(host, NULL, &hints, &res_info) || !res_info){				// port is NULL
+			ERR("Could not get address information for host(%s) : errno=%d", host, errno);
+			return false;
+		}
+
+		// addrinfo -> hostname
+		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
+			memset(&hostname, 0, sizeof(hostname));
+			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
+				MSG("Could not get hostname %s, errno=%d.", host, result);
+			}else{
+				AddUniqueStringToList(string(hostname), hostnames);
+			}
+		}
+
+		// addrinfo -> normalized ipaddress
+		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
+			memset(&ipaddr, 0, sizeof(ipaddr));
+			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
+				MSG("Could not convert normalized ipaddress  %s, errno=%d.", host, result);
+			}else{
+				AddUniqueStringToList(string(ipaddr), ipaddresses);
+			}
+		}
+		freeaddrinfo(res_info);
 	}
 	return true;
 }
@@ -1355,12 +1570,41 @@ static size_t get_chmpx_nodes(const nodectrllist_t& nodes, nodectrllist_t& tgnod
 
 static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, string& hostname, short& port)
 {
+	strlst_t	hostnames;
+	strlst_t	ipaddresses;
+
+	// get all host information from hostname
+	GetAllHostInfos(hostname.c_str(), hostnames, ipaddresses);
+
 	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		// direct comparison
 		if(hostname == iter->hostname){
 			if(CHM_INVALID_PORT == port || port == iter->ctrlport){
 				hostname	= iter->hostname;
 				port		= iter->ctrlport;
 				return true;
+			}
+		}
+		// search in hostname list
+		for(strlst_t::const_iterator hiter = hostnames.begin(); hiter != hostnames.end(); ++hiter){
+			if((*hiter) == iter->hostname){
+				if(CHM_INVALID_PORT == port || port == iter->ctrlport){
+					hostname	= iter->hostname;
+					port		= iter->ctrlport;
+					return true;
+				}
+			}
+		}
+		// search in ipaddress list
+		string	node_nozi = GetNoZoneIndexIpAddress(iter->hostname);
+		for(strlst_t::const_iterator ipiter = ipaddresses.begin(); ipiter != ipaddresses.end(); ++ipiter){
+			string	ipaddr_nozi = GetNoZoneIndexIpAddress(*ipiter);
+			if(ipaddr_nozi == node_nozi){
+				if(CHM_INVALID_PORT == port || port == iter->ctrlport){
+					hostname	= node_nozi;
+					port		= iter->ctrlport;
+					return true;
+				}
 			}
 		}
 	}
@@ -1575,47 +1819,6 @@ static inline string BG_CYAN(const char* str, bool bold = false, bool blink = fa
 static inline string BG_WHITE(const char* str, bool bold = false, bool blink = false)		{ return CVT_ESC_CHAR(str, CLR_WHITE,	true, bold, blink); }
 
 //---------------------------------------------------------
-// Utility for hostname
-//---------------------------------------------------------
-static bool GetLocalHostnames(strlst_t& expand_lst)
-{
-	return ExpandSimpleRegxHostname("127.0.0.1", expand_lst, true);
-}
-
-static bool IsHostLocalHost(const string& hostname)
-{
-	if(hostname.empty()){
-		return false;
-	}
-	strlst_t	localnames;
-	bool		found = false;
-	if(!GetLocalHostnames(localnames)){
-		if(hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1"){
-			found = true;
-		}
-	}else{
-		strlst_t	hostnames;
-		ExpandSimpleRegxHostname(hostname.c_str(), hostnames, true);
-
-		for(strlst_t::const_iterator iter1 = localnames.begin(); !found && iter1 != localnames.end(); ++iter1){
-			// check original hostname first.
-			if(0 == strcasecmp(iter1->c_str(), hostname.c_str())){
-				found = true;
-			}else{
-				// check converted fqdn hostnames
-				for(strlst_t::const_iterator iter2 = hostnames.begin(); iter2 != hostnames.end(); ++iter2){
-					if(0 == strcasecmp(iter1->c_str(), iter2->c_str())){
-						found = true;
-						break;
-					}
-				}
-			}
-		}
-	}
-	return found;
-}
-
-//---------------------------------------------------------
 // Utility for communication
 //---------------------------------------------------------
 #define	RECEIVE_LENGTH					(128 * 1024)	// 128KB for one receiving data maximum from sock
@@ -1770,44 +1973,47 @@ static int ConnectControlPort(const char* hostname, short port)
 		return CHM_INVALID_SOCK;
 	}
 
-	// Get addrinfo
-	struct addrinfo*	paddrinfo = NULL;
-	if(!ChmNetDb::Get()->GetAddrInfo(hostname, port, &paddrinfo, true)){			// if "localhost", convert fqdn.
+	// Get addrinfo list
+	addrinfolist_t	addrinfos;
+	if(!ChmNetDb::Get()->GetAddrInfoList(hostname, port, addrinfos, true)){		// if "localhost", convert fqdn.
 		WAN("Failed to get addrinfo for %s:%d.", hostname, port);
 		return CHM_INVALID_SOCK;
 	}
 
 	// make socket, bind, listen
 	int	sockfd = CHM_INVALID_SOCK;
-	for(struct addrinfo* ptmpaddrinfo = paddrinfo; ptmpaddrinfo && CHM_INVALID_SOCK == sockfd; ptmpaddrinfo = ptmpaddrinfo->ai_next){
-		if(IPPROTO_TCP != ptmpaddrinfo->ai_protocol){
-			MSG("protocol in addrinfo which is made from %s:%d does not TCP, so check next addrinfo...", hostname, port);
-			continue;
-		}
-		// socket
-		if(-1 == (sockfd = socket(ptmpaddrinfo->ai_family, ptmpaddrinfo->ai_socktype, ptmpaddrinfo->ai_protocol))){
-			WAN("Failed to make socket for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
-			continue;
-		}
+	for(addrinfolist_t::const_iterator iter = addrinfos.begin(); addrinfos.end() != iter && CHM_INVALID_SOCK == sockfd; ++iter){
+		struct addrinfo*	paddrinfo = *iter;
+		for(struct addrinfo* ptmpaddrinfo = paddrinfo; ptmpaddrinfo && CHM_INVALID_SOCK == sockfd; ptmpaddrinfo = ptmpaddrinfo->ai_next){
+			if(IPPROTO_TCP != ptmpaddrinfo->ai_protocol){
+				MSG("protocol in addrinfo which is made from %s:%d does not TCP, so check next addrinfo...", hostname, port);
+				continue;
+			}
+			// socket
+			if(CHM_INVALID_SOCK == (sockfd = socket(ptmpaddrinfo->ai_family, ptmpaddrinfo->ai_socktype, ptmpaddrinfo->ai_protocol))){
+				WAN("Failed to make socket for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
+				continue;
+			}
 
-		// options
-		setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<const void*>(&opt_keepidle), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<const void*>(&opt_keepinterval), sizeof(int));
-		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<const void*>(&opt_keepcount), sizeof(int));
+			// options
+			setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const void*>(&opt_yes), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, reinterpret_cast<const void*>(&opt_keepidle), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, reinterpret_cast<const void*>(&opt_keepinterval), sizeof(int));
+			setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, reinterpret_cast<const void*>(&opt_keepcount), sizeof(int));
 
-		// connect
-		if(-1 == connect(sockfd, ptmpaddrinfo->ai_addr, ptmpaddrinfo->ai_addrlen)){
-			MSG("Failed to connect for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
-			CHM_CLOSESOCK(sockfd);
-			continue;
-		}
-		if(CHM_INVALID_SOCK != sockfd){
-			break;
+			// connect
+			if(-1 == connect(sockfd, ptmpaddrinfo->ai_addr, ptmpaddrinfo->ai_addrlen)){
+				MSG("Failed to connect for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
+				CHM_CLOSESOCK(sockfd);
+				continue;
+			}
+			if(CHM_INVALID_SOCK != sockfd){
+				break;
+			}
 		}
 	}
-	freeaddrinfo(paddrinfo);
+	ChmNetDb::FreeAddrInfoList(addrinfos);
 
 	if(CHM_INVALID_SOCK == sockfd){
 		MSG("Could not make socket and connect %s:%d.", hostname, port);
@@ -2098,8 +2304,7 @@ static void* SendDumpCommandThread(void* param)
 //
 static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 {
-	// cppcheck-suppress stlSize
-	if(0 == nodes.size()){
+	if(nodes.empty()){
 		ERR("Parameter is wrong.");
 		return false;
 	}
@@ -2206,15 +2411,13 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	// cppcheck-suppress stlIfStrFind
-	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
+	while(string::npos != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		string	name;
 		string	strctrlport;
 		short	ctrlport;
 
 		// "[XX]={\n"
-		// cppcheck-suppress stlIfStrFind
-		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
+		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || string::npos != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
@@ -2284,8 +2487,7 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 			return strInput;
 		}
 	}
-	// cppcheck-suppress stlIfStrFind
-	if(0 != strInput.find(DUMP_KEY_END)){
+	if(string::npos != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		is_error = true;
 		return strInput;
@@ -2605,11 +2807,9 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	// cppcheck-suppress stlIfStrFind
-	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
+	while(string::npos != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
-		// cppcheck-suppress stlIfStrFind
-		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
+		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || string::npos != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
@@ -2635,8 +2835,7 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 		string		hostport= MakeHostCtrlport(unitdata.hostname, unitdata.ctrlport);
 		unitdatas[hostport]	= unitdata;
 	}
-	// cppcheck-suppress stlIfStrFind
-	if(0 != strInput.find(DUMP_KEY_END)){
+	if(string::npos != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		return strInput;
 	}
@@ -3572,9 +3771,7 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 
 		// Get Server Name as "VerifyPeer="
 		string	strIsVerify;
-		// cppcheck-suppress unmatchedSuppression
-		// cppcheck-suppress stlIfStrFind
-		if(isSSL && 0 == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
+		if(isSSL && string::npos == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
 			strInput = strInput.substr(pos + strlen(ALLSTATUS_KEY_ISVERIFY));
 			if(string::npos == (pos = strInput.find(ALLSTATUS_KEY_CR))){
 				ERR("Could not found CR after \"Verify Peer=\" key in ALLSTATUS result.");
@@ -4699,8 +4896,7 @@ static bool VersionCommand(params_t& params)
 	get_chmpx_nodes(is_dyna_nodes ? TargetNodes : InitialAllNodes, slvnodes, false);
 
 	PRN(" Chmpx server nodes             : %zu", svrnodes.size());
-	// cppcheck-suppress stlSize
-	if(0 < svrnodes.size()){
+	if(!svrnodes.empty()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = svrnodes.begin(); iter != svrnodes.end(); ++iter){
 			string	strVersion = VersionCommandSub(iter->hostname.c_str(), iter->ctrlport);
@@ -4709,8 +4905,7 @@ static bool VersionCommand(params_t& params)
 		PRN(" }");
 	}
 	PRN(" Chmpx slave nodes              : %zu", slvnodes.size());
-	// cppcheck-suppress stlSize
-	if(0 < slvnodes.size()){
+	if(!slvnodes.empty()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = slvnodes.begin(); iter != slvnodes.end(); ++iter){
 			string	strVersion = VersionCommandSub(iter->hostname.c_str(), iter->ctrlport);
@@ -5310,9 +5505,7 @@ static bool CommandStringHandle(ConsoleInput& InputIF, const char* pCommand, boo
 	if(!LineOptionParser(pCommand, opts)){
 		return true;	// for continue.
 	}
-	// cppcheck-suppress unmatchedSuppression
-	// cppcheck-suppress stlSize
-	if(0 == opts.size()){
+	if(opts.empty()){
 		return true;
 	}
 
@@ -5471,7 +5664,6 @@ int main(int argc, char** argv)
 {
 	option_t	opts;
 	string		prgname;
-	string		strOrgHostname;
 	bool		is_load_from_env = false;
 
 	//----------------------
@@ -5556,11 +5748,7 @@ int main(int argc, char** argv)
 	// -host
 	if(opts.end() != opts.find("-host")){
 		strInitialHostname	= opts["-host"][0];
-		strOrgHostname		= strInitialHostname;
-		if(IsHostLocalHost(strInitialHostname)){
-			// hostname is as same as localhost's name
-			strInitialHostname	= "localhost";
-		}
+
 		// check control port
 		if(CHM_INVALID_PORT == nInitialCtrlPort){
 			ERR("No control port(-ctrlport option) is specified.");
@@ -5758,15 +5946,7 @@ int main(int argc, char** argv)
 					PRN("    Specified Control port      : %d",	nInitialCtrlPort);
 				}
 			}else if(!strInitialHostname.empty()){
-				if(!strOrgHostname.empty()){
-					if(strOrgHostname != strInitialHostname){
-						PRN("    Specified Hostname          : %s(%s)",	strOrgHostname.c_str(), strInitialHostname.c_str());
-					}else{
-						PRN("    Specified Hostname          : %s",	strInitialHostname.c_str());
-					}
-				}else{
-					PRN("    Hostname is not specified   : (%s)",	strInitialHostname.c_str());
-				}
+				PRN("    Hostname is not specified   : (%s)",	strInitialHostname.c_str());
 				PRN("    Specified Control port      : %d",	(CHM_INVALID_PORT == nInitialCtrlPort ? 0 : nInitialCtrlPort));
 				PRN("    Specified Chmpx mode        : %s",	isInitialServerMode ? "Server node" : "Slave node");
 			}

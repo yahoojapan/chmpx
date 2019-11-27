@@ -216,8 +216,7 @@ class ChmIMData
 		bool GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const;
 		bool GetServerSocks(chmpxid_t chmpxid, socklist_t& socklist, int& ctlsock) const;
 		bool GetServerSock(chmpxid_t chmpxid, socklist_t& socklist) const { int tmp; return GetServerSocks(chmpxid, socklist, tmp); }
-		// cppcheck-suppress stlSize
-		bool IsConnectServer(chmpxid_t chmpxid) const { socklist_t tmpsocklist; return (GetServerSock(chmpxid, tmpsocklist) && 0 < tmpsocklist.size()); }
+		bool IsConnectServer(chmpxid_t chmpxid) const { socklist_t tmpsocklist; return (GetServerSock(chmpxid, tmpsocklist) && !tmpsocklist.empty()); }
 		bool GetServerCtlSock(chmpxid_t chmpxid, int& ctlsock) const { socklist_t tmplist; return GetServerSocks(chmpxid, tmplist, ctlsock); }
 		bool GetServerHash(chmpxid_t chmpxid, chmhash_t& base, chmhash_t& pending) const;
 		bool GetServerBaseHash(chmpxid_t chmpxid, chmhash_t& hash) const { chmhash_t tmp; return GetServerHash(chmpxid, hash, tmp); }
@@ -239,8 +238,7 @@ class ChmIMData
 		long GetSlaveChmpxIds(chmpxidlist_t& list) const;
 		bool GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const;
 		bool GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const;
-		// cppcheck-suppress stlSize
-		bool IsConnectSlave(chmpxid_t chmpxid) const { socklist_t tmplist; return (GetSlaveSock(chmpxid, tmplist) && 0 < tmplist.size()); }
+		bool IsConnectSlave(chmpxid_t chmpxid) const { socklist_t tmplist; return (GetSlaveSock(chmpxid, tmplist) && !tmplist.empty()); }
 		chmpxsts_t GetSlaveStatus(chmpxid_t chmpxid) const;
 
 		bool SetServerSocks(chmpxid_t chmpxid, int sock, int ctlsock, int type);
