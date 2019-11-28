@@ -5074,7 +5074,9 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
-					if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress stlIfStrFind
+					if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DIR));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_IN)){
@@ -5088,7 +5090,9 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 							isError	= true;
 							break;
 						}
-					}else if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress stlIfStrFind
+					}else if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DEV));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_SOCK)){
