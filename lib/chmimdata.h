@@ -80,7 +80,7 @@ class ChmIMData
 		off_t GetLockOffsetForMQ(void) const;
 		bool CloseShm(void);
 		bool InitializeShm(void);
-		bool InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pself);
+		bool InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself);
 		bool IsAttachedShm(void) const { return (NULL != pChmShm); }
 		bool AttachShm(void);													// For client process library
 		bool InitializeOther(void);

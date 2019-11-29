@@ -192,8 +192,8 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 		Clean(bup_cfg.empty());
 		return false;
 	}
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
 		ERR_CHMPRN("Failed to load configuration from %s", cfgfile);
 		Clean(bup_cfg.empty());
 		return false;
@@ -210,7 +210,7 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 		// If client process joining on slave chmpx, MQPERATTACH and MAXQPERCLIENTMQ should be "1".
 		// But you can set not "1", so put a message here.
 		//
-		if(1 != pchmcfg->mqcnt_per_attach || 1 != pchmcfg->max_q_per_clientmq){
+		if(1 != chmcfg.mqcnt_per_attach || 1 != chmcfg.max_q_per_clientmq){
 			MSG_CHMPRN("Client process on slave chmpx must be 1 for MQPERATTACH and MAXQPERCLIENTMQ in configuration.");
 		}
 	}

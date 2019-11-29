@@ -206,6 +206,11 @@ CHMConf* CHMConf::GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config,
 }
 
 //---------------------------------------------------------
+// Class variables
+//---------------------------------------------------------
+int	CHMConf::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
+
+//---------------------------------------------------------
 // CHMConf Class
 //---------------------------------------------------------
 CHMConf::CHMConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* pJson) : ChmEventBase(eventqfd, pcntrl), ctlport_param(ctlport), type(CONF_UNKNOWN), inotifyfd(CHM_INVALID_HANDLE), watchfd(CHM_INVALID_HANDLE), pchmcfginfo(NULL)
@@ -230,7 +235,10 @@ bool CHMConf::Clean(void)
 		MSG_CHMPRN("Should call RemoveNotify function before calling this destructor.");
 		UnsetEventQueue();
 	}
+
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
 	CHM_Delete(pchmcfginfo);
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
 
 	return ChmEventBase::Clean();
 }
@@ -529,6 +537,8 @@ bool CHMConf::CheckUpdate(void)
 		return false;
 	}
 
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	bool	result = false;
 	if(pchmcfginfo){
 		if(!pchmcfginfo->compare(*pnewinfo)){
@@ -541,9 +551,14 @@ bool CHMConf::CheckUpdate(void)
 	}
 	pchmcfginfo = pnewinfo;
 
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
 	return result;
 }
 
+// [NOTE]
+// This method is not safe for multi threading.
+//
 const CHMCFGINFO* CHMConf::GetConfiguration(bool is_check_update)
 {
 	if(IsFileType() && !CheckConfFile()){
@@ -554,6 +569,23 @@ const CHMCFGINFO* CHMConf::GetConfiguration(bool is_check_update)
 		CheckUpdate();
 	}
 	return pchmcfginfo;
+}
+
+bool CHMConf::GetConfiguration(CHMCFGINFO& config, bool is_check_update)
+{
+	if(IsFileType() && !CheckConfFile()){
+		return false;
+	}
+	// Load & Check	configuration file.
+	if(is_check_update || !pchmcfginfo){
+		CheckUpdate();
+	}
+
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+	config = *pchmcfginfo;
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
+	return true;
 }
 
 bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update)
@@ -571,6 +603,8 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 		CheckUpdate();
 	}
 
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	string		globalname;
 	strlst_t	server_list;
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
@@ -580,10 +614,13 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 			if(CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport){
 				// found
 				svrnodeinfo = *iter;
+				fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
 				return true;
 			}
 		}
 	}
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
 	MSG_CHMPRN("Not found host(%s) in server node list.", hostname);
 
 	return false;
@@ -609,6 +646,8 @@ bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO&
 		CheckUpdate();
 	}
 
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	string		globalname;
 	strlst_t	slave_list;
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
@@ -617,27 +656,23 @@ bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO&
 		if(IsMatchHostname(hostname, slave_list, globalname)){
 			if(CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport){
 				// found
-				slvnodeinfo.name			= globalname;
-				slvnodeinfo.port			= iter->port;
-				slvnodeinfo.ctlport			= iter->ctlport;
-				slvnodeinfo.is_ssl			= iter->is_ssl;
-				slvnodeinfo.verify_peer		= iter->verify_peer;
-				slvnodeinfo.is_ca_file		= iter->is_ca_file;
-				slvnodeinfo.capath			= iter->capath;
-				slvnodeinfo.server_cert		= iter->server_cert;
-				slvnodeinfo.server_prikey	= iter->server_prikey;
-				slvnodeinfo.slave_cert		= iter->slave_cert;
-				slvnodeinfo.slave_prikey	= iter->slave_prikey;
+				slvnodeinfo 	= *iter;
+				slvnodeinfo.name= globalname;							// replace globalname to name
+				fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
 				return true;
 			}
 		}
 	}
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
+	MSG_CHMPRN("Not found host(%s) in slave node list.", hostname);
+
 	return false;
 }
 
 bool CHMConf::GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update)
 {
-	return GetServerInfo("localhost", pchmcfginfo->self_ctlport, slvnodeinfo, is_check_update);
+	return GetSlaveInfo("localhost", pchmcfginfo->self_ctlport, slvnodeinfo, is_check_update);
 }
 
 bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& nodeinfo, bool is_only_server, bool is_check_update)
@@ -671,10 +706,15 @@ bool CHMConf::GetServerList(strlst_t& server_list)
 		ERR_CHMPRN("Could not get configuration file(%s) contents.", cfgfile.c_str());
 		return false;
 	}
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	server_list.clear();
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
 		server_list.push_back(iter->name);
 	}
+
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
 	server_list.sort(strarr_sort());
 
 	return true;
@@ -706,9 +746,13 @@ bool CHMConf::GetSlaveList(strlst_t& slave_list)
 	}
 	slave_list.clear();
 
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
 		slave_list.push_back(iter->name);
 	}
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
 	slave_list.sort(strarr_sort());
 
 	return true;
@@ -739,11 +783,15 @@ bool CHMConf::IsSsl(void) const
 		return false;
 	}
 
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
 		if(iter->is_ssl){
 			return true;
 		}
 	}
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
 	return false;
 }
 

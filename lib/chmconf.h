@@ -54,7 +54,33 @@ typedef struct chm_node_cfg_info{
 	std::string		slave_cert;
 	std::string		slave_prikey;
 
-	chm_node_cfg_info() : name(""), port(0), ctlport(0), is_ssl(false), verify_peer(false), is_ca_file(false), capath(""), server_cert(""), server_prikey(""), slave_cert(""), slave_prikey("") {}
+	chm_node_cfg_info() :
+		name(""),
+		port(0),
+		ctlport(0),
+		is_ssl(false),
+		verify_peer(false),
+		is_ca_file(false),
+		capath(""),
+		server_cert(""),
+		server_prikey(""),
+		slave_cert(""),
+		slave_prikey("")
+	{}
+
+	chm_node_cfg_info(const struct chm_node_cfg_info& other) :
+		name(other.name),
+		port(other.port),
+		ctlport(other.ctlport),
+		is_ssl(other.is_ssl),
+		verify_peer(other.verify_peer),
+		is_ca_file(other.is_ca_file),
+		capath(other.capath),
+		server_cert(other.server_cert),
+		server_prikey(other.server_prikey),
+		slave_cert(other.slave_cert),
+		slave_prikey(other.slave_prikey)
+	{}
 
 	bool compare(const struct chm_node_cfg_info& other) const
 	{
@@ -73,6 +99,22 @@ typedef struct chm_node_cfg_info{
 			return true;
 		}
 		return false;
+	}
+	struct chm_node_cfg_info& operator=(const struct chm_node_cfg_info& other)
+	{
+		name			= other.name;
+		port			= other.port;
+		ctlport			= other.ctlport;
+		is_ssl			= other.is_ssl;
+		verify_peer		= other.verify_peer;
+		is_ca_file		= other.is_ca_file;
+		capath			= other.capath;
+		server_cert		= other.server_cert;
+		server_prikey	= other.server_prikey;
+		slave_cert		= other.slave_cert;
+		slave_prikey	= other.slave_prikey;
+
+		return *this;
 	}
 	bool operator==(const struct chm_node_cfg_info& other) const
 	{
@@ -158,13 +200,86 @@ typedef struct chm_cfg_info{
 	chmnode_cfginfos_t	slaves;
 
 	chm_cfg_info() :
-		groupname(""), revision(UNINITIALIZE_REVISION), is_server_mode(false), is_random_mode(false), self_ctlport(CHM_INVALID_PORT),
-		max_chmpx_count(0L), replica_count(0L), max_server_mq_cnt(0L), max_client_mq_cnt(0L), mqcnt_per_attach(0L), max_q_per_servermq(0L),
-		max_q_per_clientmq(0L), max_mq_per_client(0L), max_histlog_count(0L), retrycnt(-1), mq_retrycnt(-1), mq_ack(true), timeout_wait_socket(-1),
-		timeout_wait_connect(-1), timeout_wait_mq(-1), is_auto_merge(false), is_do_merge(false), timeout_merge(0), sock_thread_cnt(0), mq_thread_cnt(0),
-		max_sock_pool(1), sock_pool_timeout(0), k2h_fullmap(true), k2h_mask_bitcnt(K2HShm::DEFAULT_MASK_BITCOUNT), k2h_cmask_bitcnt(K2HShm::DEFAULT_COLLISION_MASK_BITCOUNT),
-		k2h_max_element(K2HShm::DEFAULT_MAX_ELEMENT_CNT), date(0L), ssl_min_ver(CHM_SSLTLS_VER_DEFAULT), nssdb_dir("")
+		groupname(""),
+		revision(UNINITIALIZE_REVISION),
+		is_server_mode(false),
+		is_random_mode(false),
+		self_ctlport(CHM_INVALID_PORT),
+		max_chmpx_count(0L),
+		replica_count(0L),
+		max_server_mq_cnt(0L),
+		max_client_mq_cnt(0L),
+		mqcnt_per_attach(0L),
+		max_q_per_servermq(0L),
+		max_q_per_clientmq(0L),
+		max_mq_per_client(0L),
+		max_histlog_count(0L),
+		retrycnt(-1),
+		mq_retrycnt(-1),
+		mq_ack(true),
+		timeout_wait_socket(-1),
+		timeout_wait_connect(-1),
+		timeout_wait_mq(-1),
+		is_auto_merge(false),
+		is_do_merge(false),
+		timeout_merge(0),
+		sock_thread_cnt(0),
+		mq_thread_cnt(0),
+		max_sock_pool(1),
+		sock_pool_timeout(0),
+		k2h_fullmap(true),
+		k2h_mask_bitcnt(K2HShm::DEFAULT_MASK_BITCOUNT),
+		k2h_cmask_bitcnt(K2HShm::DEFAULT_COLLISION_MASK_BITCOUNT),
+		k2h_max_element(K2HShm::DEFAULT_MAX_ELEMENT_CNT),
+		date(0L),
+		ssl_min_ver(CHM_SSLTLS_VER_DEFAULT),
+		nssdb_dir("")
 	{}
+
+	chm_cfg_info(const struct chm_cfg_info& other) :
+		groupname(other.groupname),
+		revision(other.revision),
+		is_server_mode(other.is_server_mode),
+		is_random_mode(other.is_random_mode),
+		self_ctlport(other.self_ctlport),
+		max_chmpx_count(other.max_chmpx_count),
+		replica_count(other.replica_count),
+		max_server_mq_cnt(other.max_server_mq_cnt),
+		max_client_mq_cnt(other.max_client_mq_cnt),
+		mqcnt_per_attach(other.mqcnt_per_attach),
+		max_q_per_servermq(other.max_q_per_servermq),
+		max_q_per_clientmq(other.max_q_per_clientmq),
+		max_mq_per_client(other.max_mq_per_client),
+		max_histlog_count(other.max_histlog_count),
+		retrycnt(other.retrycnt),
+		mq_retrycnt(other.mq_retrycnt),
+		mq_ack(other.mq_ack),
+		timeout_wait_socket(other.timeout_wait_socket),
+		timeout_wait_connect(other.timeout_wait_connect),
+		timeout_wait_mq(other.timeout_wait_mq),
+		is_auto_merge(other.is_auto_merge),
+		is_do_merge(other.is_do_merge),
+		timeout_merge(other.timeout_merge),
+		sock_thread_cnt(other.sock_thread_cnt),
+		mq_thread_cnt(other.mq_thread_cnt),
+		max_sock_pool(other.max_sock_pool),
+		sock_pool_timeout(other.sock_pool_timeout),
+		k2h_fullmap(other.k2h_fullmap),
+		k2h_mask_bitcnt(other.k2h_mask_bitcnt),
+		k2h_cmask_bitcnt(other.k2h_cmask_bitcnt),
+		k2h_max_element(other.k2h_max_element),
+		date(other.date),
+		ssl_min_ver(other.ssl_min_ver),
+		nssdb_dir(other.nssdb_dir)
+	{
+		chmnode_cfginfos_t::const_iterator	iter;
+		for(iter = other.servers.begin(); other.servers.end() != iter; ++iter){
+			servers.push_back(*iter);
+		}
+		for(iter = other.slaves.begin(); other.slaves.end() != iter; ++iter){
+			slaves.push_back(*iter);
+		}
+	}
 
 	bool compare(const struct chm_cfg_info& other) const
 	{
@@ -208,6 +323,52 @@ typedef struct chm_cfg_info{
 			return true;
 		}
 		return false;
+	}
+	struct chm_cfg_info& operator=(const struct chm_cfg_info& other)
+	{
+		groupname				= other.groupname;
+		revision				= other.revision;
+		is_server_mode			= other.is_server_mode;
+		is_random_mode			= other.is_random_mode;
+		self_ctlport			= other.self_ctlport;
+		max_chmpx_count			= other.max_chmpx_count;
+		replica_count			= other.replica_count;
+		max_server_mq_cnt		= other.max_server_mq_cnt;
+		max_client_mq_cnt		= other.max_client_mq_cnt;
+		mqcnt_per_attach		= other.mqcnt_per_attach;
+		max_q_per_servermq		= other.max_q_per_servermq;
+		max_q_per_clientmq		= other.max_q_per_clientmq;
+		max_mq_per_client		= other.max_mq_per_client;
+		max_histlog_count		= other.max_histlog_count;
+		retrycnt				= other.retrycnt;
+		mq_retrycnt				= other.mq_retrycnt;
+		mq_ack					= other.mq_ack;
+		timeout_wait_socket		= other.timeout_wait_socket;
+		timeout_wait_connect	= other.timeout_wait_connect;
+		timeout_wait_mq			= other.timeout_wait_mq;
+		is_auto_merge			= other.is_auto_merge;
+		is_do_merge				= other.is_do_merge;
+		timeout_merge			= other.timeout_merge;
+		sock_thread_cnt			= other.sock_thread_cnt;
+		mq_thread_cnt			= other.mq_thread_cnt;
+		max_sock_pool			= other.max_sock_pool;
+		sock_pool_timeout		= other.sock_pool_timeout;
+		k2h_fullmap				= other.k2h_fullmap;
+		k2h_mask_bitcnt			= other.k2h_mask_bitcnt;
+		k2h_cmask_bitcnt		= other.k2h_cmask_bitcnt;
+		k2h_max_element			= other.k2h_max_element;
+		date					= other.date;
+		ssl_min_ver				= other.ssl_min_ver;
+		nssdb_dir				= other.nssdb_dir;
+
+		chmnode_cfginfos_t::const_iterator	iter;
+		for(iter = other.servers.begin(); other.servers.end() != iter; ++iter){
+			servers.push_back(*iter);
+		}
+		for(iter = other.slaves.begin(); other.slaves.end() != iter; ++iter){
+			slaves.push_back(*iter);
+		}
+		return *this;
 	}
 	bool operator==(const struct chm_cfg_info& other) const
 	{
@@ -264,6 +425,8 @@ class CHMConf : public ChmEventBase
 		};
 
 	protected:
+		static int			lockval;			// like mutex
+
 		std::string			cfgfile;
 		std::string			strjson;
 		short				ctlport_param;
@@ -277,6 +440,7 @@ class CHMConf : public ChmEventBase
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const = 0;
 
+		const CHMCFGINFO* GetConfiguration(bool is_check_update = false);		// thread unsafe
 		bool GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
 		bool GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
 		bool GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update = false);
@@ -307,7 +471,7 @@ class CHMConf : public ChmEventBase
 
 		bool CheckConfFile(void) const;
 		bool CheckUpdate(void);
-		const CHMCFGINFO* GetConfiguration(bool is_check_update = false);
+		bool GetConfiguration(CHMCFGINFO& config, bool is_check_update = false);
 
 		bool GetNodeInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& nodeinfo, bool is_only_server, bool is_check_update = false);
 		bool GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, bool is_check_update = false);
