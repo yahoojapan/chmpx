@@ -3920,6 +3920,11 @@ bool ChmEventSock::Accept(int sock)
 	MSG_CHMPRN("Accept new socket(%d)", newsock);
 	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);			// UNLOCK
 
+	// Convert IPv4-mapped IPv6 addresses to plain IPv4.
+	if(!ChmNetDb::CvtV4MappedAddrInfo(&from, fromlen)){
+		ERR_CHMPRN("Something error occured during converting IPv4-mapped IPv6 addresses to plain IPv4, but continue...");
+	}
+
 	// get hostname for accessing control
 	string	stripaddress;
 	string	strhostname;
@@ -3931,6 +3936,7 @@ bool ChmEventSock::Accept(int sock)
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
 		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
 		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
+		strhostname = ChmNetDb::CvtIPv4MappedIPv6Address(strhostname);
 	}
 
 	// add tempolary accepting socket mapping.(before adding epoll for multi threading)
@@ -4056,6 +4062,7 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
 		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
 		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
+		strhostname = ChmNetDb::CvtIPv4MappedIPv6Address(strhostname);
 	}
 
 	// check ACL

@@ -86,10 +86,12 @@ class ChmNetDb
 		static bool GetLocalHostnameList(strlst_t& hostnames);
 		static bool GetLocalHostList(strlst_t& hostinfo, bool remove_localhost = false);
 		static bool GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inetv6);
-		static bool CvtAddrInfoToIpAddress(const struct sockaddr_storage* info, socklen_t infolen, std::string& stripaddress);
+		static bool CvtAddrInfoToIpAddress(struct sockaddr_storage* info, socklen_t infolen, std::string& stripaddress);
 		static bool CvtSockToLocalPort(int sock, short& port);
 		static bool CvtSockToPeerPort(int sock, short& port);
 		static bool CvtV4MappedAddrInfo(struct sockaddr_storage* info, socklen_t& addrlen);
+		static bool GetIPv4MappedIPv6Address(const char* target, std::string& stripv4);
+		static std::string CvtIPv4MappedIPv6Address(const std::string& target);
 		static void FreeAddrInfoList(addrinfolist_t& infolist);
 		static std::string GetNoZoneIndexIpAddress(const std::string& ipaddr);
 		static bool IsLocalhostKeyword(const char* host);

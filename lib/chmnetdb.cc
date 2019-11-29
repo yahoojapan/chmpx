@@ -31,6 +31,8 @@
 #include <string.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <string>
 
 #include "chmcommon.h"
@@ -241,7 +243,7 @@ bool ChmNetDb::GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_
 	return true;
 }
 
-bool ChmNetDb::CvtAddrInfoToIpAddress(const struct sockaddr_storage* info, socklen_t infolen, string& stripaddress)
+bool ChmNetDb::CvtAddrInfoToIpAddress(struct sockaddr_storage* info, socklen_t infolen, string& stripaddress)
 {
 	char	ipaddress[NI_MAXHOST];
 	int		result;
@@ -254,8 +256,18 @@ bool ChmNetDb::CvtAddrInfoToIpAddress(const struct sockaddr_storage* info, sockl
 	// addrinfo -> normalized ipaddress
 	memset(&ipaddress, 0, sizeof(ipaddress));
 	if(0 != (result = getnameinfo(reinterpret_cast<const struct sockaddr*>(info), infolen, ipaddress, sizeof(ipaddress), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
-		MSG_CHMPRN("Could not convert addrinfo to normalized ipaddress, errno=%d.", result);
-		return false;
+		MSG_CHMPRN("Could not convert addrinfo to normalized ipaddress(errno=%d), but retry IPv4 address if address is IPv4 mapped IPv6.", result);
+
+		// If the address is IPv4 mapped IPv6, try again with the IPv4 address.
+		socklen_t	tmp_infolen = infolen;
+		if(ChmNetDb::CvtV4MappedAddrInfo(info, infolen) && tmp_infolen != infolen){
+			if(0 != (result = getnameinfo(reinterpret_cast<const struct sockaddr*>(info), tmp_infolen, ipaddress, sizeof(ipaddress), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
+				MSG_CHMPRN("Could not convert addrinfo to normalized ipaddress(errno=%d) from IPv4 mapped IPv6.", result);
+				return false;
+			}
+		}else{
+			return false;
+		}
 	}
 	stripaddress = ipaddress;
 
@@ -339,6 +351,57 @@ bool ChmNetDb::CvtV4MappedAddrInfo(struct sockaddr_storage* info, socklen_t& add
 		addrlen = sizeof(struct sockaddr_in);
 	}
 	return true;
+}
+
+// [NOTE] IPv4-Mapped IPv6 Address(RFC 4291)
+// This function checks if the IP address string is IPv4-Mapped IPv6 Address(RFC 4291)
+// and returns an IPv4 address string if applicable.
+//
+// ex1)
+//	IPv4 address				-> 192.168.0.0
+//	IPv4-Mapped IPv6 Address	-> ::ffff:192.168.0.0 or ::ffff:c0a8:0
+// ex2)
+//	IPv4 address				-> 192.168.0.1
+//	IPv4-Mapped IPv6 Address	-> ::ffff:192.168.0.1 or ::ffff:c0a8:0001
+//
+bool ChmNetDb::GetIPv4MappedIPv6Address(const char* target, string& stripv4)
+{
+	if(CHMEMPTYSTR(target)){
+		return false;
+	}
+	if(0 != strncmp(target, "::ffff:", 7)){
+		return false;
+	}
+
+	// get address
+	unsigned char	buf[sizeof(struct in6_addr)];
+	int				result;
+	if(1 != (result = inet_pton(AF_INET6, target, &buf))){
+		if(0 == result){
+			MSG_CHMPRN("Could not convert %s by wrong ip address string\n", target);
+		}else{
+			MSG_CHMPRN("Could not convert %s by errno(%d)\n", target, errno);
+		}
+		return false;
+	}
+
+	// do convert
+	char			ipv4buf[32];									// A maximum of 16 bytes("xxx.xxx.xxx.xxx") is enough, but declare with 32 bytes
+	struct in_addr*	ipv4	= reinterpret_cast<struct in_addr*>(&buf[12]);
+	memset(ipv4buf, 0, sizeof(ipv4buf));
+	strncpy(ipv4buf, inet_ntoa(*ipv4), sizeof(ipv4buf) - 1);		// inet_ntoa() is not thread safe
+
+	stripv4 = ipv4buf;
+	return true;
+}
+
+string ChmNetDb::CvtIPv4MappedIPv6Address(const string& target)
+{
+	string	result;
+	if(!ChmNetDb::GetIPv4MappedIPv6Address(target.c_str(), result)){
+		result = target;
+	}
+	return result;
 }
 
 void ChmNetDb::FreeAddrInfoList(addrinfolist_t& infolist)
@@ -429,6 +492,13 @@ bool ChmNetDb::InitializeLocalHostIpAddresses()
 			memset(ipaddr, 0, sizeof(ipaddr));
 			socklen_t	salen	= (AF_INET == tmp_ifaddr->ifa_addr->sa_family) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 			int			result	= getnameinfo(tmp_ifaddr->ifa_addr, salen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
+			if(0 != result){
+				// If the address is IPv4 mapped IPv6, try again with the IPv4 address.
+				socklen_t	tmp_salen = salen;
+				if(ChmNetDb::CvtV4MappedAddrInfo(reinterpret_cast<struct sockaddr_storage*>(tmp_ifaddr->ifa_addr), tmp_salen) && tmp_salen != salen){
+					result	= getnameinfo(tmp_ifaddr->ifa_addr, tmp_salen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
+				}
+			}
 			if(0 == result){
 				if(!CHMEMPTYSTR(ipaddr)){
 					MSG_CHMPRN("Found local interface IP address : %s", ipaddr);
@@ -437,6 +507,17 @@ bool ChmNetDb::InitializeLocalHostIpAddresses()
 
 					// add cache without hostnames
 					IpAddressAddCache(string(ipaddr), string(""), true);
+
+					// check IPv4 mapped IPv6
+					string	stripv4;
+					if(ChmNetDb::GetIPv4MappedIPv6Address(ipaddr, stripv4)){
+						MSG_CHMPRN("Found local interface IP address : %s", stripv4.c_str());
+
+						AddUniqueStringToList(stripv4, localaddrs, false);
+
+						// add cache without hostnames
+						IpAddressAddCache(stripv4, string(""), true);
+					}
 				}else{
 					WAN_CHMPRN("Found local interface IP address, but it is empty.");
 				}
@@ -826,6 +907,14 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 		return false;
 	}
 
+	// at first, check IPv4 mapped IPv6
+	string	stripv4;
+	if(ChmNetDb::GetIPv4MappedIPv6Address(target, stripv4)){
+		if(!ChmNetDb::GetHostAddressInfo(stripv4.c_str(), data)){
+			MSG_CHMPRN("Could not get (first checking)host address information %s which is IPv4 mapped IPv6, but continue by target(%s)", stripv4.c_str(), target);
+		}
+	}
+
 	// target -> addrinfo
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags		= AI_CANONNAME;
@@ -861,8 +950,22 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 			AddUniqueStringToList(string(ipaddr), data.ipaddresses, false);
 
 			// add cache
+			bool	is_hostname = false;
 			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
+				is_hostname = true;
 				IpAddressAddCache(string(ipaddr), string(hostname));
+			}
+
+			// check IPv4 mapped IPv6
+			stripv4.erase();
+			if(ChmNetDb::GetIPv4MappedIPv6Address(ipaddr, stripv4)){
+				// add ip address
+				AddUniqueStringToList(stripv4, data.ipaddresses, false);
+
+				// add cache
+				if(is_hostname){
+					IpAddressAddCache(stripv4, string(hostname));
+				}
 			}
 		}
 	}
@@ -1065,6 +1168,9 @@ bool ChmNetDb::GetIpAddressStringList(const char* target, strlst_t& ipaddrs, boo
 //
 bool ChmNetDb::GetAllHostList(const char* target, strlst_t& expandlist, bool is_cvt_localhost)
 {
+	// [NOTE]
+	// expandlist is not initialized.
+	//
 	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is wrong.");
 		return false;
@@ -1081,7 +1187,7 @@ bool ChmNetDb::GetAllHostList(const char* target, strlst_t& expandlist, bool is_
 	}else{
 		strlst_t	tmplist;
 		GetHostnameList(target, tmplist, true);						// without localhost
-		AddUniqueStringListToList(tmplist, expandlist, true);		// first adding, then clear it.
+		AddUniqueStringListToList(tmplist, expandlist, false);
 
 		tmplist.clear();
 		GetIpAddressStringList(target, tmplist, true);				// without localhost

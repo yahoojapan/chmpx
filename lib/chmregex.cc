@@ -216,6 +216,60 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 	return true;
 }
 
+static bool expand_simple_regexes(const string& simple_regexes, strlst_t& expand_lst)
+{
+	// parse regexes by comma
+	strlst_t	regex_lst;
+	string		before_part;
+	for(string tmp_regexes = simple_regexes; !tmp_regexes.empty(); ){
+		string::size_type	pos_comma	= tmp_regexes.find(',');
+		string::size_type	pos_bracket	= tmp_regexes.find('[');
+
+		if(string::npos == pos_comma && string::npos == pos_bracket){
+			// not found both
+			regex_lst.push_back(before_part + tmp_regexes);
+			before_part.clear();
+			tmp_regexes.clear();
+
+		}else if(	(string::npos != pos_comma && string::npos == pos_bracket)								||
+					(string::npos != pos_comma && string::npos != pos_bracket && pos_comma < pos_bracket)	)
+		{
+			// parse regexes by comma
+			regex_lst.push_back(before_part + tmp_regexes.substr(0, pos_comma));
+			before_part.clear();
+			tmp_regexes = tmp_regexes.substr(pos_comma + 1);
+
+		}else{
+			// found bracket
+			before_part	+= tmp_regexes.substr(0, pos_bracket + 1);
+			tmp_regexes	= tmp_regexes.substr(pos_bracket + 1);
+
+			// search end of bracket
+			string::size_type	pos_end_bracket	= tmp_regexes.find(']');
+			if(string::npos != pos_end_bracket){
+				before_part	+= tmp_regexes.substr(0, pos_end_bracket + 1);
+				tmp_regexes	= tmp_regexes.substr(pos_end_bracket + 1);
+			}else{
+				// not found end of bracket, maybe syntax error
+				regex_lst.push_back(before_part + tmp_regexes);
+				before_part.clear();
+				tmp_regexes.clear();
+			}
+		}
+	}
+	if(!before_part.empty()){
+		regex_lst.push_back(before_part);
+	}
+	// expand each regex
+	for(strlst_t::const_iterator iter = regex_lst.begin(); regex_lst.end() != iter; ++iter){
+		if(!expand_simple_regex(*iter, expand_lst)){
+			MSG_CHMPRN("host regexes %s has something wrong format.", simple_regexes.c_str());
+			return false;
+		}
+	}
+	return true;
+}
+
 //---------------------------------------------------------
 // Utilities
 //---------------------------------------------------------
@@ -237,8 +291,8 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 	string	strhost = hostname;
 
 	expand_lst.clear();
-	if(!expand_simple_regex(strhost, expand_lst) || expand_lst.empty()){
-		ERR_CHMPRN("Failed to expand simple regex.");
+	if(!expand_simple_regexes(strhost, expand_lst) || expand_lst.empty()){
+		MSG_CHMPRN("Failed to expand simple regexes for %s.", hostname);
 		return false;
 	}
 	return true;
@@ -247,48 +301,68 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 // For server hostname
 //
 // This function is checking hostname in expanded hostname list
-// for server list. The hostname_lst should be expanded by 
+// for server list. The hostname_list should be expanded by 
 // ExpandSimpleRegxHostname() with is_cvt_localhost = true and 
 // is_cvt_fqdn = true.
-// If the hostname matches in array, matchhostname is set as
+// If the hostname matches in array, foundname is set as
 // matched hostname(FQDN or localhost or IP address).
 //
-bool IsInHostnameList(const char* hostname, strlst_t& hostname_lst, string& matchhostname, bool is_cvt_localhost)
+bool IsInHostnameList(const char* target, strlst_t& hostname_list, string& foundname, bool is_cvt_localhost)
 {
-	if(CHMEMPTYSTR(hostname)){
+	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is NULL.");
 		return false;
 	}
 
-	// get expanded all host(FQDN, hostnames, IP addresses)
-	strlst_t	expandlist;
-	if(!ChmNetDb::Get()->GetAllHostList(hostname, expandlist, is_cvt_localhost)){
-		MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", hostname, hostname);
-		expandlist.push_back(hostname);
+	// get expanded all host(FQDN, hostnames, IP addresses) from target
+	strlst_t	expand_target_list;
+	if(!ChmNetDb::Get()->GetAllHostList(target, expand_target_list, is_cvt_localhost)){
+		MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", target, target);
+		expand_target_list.push_back(string(target));
+	}
+
+	// get expaned all host from hostname_list
+	strlst_t	expand_hostname_list;
+	for(strlst_t::const_iterator hostname_list_iter = hostname_list.begin(); hostname_list_iter != hostname_list.end(); ++hostname_list_iter){
+		strlst_t	tmp_hostname_list;
+		// check simple regex
+		if(!ExpandSimpleRegxHostname(hostname_list_iter->c_str(), tmp_hostname_list, is_cvt_localhost, true, false)){
+			// hostname_list_iter->c_str() is not simple regex
+			tmp_hostname_list.push_back(*hostname_list_iter);
+		}
+		for(strlst_t::const_iterator tmp_hostname_list_iter = tmp_hostname_list.begin(); tmp_hostname_list_iter != tmp_hostname_list.end(); ++tmp_hostname_list_iter){
+			if(!ChmNetDb::Get()->GetAllHostList(tmp_hostname_list_iter->c_str(), expand_hostname_list, is_cvt_localhost)){
+				MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", tmp_hostname_list_iter->c_str(), tmp_hostname_list_iter->c_str());
+				expand_hostname_list.push_back(*tmp_hostname_list_iter);
+			}
+			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(tmp_hostname_list_iter->c_str())){
+				ChmNetDb::GetLocalHostList(expand_hostname_list, true);
+			}
+		}
 	}
 
 	// compare
-	for(strlst_t::const_iterator list_iter = hostname_lst.begin(); list_iter != hostname_lst.end(); ++list_iter){
+	for(strlst_t::const_iterator expand_hostname_list_iter = expand_hostname_list.begin(); expand_hostname_list_iter != expand_hostname_list.end(); ++expand_hostname_list_iter){
 		// loop for all expand host
-		for(strlst_t::const_iterator expand_iter = expandlist.begin(); expand_iter != expandlist.end(); ++expand_iter){
+		for(strlst_t::const_iterator expand_target_list_iter = expand_target_list.begin(); expand_target_list_iter != expand_target_list.end(); ++expand_target_list_iter){
 			// make host list for one expand host
-			strlst_t	expand_hostlist;
-			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(expand_iter->c_str())){
-				ChmNetDb::GetLocalHostList(expand_hostlist, true);
+			strlst_t	one_target_list;
+			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(expand_target_list_iter->c_str())){
+				ChmNetDb::GetLocalHostList(one_target_list, true);
 			}else{
-				expand_hostlist.push_back(*expand_iter);
+				one_target_list.push_back(*expand_target_list_iter);
 			}
 			// compare each host in expand host
-			for(strlst_t::const_iterator expand_host_iter = expand_hostlist.begin(); expand_host_iter != expand_hostlist.end(); ++expand_host_iter){
-				if((*list_iter) == (*expand_host_iter)){
+			for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
+				if((*expand_hostname_list_iter) == (*one_target_list_iter)){
 					// found!
-					matchhostname = *list_iter;
+					foundname = *expand_hostname_list_iter;
 					return true;
 				}
 			}
 		}
 	}
-	MSG_CHMPRN("Not found host(%s) in hostname list.", hostname);
+	MSG_CHMPRN("Not found host(%s) in hostname list(simple regex).", target);
 
 	return false;
 }
@@ -297,21 +371,26 @@ bool IsInHostnameList(const char* hostname, strlst_t& hostname_lst, string& matc
 //
 // This function is checking hostname in hostname array which 
 // are wrote regex.
-// If the hostname matches in array, matchhostname is set as
+// If the hostname matches in array, foundname is set as
 // matched hostname(FQDN or localhost or IP address).
 //
-bool IsMatchHostname(const char* hostname, strlst_t& regex_lst, string& matchhostname)
+bool IsMatchHostname(const char* target, strlst_t& regex_lst, string& foundname)
 {
-	if(CHMEMPTYSTR(hostname)){
+	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is NULL.");
 		return false;
 	}
 
-	// get expanded all host(FQDN, hostnames, IP addresses)
-	strlst_t	expandlist;										// order by global hostname, ip address, i/f ip address, localhost
-	if(!ChmNetDb::Get()->GetAllHostList(hostname, expandlist, false)){
-		MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", hostname, hostname);
-		expandlist.push_back(hostname);
+	// at first, check simple regexes
+	if(IsInHostnameList(target, regex_lst, foundname, false)){
+		return true;
+	}
+
+	// get expanded all host(FQDN, hostnames, IP addresses) from target
+	strlst_t	expand_target_list;										// order by global hostname, ip address, i/f ip address, localhost
+	if(!ChmNetDb::Get()->GetAllHostList(target, expand_target_list, false)){
+		MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", target, target);
+		expand_target_list.push_back(target);
 	}
 
 	// matching
@@ -320,23 +399,23 @@ bool IsMatchHostname(const char* hostname, strlst_t& regex_lst, string& matchhos
 		regex_t	regex_obj;
 		int		result;
 		if(0 != (result = regcomp(&regex_obj, reg_iter->c_str(), REG_EXTENDED | REG_NOSUB))){
-			ERR_CHMPRN("Failed to compile regex for %s.", reg_iter->c_str());
-			return false;
+			WAN_CHMPRN("Failed to compile regex for %s, then skip this and continue...", reg_iter->c_str());
+			continue;
 		}
 		// loop for all expand host
-		for(strlst_t::const_iterator expand_iter = expandlist.begin(); expand_iter != expandlist.end(); ++expand_iter){
+		for(strlst_t::const_iterator expand_target_list_iter = expand_target_list.begin(); expand_target_list_iter != expand_target_list.end(); ++expand_target_list_iter){
 			// make host list for one expand host
-			strlst_t	expand_hostlist;
-			if(ChmNetDb::IsLocalhostKeyword(expand_iter->c_str())){
-				ChmNetDb::GetLocalHostList(expand_hostlist, true);
+			strlst_t	one_target_list;
+			if(ChmNetDb::IsLocalhostKeyword(expand_target_list_iter->c_str())){
+				ChmNetDb::GetLocalHostList(one_target_list, true);
 			}else{
-				expand_hostlist.push_back(*expand_iter);
+				one_target_list.push_back(*expand_target_list_iter);
 			}
 			// compare each host in expand host
-			for(strlst_t::const_iterator expand_host_iter = expand_hostlist.begin(); expand_host_iter != expand_hostlist.end(); ++expand_host_iter){
-				if(0 == regexec(&regex_obj, expand_host_iter->c_str(), 0, NULL, 0)){
+			for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
+				if(0 == regexec(&regex_obj, one_target_list_iter->c_str(), 0, NULL, 0)){
 					// match!
-					matchhostname = (*expand_host_iter);
+					foundname = (*one_target_list_iter);
 					regfree(&regex_obj);
 					return true;
 				}
@@ -344,7 +423,7 @@ bool IsMatchHostname(const char* hostname, strlst_t& regex_lst, string& matchhos
 		}
 		regfree(&regex_obj);
 	}
-	MSG_CHMPRN("Not found host(%s) in regex list.", hostname);
+	MSG_CHMPRN("Not found host(%s) in regex list.", target);
 
 	return false;
 }

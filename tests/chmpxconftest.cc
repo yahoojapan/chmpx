@@ -61,30 +61,30 @@ static bool LoadConfTest(CHMConf* pconfobj)
 		return false;
 	}
 
-	const CHMCFGINFO*	pchmcfginfo = pconfobj->GetConfiguration(true);
-	if(!pchmcfginfo){
+	CHMCFGINFO	chmcfg;
+	if(!pconfobj->GetConfiguration(chmcfg, true)){
 		ERR_CHMPRN("Failed load configuration.");
 		return false;
 	}
 
 	// Dump
 	printf("configuration{\n");
-	printf("\tGROUP           = %s\n", pchmcfginfo->groupname.c_str());
-	printf("\tREVISION        = %ld\n", pchmcfginfo->revision);
-	printf("\tMAXCHMPX        = %ld\n", pchmcfginfo->max_chmpx_count);
-	printf("\tREPLICA         = %ld\n", pchmcfginfo->replica_count);
-	printf("\tMAXMQSERVER     = %ld\n", pchmcfginfo->max_server_mq_cnt);
-	printf("\tMAXMQCLIENT     = %ld\n", pchmcfginfo->max_client_mq_cnt);
-	printf("\tMQPERATTACH     = %ld\n", pchmcfginfo->mqcnt_per_attach);
-	printf("\tMAXQPERSERVERMQ = %ld\n", pchmcfginfo->max_q_per_servermq);
-	printf("\tMAXQPERCLIENTMQ = %ld\n", pchmcfginfo->max_q_per_clientmq);
-	printf("\tMAXMQPERCLIENT  = %ld\n", pchmcfginfo->max_mq_per_client);
-	printf("\tMAXHISTLOG      = %ld\n", pchmcfginfo->max_histlog_count);
-	printf("\tDATE            = %jd\n", static_cast<intmax_t>(pchmcfginfo->date));
+	printf("\tGROUP           = %s\n", chmcfg.groupname.c_str());
+	printf("\tREVISION        = %ld\n", chmcfg.revision);
+	printf("\tMAXCHMPX        = %ld\n", chmcfg.max_chmpx_count);
+	printf("\tREPLICA         = %ld\n", chmcfg.replica_count);
+	printf("\tMAXMQSERVER     = %ld\n", chmcfg.max_server_mq_cnt);
+	printf("\tMAXMQCLIENT     = %ld\n", chmcfg.max_client_mq_cnt);
+	printf("\tMQPERATTACH     = %ld\n", chmcfg.mqcnt_per_attach);
+	printf("\tMAXQPERSERVERMQ = %ld\n", chmcfg.max_q_per_servermq);
+	printf("\tMAXQPERCLIENTMQ = %ld\n", chmcfg.max_q_per_clientmq);
+	printf("\tMAXMQPERCLIENT  = %ld\n", chmcfg.max_mq_per_client);
+	printf("\tMAXHISTLOG      = %ld\n", chmcfg.max_histlog_count);
+	printf("\tDATE            = %jd\n", static_cast<intmax_t>(chmcfg.date));
 
 	int count = 1;
 	chmnode_cfginfos_t::const_iterator	iter;
-	for(iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter, ++count){
+	for(iter = chmcfg.servers.begin(); iter != chmcfg.servers.end(); ++iter, ++count){
 		printf("\tserver[%d]{\n", count);
 		printf("\t\tNAME          = %s\n", iter->name.c_str());
 		printf("\t\tPORT          = %d\n", iter->port);
@@ -103,7 +103,7 @@ static bool LoadConfTest(CHMConf* pconfobj)
 	}
 
 	count = 1;
-	for(iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter, ++count){
+	for(iter = chmcfg.slaves.begin(); iter != chmcfg.slaves.end(); ++iter, ++count){
 		printf("\tserver[%d]{\n", count);
 		printf("\t\tNAME          = %s\n", iter->name.c_str());
 		printf("\t\tPORT          = %d\n", iter->port);
