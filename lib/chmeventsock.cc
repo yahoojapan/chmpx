@@ -3920,6 +3920,11 @@ bool ChmEventSock::Accept(int sock)
 	MSG_CHMPRN("Accept new socket(%d)", newsock);
 	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);			// UNLOCK
 
+	// Convert IPv4-mapped IPv6 addresses to plain IPv4.
+	if(!ChmNetDb::CvtV4MappedAddrInfo(&from, fromlen)){
+		ERR_CHMPRN("Something error occured during converting IPv4-mapped IPv6 addresses to plain IPv4, but continue...");
+	}
+
 	// get hostname for accessing control
 	string	stripaddress;
 	string	strhostname;
@@ -3931,6 +3936,7 @@ bool ChmEventSock::Accept(int sock)
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
 		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
 		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
+		strhostname = ChmNetDb::CvtIPv4MappedIPv6Address(strhostname);
 	}
 
 	// add tempolary accepting socket mapping.(before adding epoll for multi threading)
@@ -4056,6 +4062,7 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 	if(!ChmNetDb::Get()->GetHostname(stripaddress.c_str(), strhostname, true)){
 		MSG_CHMPRN("Could not get hostname(FQDN) from %s, then ip address is instead of hostname.", stripaddress.c_str());
 		strhostname = ChmNetDb::GetNoZoneIndexIpAddress(stripaddress);
+		strhostname = ChmNetDb::CvtIPv4MappedIPv6Address(strhostname);
 	}
 
 	// check ACL
@@ -5074,7 +5081,9 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
-					if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress stlIfStrFind
+					if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DIR));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_IN)){
@@ -5088,7 +5097,9 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 							isError	= true;
 							break;
 						}
-					}else if(string::npos == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress stlIfStrFind
+					}else if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DEV));
 
 						if(0 == strcasecmp(strTmp.c_str(), CTL_COMMAND_TRACE_VIEW_SOCK)){
