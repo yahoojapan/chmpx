@@ -27,8 +27,8 @@
 // Utilities
 //---------------------------------------------------------
 bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool is_cvt_localhost, bool is_cvt_fqdn = true, bool is_strict = false);
-bool IsInHostnameList(const char* hostname, strlst_t& hostname_lst, std::string& matchhostname, bool is_cvt_localhost = false);
-bool IsMatchHostname(const char* hostname, strlst_t& regex_lst, std::string& matchhostname);
+bool IsInHostnameList(const char* target, strlst_t& hostname_list, std::string& foundname, bool is_cvt_localhost = false);
+bool IsMatchHostname(const char* target, strlst_t& regex_lst, std::string& foundname);
 
 #endif	// CHMREGEX_H
 

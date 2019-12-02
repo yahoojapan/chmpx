@@ -321,15 +321,15 @@ bool ChmIMData::InitializeK2hash(void)
 		return false;
 	}
 
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
 
 	string	k2hfilepath;
-	if(!ChmIMData::MakeK2hashFilePath(pchmcfg->groupname.c_str(), pchmcfg->self_ctlport, k2hfilepath)){
-		ERR_CHMPRN("Failed to make k2hash file path from groupname(%s).", pchmcfg->groupname.c_str());
+	if(!ChmIMData::MakeK2hashFilePath(chmcfg.groupname.c_str(), chmcfg.self_ctlport, k2hfilepath)){
+		ERR_CHMPRN("Failed to make k2hash file path from groupname(%s).", chmcfg.groupname.c_str());
 		return false;
 	}
 	if(is_file_exist(k2hfilepath.c_str())){
@@ -342,7 +342,7 @@ bool ChmIMData::InitializeK2hash(void)
 
 	// init
 	pK2hash = new K2HShm();
-	if(!pK2hash->Create(k2hfilepath.c_str(), pchmcfg->k2h_fullmap, pchmcfg->k2h_mask_bitcnt, pchmcfg->k2h_cmask_bitcnt, pchmcfg->k2h_max_element, ChmIMData::SYSPAGE_SIZE)){
+	if(!pK2hash->Create(k2hfilepath.c_str(), chmcfg.k2h_fullmap, chmcfg.k2h_mask_bitcnt, chmcfg.k2h_cmask_bitcnt, chmcfg.k2h_max_element, ChmIMData::SYSPAGE_SIZE)){
 		ERR_CHMPRN("Failed to create new k2hash file(%s)", k2hfilepath.c_str());
 		CHM_Delete(pK2hash);
 		return false;
@@ -365,15 +365,15 @@ bool ChmIMData::AttachK2hash(void)
 		return false;
 	}
 
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
 
 	string	k2hfilepath;
-	if(!ChmIMData::MakeK2hashFilePath(pchmcfg->groupname.c_str(), pchmcfg->self_ctlport, k2hfilepath)){
-		ERR_CHMPRN("Failed to make k2hash file path from groupname(%s).", pchmcfg->groupname.c_str());
+	if(!ChmIMData::MakeK2hashFilePath(chmcfg.groupname.c_str(), chmcfg.self_ctlport, k2hfilepath)){
+		ERR_CHMPRN("Failed to make k2hash file path from groupname(%s).", chmcfg.groupname.c_str());
 		return false;
 	}
 
@@ -384,7 +384,7 @@ bool ChmIMData::AttachK2hash(void)
 
 	// init
 	pK2hash = new K2HShm();
-	if(!pK2hash->Attach(k2hfilepath.c_str(), false, false, false, pchmcfg->k2h_fullmap, pchmcfg->k2h_mask_bitcnt, pchmcfg->k2h_cmask_bitcnt, pchmcfg->k2h_max_element, ChmIMData::SYSPAGE_SIZE)){
+	if(!pK2hash->Attach(k2hfilepath.c_str(), false, false, false, chmcfg.k2h_fullmap, chmcfg.k2h_mask_bitcnt, chmcfg.k2h_cmask_bitcnt, chmcfg.k2h_max_element, ChmIMData::SYSPAGE_SIZE)){
 		ERR_CHMPRN("Failed to attach k2hash file(%s)", k2hfilepath.c_str());
 		CHM_Delete(pK2hash);
 		return false;
@@ -509,9 +509,9 @@ bool ChmIMData::InitializeShm(void)
 		return false;
 	}
 
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
 
@@ -519,9 +519,9 @@ bool ChmIMData::InitializeShm(void)
 	//
 	// If chmpx process is mq receiver for all mq sender(client processes), mq size should be max mq count.
 	//
-	long	maxmsg = pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt;
+	long	maxmsg = chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt;
 	if(!ChmEventMq::InitializeMaxMqSystemSize(maxmsg)){
-		ERR_CHMPRN("Could not get mq size = %ld for chmpx process.", pchmcfg->max_client_mq_cnt);
+		ERR_CHMPRN("Could not get mq size = %ld for chmpx process.", chmcfg.max_client_mq_cnt);
 		return false;
 	}
 
@@ -531,21 +531,21 @@ bool ChmIMData::InitializeShm(void)
 		return false;
 	}
 
-	return InitializeShmEx(pchmcfg, &self);
+	return InitializeShmEx(chmcfg, &self);
 }
 
-bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pself)
+bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself)
 {
-	if(	!pchmcfg || MAX_GROUP_LENGTH <= pchmcfg->groupname.length() || MAX_CHMPX_COUNT < pchmcfg->max_chmpx_count || 
-		MAX_SERVER_MQ_CNT < pchmcfg->max_server_mq_cnt || MAX_CLIENT_MQ_CNT < pchmcfg->max_client_mq_cnt || 
-		MAX_MQ_PER_CLIENT < pchmcfg->max_mq_per_client || MAX_HISTLOG_COUNT < pchmcfg->max_histlog_count )
+	if(	MAX_GROUP_LENGTH <= chmcfg.groupname.length() || MAX_CHMPX_COUNT < chmcfg.max_chmpx_count || 
+		MAX_SERVER_MQ_CNT < chmcfg.max_server_mq_cnt || MAX_CLIENT_MQ_CNT < chmcfg.max_client_mq_cnt || 
+		MAX_MQ_PER_CLIENT < chmcfg.max_mq_per_client || MAX_HISTLOG_COUNT < chmcfg.max_histlog_count )
 	{
 		ERR_CHMPRN("Configuration information are wrong.");
 		return false;
 	}
 	string	shmpath;
-	if(!ChmIMData::MakeShmFilePath(pchmcfg->groupname.c_str(), pchmcfg->self_ctlport, shmpath)){
-		ERR_CHMPRN("Failed to make chmshm file path from groupname(%s).", pchmcfg->groupname.c_str());
+	if(!ChmIMData::MakeShmFilePath(chmcfg.groupname.c_str(), chmcfg.self_ctlport, shmpath)){
+		ERR_CHMPRN("Failed to make chmshm file path from groupname(%s).", chmcfg.groupname.c_str());
 		return false;
 	}
 
@@ -567,12 +567,12 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 
 	// file total size
 	size_t	total_shmsize =	sizeof(CHMSHM) + 																						// CHMSHM (this structure is alignmented)
-							sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count + 															// CHMPX Area
-							sizeof(PCHMPX) * pchmcfg->max_chmpx_count * 2 +															// PCHMPX array Area
-							sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt) + 					// MQUEUE Area
-							sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach) +	// CLTPROCLIST Area
-							sizeof(CHMLOGRAW) * pchmcfg->max_histlog_count +														// LOG Area
-							sizeof(CHMSOCKLIST) * pchmcfg->max_chmpx_count * pchmcfg->max_sock_pool * 2;							// SOCK array Area([NOTICE] twice for margin)
+							sizeof(CHMPXLIST) * chmcfg.max_chmpx_count + 															// CHMPX Area
+							sizeof(PCHMPX) * chmcfg.max_chmpx_count * 2 +															// PCHMPX array Area
+							sizeof(MQMSGHEADLIST) * (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt) + 						// MQUEUE Area
+							sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(chmcfg.max_client_mq_cnt, chmcfg.mqcnt_per_attach) +		// CLTPROCLIST Area
+							sizeof(CHMLOGRAW) * chmcfg.max_histlog_count +															// LOG Area
+							sizeof(CHMSOCKLIST) * chmcfg.max_chmpx_count * chmcfg.max_sock_pool * 2;								// SOCK array Area([NOTICE] twice for margin)
 
 	// truncate with filling zero
 	if(!truncate_filling_zero(fd, total_shmsize, ChmIMData::SYSPAGE_SIZE)){
@@ -594,34 +594,34 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 	{
 		PCHMPXLIST		rel_chmpxarea			= reinterpret_cast<PCHMPXLIST>(		sizeof(CHMSHM));
 		PCHMPX*			rel_pchmpxarrarea		= reinterpret_cast<PCHMPX*>(		sizeof(CHMSHM) +
-																					sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count);
+																					sizeof(CHMPXLIST) * chmcfg.max_chmpx_count);
 		PMQMSGHEADLIST	rel_chmpxmsgarea		= reinterpret_cast<PMQMSGHEADLIST>(	sizeof(CHMSHM) +
-																					sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count +
-																					sizeof(PCHMPX) * pchmcfg->max_chmpx_count * 2);
+																					sizeof(CHMPXLIST) * chmcfg.max_chmpx_count +
+																					sizeof(PCHMPX) * chmcfg.max_chmpx_count * 2);
 		PCLTPROCLIST	rel_chmpxpidarea		= reinterpret_cast<PCLTPROCLIST>(	sizeof(CHMSHM) +
-																					sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count +
-																					sizeof(PCHMPX) * pchmcfg->max_chmpx_count * 2 +
-																					sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt));
+																					sizeof(CHMPXLIST) * chmcfg.max_chmpx_count +
+																					sizeof(PCHMPX) * chmcfg.max_chmpx_count * 2 +
+																					sizeof(MQMSGHEADLIST) * (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt));
 		PCHMLOGRAW		rel_lograwarea			= reinterpret_cast<PCHMLOGRAW>(		sizeof(CHMSHM) +
-																					sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count +
-																					sizeof(PCHMPX) * pchmcfg->max_chmpx_count * 2 +
-																					sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt) +
-																					sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach));
+																					sizeof(CHMPXLIST) * chmcfg.max_chmpx_count +
+																					sizeof(PCHMPX) * chmcfg.max_chmpx_count * 2 +
+																					sizeof(MQMSGHEADLIST) * (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt) +
+																					sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(chmcfg.max_client_mq_cnt, chmcfg.mqcnt_per_attach));
 		PCHMSOCKLIST	rel_chmsockarea			= reinterpret_cast<PCHMSOCKLIST>(	sizeof(CHMSHM) +
-																					sizeof(CHMPXLIST) * pchmcfg->max_chmpx_count +
-																					sizeof(PCHMPX) * pchmcfg->max_chmpx_count * 2 +
-																					sizeof(MQMSGHEADLIST) * (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt) +
-																					sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach) +
-																					sizeof(CHMLOGRAW) * pchmcfg->max_histlog_count);
+																					sizeof(CHMPXLIST) * chmcfg.max_chmpx_count +
+																					sizeof(PCHMPX) * chmcfg.max_chmpx_count * 2 +
+																					sizeof(MQMSGHEADLIST) * (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt) +
+																					sizeof(CLTPROCLIST) * MAX_CLTPROCLIST_COUNT(chmcfg.max_client_mq_cnt, chmcfg.mqcnt_per_attach) +
+																					sizeof(CHMLOGRAW) * chmcfg.max_histlog_count);
 		PCHMPX*			rel_pchmpxarr_base		= rel_pchmpxarrarea;
-		PCHMPX*			rel_pchmpxarr_pend		= CHM_OFFSET(rel_pchmpxarrarea, static_cast<off_t>(sizeof(PCHMPX) * pchmcfg->max_chmpx_count), PCHMPX*);
+		PCHMPX*			rel_pchmpxarr_pend		= CHM_OFFSET(rel_pchmpxarrarea, static_cast<off_t>(sizeof(PCHMPX) * chmcfg.max_chmpx_count), PCHMPX*);
 
 		// initializing each area
 		{
 			PCHMPXLIST	chmpxlist = CHM_ABS(shmbase, rel_chmpxarea, PCHMPXLIST);
-			for(long cnt = 0L; cnt < pchmcfg->max_chmpx_count; cnt++){
+			for(long cnt = 0L; cnt < chmcfg.max_chmpx_count; cnt++){
 				PCHMPXLIST	prev = 0 < cnt ? &chmpxlist[cnt - 1] : NULL;
-				PCHMPXLIST	next = (cnt + 1 < pchmcfg->max_chmpx_count) ? &chmpxlist[cnt + 1] : NULL;
+				PCHMPXLIST	next = (cnt + 1 < chmcfg.max_chmpx_count) ? &chmpxlist[cnt + 1] : NULL;
 
 				chmpxlistlap	tmpchmpxlist(&chmpxlist[cnt], NULL, NULL, NULL, NULL, NULL, shmbase);		// absmapptr, chmpx*s are NULL, these can allow only here(calling only Initialize()).
 				if(!tmpchmpxlist.Initialize(prev, next)){
@@ -633,15 +633,15 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 		}
 		{
 			PCHMPX*	pchmpxarr = CHM_ABS(shmbase, rel_pchmpxarrarea, PCHMPX*);
-			for(long cnt = 0L; cnt < (pchmcfg->max_chmpx_count * 2); cnt++){
+			for(long cnt = 0L; cnt < (chmcfg.max_chmpx_count * 2); cnt++){
 				pchmpxarr[cnt] = NULL;
 			}
 		}
 		{
 			PMQMSGHEADLIST	mqmsglist = CHM_ABS(shmbase, rel_chmpxmsgarea, PMQMSGHEADLIST);
-			for(long cnt = 0L; cnt < (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt); cnt++){
+			for(long cnt = 0L; cnt < (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt); cnt++){
 				PMQMSGHEADLIST	prev = (0 < cnt) ? &mqmsglist[cnt - 1] : NULL;
-				PMQMSGHEADLIST	next = (cnt + 1 < (pchmcfg->max_server_mq_cnt + pchmcfg->max_client_mq_cnt)) ? &mqmsglist[cnt + 1] : NULL;
+				PMQMSGHEADLIST	next = (cnt + 1 < (chmcfg.max_server_mq_cnt + chmcfg.max_client_mq_cnt)) ? &mqmsglist[cnt + 1] : NULL;
 
 				mqmsgheadlistlap	tmpmqmsgheadlist(&mqmsglist[cnt], shmbase);
 				if(!tmpmqmsgheadlist.Initialize(prev, next)){
@@ -653,7 +653,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 		}
 		{
 			PCLTPROCLIST	cltproclist		= CHM_ABS(shmbase, rel_chmpxpidarea, PCLTPROCLIST);
-			long			cltproclist_cnt	= MAX_CLTPROCLIST_COUNT(pchmcfg->max_client_mq_cnt, pchmcfg->mqcnt_per_attach);
+			long			cltproclist_cnt	= MAX_CLTPROCLIST_COUNT(chmcfg.max_client_mq_cnt, chmcfg.mqcnt_per_attach);
 			for(long cnt = 0L; cnt < cltproclist_cnt; cnt++){
 				PCLTPROCLIST	prev = (0 < cnt) ? &cltproclist[cnt - 1] : NULL;
 				PCLTPROCLIST	next = (cnt + 1 < cltproclist_cnt) ? &cltproclist[cnt + 1] : NULL;
@@ -668,7 +668,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 		}
 		{
 			PCHMLOGRAW	lograw = CHM_ABS(shmbase, rel_lograwarea, PCHMLOGRAW);
-			for(long cnt = 0L; cnt < pchmcfg->max_histlog_count; cnt++){
+			for(long cnt = 0L; cnt < chmcfg.max_histlog_count; cnt++){
 				chmlograwlap	tmplograw(&lograw[cnt], shmbase);
 				if(!tmplograw.Initialize()){
 					ERR_CHMPRN("Failed to initialize No.%ld CHMLOGRAW.", cnt);
@@ -679,7 +679,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 		}
 		{
 			PCHMSOCKLIST	chmsocklist		= CHM_ABS(shmbase, rel_chmsockarea, PCHMSOCKLIST);
-			long			chmsocklist_cnt	= pchmcfg->max_chmpx_count * pchmcfg->max_sock_pool * 2;
+			long			chmsocklist_cnt	= chmcfg.max_chmpx_count * chmcfg.max_sock_pool * 2;
 			for(long cnt = 0L; cnt < chmsocklist_cnt; cnt++){
 				PCHMSOCKLIST	prev = (0 < cnt) ? &chmsocklist[cnt - 1] : NULL;
 				PCHMSOCKLIST	next = (cnt + 1 < chmsocklist_cnt) ? &chmsocklist[cnt + 1] : NULL;
@@ -702,7 +702,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 
 		// CHMSHM.CHMLOG
 		chmloglap	tmpchmlog(&pChmBase->chmpxlog, shmbase);
-		if(!tmpchmlog.Initialize(rel_lograwarea, pchmcfg->max_histlog_count)){
+		if(!tmpchmlog.Initialize(rel_lograwarea, chmcfg.max_histlog_count)){
 			ERR_CHMPRN("Failed to initialize CHMLOG.");
 			CHM_MUMMAP(fd, shmbase, total_shmsize);
 			return false;
@@ -710,7 +710,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO
 
 		// CHMSHM.CHMINFO
 		chminfolap	tmpchminfo(&pChmBase->info, shmbase);
-		if(!tmpchminfo.Initialize(pchmcfg, rel_chmpxmsgarea, pself, rel_chmpxarea, rel_chmpxpidarea, rel_chmsockarea, rel_pchmpxarr_base, rel_pchmpxarr_pend)){
+		if(!tmpchminfo.Initialize(&chmcfg, rel_chmpxmsgarea, pself, rel_chmpxarea, rel_chmpxpidarea, rel_chmsockarea, rel_pchmpxarr_base, rel_pchmpxarr_pend)){
 			ERR_CHMPRN("Failed to initialize CHMINFO.");
 			CHM_MUMMAP(fd, shmbase, total_shmsize);
 			return false;
@@ -739,19 +739,19 @@ bool ChmIMData::AttachShm(void)
 	}
 
 	// get config
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
-	if(MAX_GROUP_LENGTH <= pchmcfg->groupname.length()){
+	if(MAX_GROUP_LENGTH <= chmcfg.groupname.length()){
 		ERR_CHMPRN("Configuration information are wrong.");
 		return false;
 	}
 
 	// Check mq size
 	//
-	long	maxmsg = pchmcfg->max_mq_per_client + pchmcfg->max_server_mq_cnt;
+	long	maxmsg = chmcfg.max_mq_per_client + chmcfg.max_server_mq_cnt;
 	if(!ChmEventMq::InitializeMaxMqSystemSize(maxmsg)){
 		ERR_CHMPRN("Could not set mq size = %ld for client process.", maxmsg);
 		return false;
@@ -759,8 +759,8 @@ bool ChmIMData::AttachShm(void)
 
 	// make shm path
 	string	shmpath;
-	if(!ChmIMData::MakeShmFilePath(pchmcfg->groupname.c_str(), pchmcfg->self_ctlport, shmpath)){
-		ERR_CHMPRN("Failed to make chmshm file path from groupname(%s).", pchmcfg->groupname.c_str());
+	if(!ChmIMData::MakeShmFilePath(chmcfg.groupname.c_str(), chmcfg.self_ctlport, shmpath)){
+		ERR_CHMPRN("Failed to make chmshm file path from groupname(%s).", chmcfg.groupname.c_str());
 		return false;
 	}
 
@@ -812,9 +812,9 @@ bool ChmIMData::InitializeOther(void)
 		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
 	// clear hostname:ctlport cache
@@ -833,15 +833,14 @@ bool ChmIMData::ReloadConfiguration(void)
 		ERR_CHMPRN("Configuration object is not loaded.");
 		return false;
 	}
-	const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-	if(!pchmcfg){
-		ERR_CHMPRN("Could not get configuration information structure pointer.");
+	CHMCFGINFO	chmcfg;
+	if(!pConfObj->GetConfiguration(chmcfg)){
+		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
-
 	// reload
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	if(!tmpchminfo.ReloadConfiguration(pchmcfg)){
+	if(!tmpchminfo.ReloadConfiguration(&chmcfg)){
 		ERR_CHMPRN("Failed to reload configuration file.");
 		return false;
 	}

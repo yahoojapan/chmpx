@@ -1031,7 +1031,9 @@ static bool ExecOptionParser(int argc, char** argv, option_t& opts, string& prgn
 		return false;
 	}
 	prgname = basename(argv[0]);
-	if(string::npos == prgname.find("lt-")){
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlIfStrFind
+	if(0 == prgname.find("lt-")){
 		// cut "lt-"
 		prgname = prgname.substr(3);
 	}
@@ -1486,8 +1488,8 @@ static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strCon
 			PRN("You can see detail about error, execute this program with \"-d\"(\"-g\") option.");
 			return false;
 		}
-		const CHMCFGINFO*	pchmcfg = pConfObj->GetConfiguration();
-		if(!pchmcfg){
+		CHMCFGINFO	chmcfg;
+		if(!pConfObj->GetConfiguration(chmcfg, true)){
 			ERR("Something error occurred in getting chmpx nodes information from configuration(%s).", strConfig.c_str());
 			pConfObj->Clean();
 			CHM_Delete(pConfObj);
@@ -1500,14 +1502,14 @@ static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strCon
 		chmnode_cfginfos_t::const_iterator	iter;
 
 		// loop to get all server nodes
-		for(iter = pchmcfg->servers.begin(); iter != pchmcfg->servers.end(); ++iter){
+		for(iter = chmcfg.servers.begin(); iter != chmcfg.servers.end(); ++iter){
 			newnode.hostname	= iter->name;
 			newnode.ctrlport	= iter->ctlport;
 			newnode.is_server	= true;
 			nodes.push_back(newnode);
 		}
 		// loop to get all slave nodes
-		for(iter = pchmcfg->slaves.begin(); iter != pchmcfg->slaves.end(); ++iter){
+		for(iter = chmcfg.slaves.begin(); iter != chmcfg.slaves.end(); ++iter){
 			newnode.hostname	= iter->name;
 			newnode.ctrlport	= iter->ctlport;
 			newnode.is_server	= false;
@@ -2411,13 +2413,17 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	while(string::npos != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlIfStrFind
+	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		string	name;
 		string	strctrlport;
 		short	ctrlport;
 
 		// "[XX]={\n"
-		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || string::npos != strInput.find(DUMP_KEY_ARRAY_START)){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress stlIfStrFind
+		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
@@ -2487,7 +2493,9 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 			return strInput;
 		}
 	}
-	if(string::npos != strInput.find(DUMP_KEY_END)){
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlIfStrFind
+	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		is_error = true;
 		return strInput;
@@ -2807,9 +2815,13 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	while(string::npos != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlIfStrFind
+	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
-		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || string::npos != strInput.find(DUMP_KEY_ARRAY_START)){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress stlIfStrFind
+		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
 			return strInput;
 		}
@@ -2835,7 +2847,9 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 		string		hostport= MakeHostCtrlport(unitdata.hostname, unitdata.ctrlport);
 		unitdatas[hostport]	= unitdata;
 	}
-	if(string::npos != strInput.find(DUMP_KEY_END)){
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress stlIfStrFind
+	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
 		return strInput;
 	}
@@ -3771,7 +3785,9 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 
 		// Get Server Name as "VerifyPeer="
 		string	strIsVerify;
-		if(isSSL && string::npos == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress stlIfStrFind
+		if(isSSL && 0 == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
 			strInput = strInput.substr(pos + strlen(ALLSTATUS_KEY_ISVERIFY));
 			if(string::npos == (pos = strInput.find(ALLSTATUS_KEY_CR))){
 				ERR("Could not found CR after \"Verify Peer=\" key in ALLSTATUS result.");
