@@ -173,7 +173,7 @@ bool ChmCntrl::GetEventBaseObjType(const ChmEventBase* pEvObj, EVOBJTYPE& type)
 // It will be judged automatically in this method.
 // This specification has been added because of support JSON format later added.
 //
-bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_rejoin, chm_merge_get_cb mgetfp, chm_merge_set_cb setfp, chm_merge_lastts_cb mlastfp, short ctlport)
+bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_rejoin, chm_merge_get_cb mgetfp, chm_merge_set_cb setfp, chm_merge_lastts_cb mlastfp, short ctlport, const char* cuk)
 {
 	// set type
 	chmcntrltype = type;
@@ -187,7 +187,7 @@ bool ChmCntrl::Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_r
 
 	// Load configuration
 	string	confval("");
-	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, true, &confval))){
+	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, cuk, true, &confval))){
 		ERR_CHMPRN("Failed to make configuration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
 		Clean(bup_cfg.empty());
 		return false;
@@ -351,14 +351,14 @@ bool ChmCntrl::ReInitialize(long waitms, int trycnt)
 // It will be judged automatically in this method.
 // This specification has been added because of support JSON format later added.
 //
-bool ChmCntrl::OnlyAttachInitialize(const char* cfgfile, short ctlport)
+bool ChmCntrl::OnlyAttachInitialize(const char* cfgfile, short ctlport, const char* cuk)
 {
 	// set type
 	chmcntrltype = CHMCHNTL_TYPE_CLIENT_ONSLAVE;	// Dummy
 
 	// Load configuration
 	string	confval("");
-	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, true, &confval))){
+	if(NULL == (pConfObj = CHMConf::GetCHMConf(eqfd, this, cfgfile, ctlport, cuk, true, &confval))){
 		ERR_CHMPRN("Failed to make configuration object from %s", ISEMPTYSTR(cfgfile) ? "empty" : cfgfile);
 		Clean(bup_cfg.empty());
 		return false;

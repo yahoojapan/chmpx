@@ -38,6 +38,7 @@
 #include "chmconf.h"
 #include "chmhash.h"
 #include "chmnetdb.h"
+#include "chmregex.h"
 
 //---------------------------------------------------------
 // Typedefs
@@ -46,7 +47,6 @@ typedef std::list<chmpxid_t>				chmpxidlist_t;
 typedef std::map<chmpxid_t, bool>			chmpxidmap_t;
 typedef std::list<chmhash_t>				chmhashlist_t;
 typedef std::map<chmhash_t, bool>			chmhashmap_t;
-typedef std::map<std::string, PCHMPXSSL>	hnamesslmap_t;
 typedef std::list<pid_t>					pidlist_t;
 typedef std::map<pid_t, bool>				pidbmap_t;
 typedef std::vector<msgid_t>				msgidlist_t;
@@ -95,6 +95,34 @@ void CVT_SSL_STRUCTURE(T1& chmpx_ssl, const T2& chmnode_cfginfo)
 	strcpy(chmpx_ssl.slave_prikey,	chmnode_cfginfo.slave_prikey.c_str());
 }
 
+template<typename T>
+void INIT_CHMPXSSL(const T& ssl)
+{
+	ssl.is_ssl		= false;
+	ssl.verify_peer	= false;
+	ssl.is_ca_file	= false;
+
+	memset(ssl.capath,			0, CHM_MAX_PATH_LEN);
+	memset(ssl.server_cert,		0, CHM_MAX_PATH_LEN);
+	memset(ssl.server_prikey,	0, CHM_MAX_PATH_LEN);
+	memset(ssl.slave_cert,		0, CHM_MAX_PATH_LEN);
+	memset(ssl.slave_prikey,	0, CHM_MAX_PATH_LEN);
+}
+
+template<typename T>
+void COPY_CHMPXSSL(const T& dst, const T& src)
+{
+	dst.is_ssl		= src.is_ssl;
+	dst.verify_peer	= src.verify_peer;
+	dst.is_ca_file	= src.is_ca_file;
+
+	memcpy(dst.capath,			src.capath,			CHM_MAX_PATH_LEN);
+	memcpy(dst.server_cert,		src.server_cert,	CHM_MAX_PATH_LEN);
+	memcpy(dst.server_prikey,	src.server_prikey,	CHM_MAX_PATH_LEN);
+	memcpy(dst.slave_cert,		src.slave_cert,		CHM_MAX_PATH_LEN);
+	memcpy(dst.slave_prikey,	src.slave_prikey,	CHM_MAX_PATH_LEN);
+}
+
 // [NOTE]
 // Comparison of SSL/TLS structure only compares SSL/TLS enable flag and
 // Verify Peer flag.
@@ -123,13 +151,222 @@ bool CMP_CHMPXSSL(const T& src1, const T& src2)
 }
 
 template<typename T>
-void FREE_HNAMESSLMAP(T& info)
+void FREE_HOSTSSLMAP(T& info)
 {
 	for(typename T::iterator iter = info.begin(); iter != info.end(); info.erase(iter++)){
 		if(iter->second){
 			delete iter->second;
 		}
 	}
+}
+
+//---------------------------------------------------------
+// Utility
+//---------------------------------------------------------
+inline const char* get_chmpxid_seed_type_string(CHMPXID_SEED_TYPE type)
+{
+	if(CHMPXID_SEED_NAME == type){
+		return "name";
+	}else if(CHMPXID_SEED_CUK == type){
+		return "cuk";
+	}else if(CHMPXID_SEED_CTLENDPOINTS == type){
+		return "control endpoints";
+	}else if(CHMPXID_SEED_CUSTOM == type){
+		return "custom";
+	}
+	WAN_CHMPRN("CHMPXID Seed type is unknown.");
+	return "unknown";
+}
+
+inline std::string get_hostport_pairs_string(const PCHMPXHP_RAWPAIR pair, size_t length)
+{
+	std::string	result;
+
+	if(!pair || 0 == length){
+		return result;
+	}
+	for(size_t cnt = 0; cnt < length; ++cnt){
+		if(CHMEMPTYSTR(pair[cnt].name) && CHM_INVALID_PORT == pair[cnt].port){
+			continue;
+		}
+		if(!result.empty()){
+			result += ",";
+		}
+		result += std::string(pair[cnt].name);
+		if(CHM_INVALID_PORT != pair[cnt].port){
+			result += ":";
+			result += to_string(pair[cnt].port);
+		}
+	}
+	return result;
+}
+
+inline bool parse_hostport_pairs_from_string(const char* hostport_pair, PCHMPXHP_RAWPAIR pair)
+{
+	if(CHMEMPTYSTR(hostport_pair) || !pair){
+		return false;
+	}
+	memset(pair->name, 0, NI_MAXHOST);
+
+	std::string				base_pair(hostport_pair);
+	std::string::size_type	pos = base_pair.find(':');
+	if(std::string::npos == pos){
+		strncpy(pair->name, base_pair.c_str(), NI_MAXHOST - 1);
+		pair->port = CHM_INVALID_PORT;
+	}else{
+		strncpy(pair->name, base_pair.substr(0, pos).c_str(), NI_MAXHOST - 1);
+		pair->port = static_cast<short>(cvt_string_to_number(base_pair.substr(pos + 1).c_str(), true));
+	}
+	return true;
+}
+
+inline bool copy_hostport_pairs(PCHMPXHP_RAWPAIR pdst, const PCHMPXHP_RAWPAIR psrc, size_t length)
+{
+	if(!pdst || !psrc || 0 == length){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	for(size_t cnt = 0; cnt < length; ++cnt){
+		strcpy(pdst[cnt].name, psrc[cnt].name);
+		pdst[cnt].port = psrc[cnt].port;
+	}
+	return true;
+}
+
+inline bool compare_hostport_pairs(PCHMPXHP_RAWPAIR phpp1, const PCHMPXHP_RAWPAIR phpp2, size_t length)
+{
+	if(!phpp2 || !phpp1 || 0 == length){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	for(size_t cnt1 = 0; cnt1 < length; ++cnt1){
+		bool	found;
+		found = false;
+		for(size_t cnt2 = 0; cnt2 < length; ++cnt2){
+			if(0 == strcmp(phpp1[cnt1].name, phpp2[cnt2].name) && phpp1[cnt1].port == phpp2[cnt2].port){
+				found = true;
+				break;
+			}
+		}
+		if(!found){
+			return false;
+		}
+	}
+	return true;
+}
+
+inline bool cvt_hostport_pairs(PCHMPXHP_RAWPAIR pdst, const hostport_list_t& src, size_t max)
+{
+	if(!pdst || 0 == max){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(max < src.size()){
+		WAN_CHMPRN("Source host:port pair list(%zu) is over maximum destination array size(%zu), then a complete copy is not possible.", src.size(), max);
+	}
+
+	// copy
+	hostport_list_t::const_iterator	iter;
+	size_t							cnt;
+	for(iter = src.begin(), cnt = 0; src.end() != iter && cnt < max; ++iter){
+		if(iter->host.empty() && CHM_INVALID_PORT == iter->port){
+			continue;
+		}
+		if(NI_MAXHOST < (iter->host.length() + 1)){
+			WAN_CHMPRN("Source host(%s) is over maximum length(%d), then a complete copy is not possible.", iter->host.c_str(), NI_MAXHOST);
+			memset(pdst[cnt].name, 0, NI_MAXHOST);
+			strncpy(pdst[cnt].name, iter->host.c_str(), NI_MAXHOST - 1);
+		}else{
+			strcpy(pdst[cnt].name, iter->host.c_str());
+		}
+		pdst[cnt].port = iter->port;
+		++cnt;
+	}
+	// clear rest structures
+	for(; cnt < max; ++cnt){
+		pdst[cnt].name[0]	= '\0';
+		pdst[cnt].port		= CHM_INVALID_PORT;
+	}
+	return true;
+}
+
+inline bool rev_hostport_pairs(hostport_list_t& dst, PCHMPXHP_RAWPAIR psrc, size_t srccnt)
+{
+	if(!psrc || 0 == srccnt){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	dst.clear();
+
+	// copy
+	for(size_t cnt = 0; cnt < srccnt; ++cnt){
+		if(!CHMEMPTYSTR(psrc[cnt].name)){
+			HOSTPORTPAIR	tmp;
+			tmp.host = psrc[cnt].name;
+			tmp.port = psrc[cnt].port;
+			dst.push_back(tmp);
+		}
+	}
+	return true;
+}
+
+inline bool cvt_parameters_by_chmpxid_type(const CHMNODE_CFGINFO* pchmpxnode, CHMPXID_SEED_TYPE type, std::string& cuk, std::string& custom_seed, PCHMPXHP_RAWPAIR pendpoints, PCHMPXHP_RAWPAIR pctlendpoints, PCHMPXHP_RAWPAIR pforward_peers, PCHMPXHP_RAWPAIR preverse_peers)
+{
+	if(!pchmpxnode || !pendpoints || !pctlendpoints || !pforward_peers || !preverse_peers){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+
+	// check chmpxid seed type
+	if(CHMPXID_SEED_CUK == type){
+		if(pchmpxnode->cuk.empty()){
+			ERR_CHMPRN("CHMPXID Seed type is CUK, but CUK is empty.");
+			return false;
+		}
+	}else if(CHMPXID_SEED_CTLENDPOINTS == type){
+		if(pchmpxnode->ctlendpoints.empty()){
+			ERR_CHMPRN("CHMPXID Seed type is CONTROL ENDPOINTS, but ctlendpoints is empty.");
+			return false;
+		}
+	}
+
+	if(CHMPXID_SEED_CUSTOM == type){
+		if(pchmpxnode->custom_seed.empty()){
+			ERR_CHMPRN("CHMPXID Seed type is CUSTOM ID SEED, but it is empty.");
+			return false;
+		}
+		custom_seed = pchmpxnode->custom_seed;
+	}else{
+		if(!pchmpxnode->custom_seed.empty()){
+			WAN_CHMPRN("CHMPXID Seed type is not CUSTOM ID SEED, but CUSTOM ID SEED is not empty, then not copy it.");
+		}
+		custom_seed.clear();
+	}
+
+	// set values
+	cuk = pchmpxnode->cuk;
+	cvt_hostport_pairs(pendpoints,		pchmpxnode->endpoints,		EXTERNAL_EP_MAX);
+	cvt_hostport_pairs(pctlendpoints,	pchmpxnode->ctlendpoints,	EXTERNAL_EP_MAX);
+	cvt_hostport_pairs(pforward_peers,	pchmpxnode->forward_peers,	FORWARD_PEER_MAX);
+	cvt_hostport_pairs(preverse_peers,	pchmpxnode->reverse_peers,	REVERSE_PEER_MAX);
+
+	return true;
+}
+
+inline std::string get_hostsslmap_key(const char* hostname, short ctlport, const char* cuk)
+{
+	std::string	key;
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return key;
+	}
+	key	= hostname;
+	key	+= ":";
+	key	+= (CHM_INVALID_PORT == ctlport) ? "" : to_string(ctlport);
+	key	+= ":";
+	key	+= CHMEMPTYSTR(cuk) ? "" : cuk;
+
+	return key;
 }
 
 //---------------------------------------------------------
@@ -183,7 +420,11 @@ inline time_t NormalizeStatusLastUpdateTime(time_t base)
 //
 inline int CompareStatusUpdateTime(time_t src1, time_t src2)
 {
-	time_t	result = NormalizeStatusLastUpdateTime(src1) - NormalizeStatusLastUpdateTime(src2);
+	// [NOTE]
+	// The comparison is made up to seconds in consideration of
+	// the time difference between servers.
+	//
+	time_t	result = (NormalizeStatusLastUpdateTime(src1) & STATUS_UPDATE_TIME_HI_MASK) - (NormalizeStatusLastUpdateTime(src2) & STATUS_UPDATE_TIME_HI_MASK);
 	return ((result < 0) ? -1 : (0 < result) ? 1 : 0);
 }
 
@@ -681,7 +922,7 @@ class chmpx_lap : public structure_lap<T>
 		PCHMSOCKLIST*				abs_sock_frees;
 
 	protected:
-		bool Initialize(const char* hostname, const char* group, CHMPXMODE mode, short port, short ctlport, const CHMPXSSL& ssl);
+		bool Initialize(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, CHMPXMODE mode, short port, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl);
 
 	public:
 		chmpx_lap(st_ptr_type ptr = NULL, st_ptr_type* pchmpxarrbase = NULL, st_ptr_type* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* pabssockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
@@ -694,16 +935,17 @@ class chmpx_lap : public structure_lap<T>
 		void Free(st_ptr_type ptr) const;
 
 		bool Close(int eqfd = CHM_INVALID_HANDLE);
-		bool InitializeServer(const char* hostname, const char* group, short port, short ctlport, const CHMPXSSL& ssl);
-		bool InitializeServer(PCHMPXSVR chmpxsvr, const char* group);
-		bool InitializeSlave(const char* hostname, const char* group, short ctlport, const CHMPXSSL& ssl);
+		bool InitializeServer(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, short port, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl);
+		bool InitializeServer(PCHMPXSVR chmpxsvr, const char* group, CHMPXID_SEED_TYPE type);
+		bool InitializeSlave(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl);
+
 		bool Set(int sock, int ctlsock, int selfsock, int selfctlsock, int type);
 		bool Set(chmhash_t base, chmhash_t pending, int type);
 		bool SetStatus(chmpxsts_t status);
 		bool UpdateLastStatusTime(void);
 		bool Remove(int sock);
 
-		bool Get(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
+		bool Get(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, PCHMPXHP_RAWPAIR pendpoints = NULL, PCHMPXHP_RAWPAIR pctlendpoints = NULL, PCHMPXHP_RAWPAIR pforward_peers = NULL, PCHMPXHP_RAWPAIR preverse_peers = NULL) const;
 		bool Get(socklist_t& socklist, int& ctlsock, int& selfsock, int& selfctlsock) const;
 		int GetSock(int type);
 		bool FindSock(int sock);
@@ -726,7 +968,7 @@ class chmpx_lap : public structure_lap<T>
 		const char* GetSlvPriKey(void) const { return ((basic_type::pAbsPtr && !CHMEMPTYSTR(basic_type::pAbsPtr->slave_prikey)) ? basic_type::pAbsPtr->slave_prikey : NULL); }
 		bool GetSslStructure(CHMPXSSL& ssl) const;
 
-		int compare_name(const chmpx_lap<T>& other) const;
+		int compare_order(const chmpx_lap<T>& other) const;
 };
 
 template<typename T>
@@ -773,6 +1015,26 @@ bool chmpx_lap<T>::Initialize(void)
 	basic_type::pAbsPtr->selfctlsock		= CHM_INVALID_SOCK;
 	basic_type::pAbsPtr->last_status_time	= 0;
 	basic_type::pAbsPtr->status				= CHMPXSTS_SLAVE_DOWN_NORMAL;		// temporary
+	basic_type::pAbsPtr->cuk[0]				= '\0';
+	basic_type::pAbsPtr->custom_seed[0]		= '\0';
+
+	int	cnt;
+	for(cnt = 0; cnt < EXTERNAL_EP_MAX; ++cnt){
+		basic_type::pAbsPtr->endpoints[cnt].name[0]		= '\0';
+		basic_type::pAbsPtr->endpoints[cnt].port		= CHM_INVALID_PORT;
+	}
+	for(cnt = 0; cnt < EXTERNAL_EP_MAX; ++cnt){
+		basic_type::pAbsPtr->ctlendpoints[cnt].name[0]	= '\0';
+		basic_type::pAbsPtr->ctlendpoints[cnt].port		= CHM_INVALID_PORT;
+	}
+	for(cnt = 0; cnt < FORWARD_PEER_MAX; ++cnt){
+		basic_type::pAbsPtr->forward_peers[cnt].name[0]	= '\0';
+		basic_type::pAbsPtr->forward_peers[cnt].port	= CHM_INVALID_PORT;
+	}
+	for(cnt = 0; cnt < REVERSE_PEER_MAX; ++cnt){
+		basic_type::pAbsPtr->reverse_peers[cnt].name[0]	= '\0';
+		basic_type::pAbsPtr->reverse_peers[cnt].port	= CHM_INVALID_PORT;
+	}
 
 	return true;
 }
@@ -791,6 +1053,12 @@ bool chmpx_lap<T>::Dump(std::stringstream& sstream, const char* spacer) const
 	sstream << (spacer ? spacer : "") << "pending_hash     = "	<< reinterpret_cast<void*>(basic_type::pAbsPtr->pending_hash)	<< std::endl;
 	sstream << (spacer ? spacer : "") << "port             = "	<< basic_type::pAbsPtr->port									<< std::endl;
 	sstream << (spacer ? spacer : "") << "ctlport          = "	<< basic_type::pAbsPtr->ctlport									<< std::endl;
+	sstream << (spacer ? spacer : "") << "cuk              = "	<< basic_type::pAbsPtr->cuk										<< std::endl;
+	sstream << (spacer ? spacer : "") << "custom_seed      = "	<< basic_type::pAbsPtr->custom_seed								<< std::endl;
+	sstream << (spacer ? spacer : "") << "endpoints        = "	<< get_hostport_pairs_string(basic_type::pAbsPtr->endpoints,	EXTERNAL_EP_MAX)	<< std::endl;
+	sstream << (spacer ? spacer : "") << "ctlendpoints     = "	<< get_hostport_pairs_string(basic_type::pAbsPtr->ctlendpoints,	EXTERNAL_EP_MAX)	<< std::endl;
+	sstream << (spacer ? spacer : "") << "forward_peers    = "	<< get_hostport_pairs_string(basic_type::pAbsPtr->forward_peers,FORWARD_PEER_MAX)	<< std::endl;
+	sstream << (spacer ? spacer : "") << "reverse_peers    = "	<< get_hostport_pairs_string(basic_type::pAbsPtr->reverse_peers,REVERSE_PEER_MAX)	<< std::endl;
 	sstream << (spacer ? spacer : "") << "is_ssl           = "	<< (basic_type::pAbsPtr->is_ssl ? "true" : "false")				<< std::endl;
 	sstream << (spacer ? spacer : "") << "verify_peer      = "	<< (basic_type::pAbsPtr->verify_peer ? "true" : "false")		<< std::endl;
 	sstream << (spacer ? spacer : "") << "is_ca_file       = "	<< (basic_type::pAbsPtr->is_ca_file ? "true" : "false")			<< std::endl;
@@ -843,11 +1111,18 @@ bool chmpx_lap<T>::Copy(st_ptr_type ptr)
 	ptr->status					= basic_type::pAbsPtr->status;
 
 	strcpy(ptr->name,			basic_type::pAbsPtr->name);
+	strcpy(ptr->cuk,			basic_type::pAbsPtr->cuk);
+	strcpy(ptr->custom_seed,	basic_type::pAbsPtr->custom_seed);
 	strcpy(ptr->capath,			basic_type::pAbsPtr->capath);
 	strcpy(ptr->server_cert,	basic_type::pAbsPtr->server_cert);
 	strcpy(ptr->server_prikey,	basic_type::pAbsPtr->server_prikey);
 	strcpy(ptr->slave_cert,		basic_type::pAbsPtr->slave_cert);
 	strcpy(ptr->slave_prikey,	basic_type::pAbsPtr->slave_prikey);
+
+	copy_hostport_pairs(ptr->endpoints,		basic_type::pAbsPtr->endpoints,		EXTERNAL_EP_MAX);
+	copy_hostport_pairs(ptr->ctlendpoints,	basic_type::pAbsPtr->ctlendpoints,	EXTERNAL_EP_MAX);
+	copy_hostport_pairs(ptr->forward_peers,	basic_type::pAbsPtr->forward_peers,	FORWARD_PEER_MAX);
+	copy_hostport_pairs(ptr->reverse_peers,	basic_type::pAbsPtr->reverse_peers,	REVERSE_PEER_MAX);
 
 	if(basic_type::pAbsPtr->socklist){
 		chmsocklistlap			socklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
@@ -867,7 +1142,7 @@ void chmpx_lap<T>::Free(st_ptr_type ptr) const
 }
 
 template<typename T>
-bool chmpx_lap<T>::Initialize(const char* hostname, const char* group, CHMPXMODE mode, short port, short ctlport, const CHMPXSSL& ssl)
+bool chmpx_lap<T>::Initialize(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, CHMPXMODE mode, short port, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl)
 {
 	if(CHMEMPTYSTR(hostname) || NI_MAXHOST <= strlen(hostname) || CHMEMPTYSTR(group)){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -881,10 +1156,6 @@ bool chmpx_lap<T>::Initialize(const char* hostname, const char* group, CHMPXMODE
 	// [NOTE]
 	// Hostname may be set to something other than an IP address string or FQDN.
 	// Therefore, we need to convert it to FQDN as much as possible here.
-	//
-	// [TODO]
-	// This function will be added or changed in the future.
-	// That is especially to deal with cases such as server node hidden in firewall.
 	//
 	strlst_t	expandlist;
 	if(!ChmNetDb::Get()->GetHostnameList(hostname, expandlist, true) || expandlist.empty()){
@@ -907,15 +1178,21 @@ bool chmpx_lap<T>::Initialize(const char* hostname, const char* group, CHMPXMODE
 		MSG_CHMPRN("convert host(%s) to hostname(%s) and register as Slave Node.", hostname, expandlist.front().c_str());
 		hostname = expandlist.front().c_str();
 	}
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("hostname after expanding is empty.");
+		return false;
+	}
 
 	strcpy(basic_type::pAbsPtr->name,			hostname);
+	strcpy(basic_type::pAbsPtr->cuk,			CHMEMPTYSTR(cuk) ? "" : cuk);
+	strcpy(basic_type::pAbsPtr->custom_seed,	CHMEMPTYSTR(custom_seed) ? "" : custom_seed);
 	strcpy(basic_type::pAbsPtr->capath,			ssl.capath);
 	strcpy(basic_type::pAbsPtr->server_cert,	ssl.server_cert);
 	strcpy(basic_type::pAbsPtr->server_prikey,	ssl.server_prikey);
 	strcpy(basic_type::pAbsPtr->slave_cert,		ssl.slave_cert);
 	strcpy(basic_type::pAbsPtr->slave_prikey,	ssl.slave_prikey);
 
-	basic_type::pAbsPtr->chmpxid				= MakeChmpxId(group, hostname, ctlport);
+	basic_type::pAbsPtr->chmpxid				= MakeChmpxId(group, type, hostname, ctlport, cuk, get_hostport_pairs_string(pctlendpoints, EXTERNAL_EP_MAX).c_str(), custom_seed);
 	basic_type::pAbsPtr->base_hash				= CHM_INVALID_HASHVAL;
 	basic_type::pAbsPtr->pending_hash			= CHM_INVALID_HASHVAL;
 	basic_type::pAbsPtr->mode					= mode;
@@ -930,6 +1207,19 @@ bool chmpx_lap<T>::Initialize(const char* hostname, const char* group, CHMPXMODE
 	basic_type::pAbsPtr->selfctlsock			= CHM_INVALID_SOCK;
 	basic_type::pAbsPtr->last_status_time		= 0;
 	basic_type::pAbsPtr->status					= CHMPX_SERVER == mode ? CHMPXSTS_SRVOUT_DOWN_NORMAL : CHMPXSTS_SLAVE_DOWN_NORMAL;
+
+	if(pendpoints){
+		copy_hostport_pairs(basic_type::pAbsPtr->endpoints,		pendpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		copy_hostport_pairs(basic_type::pAbsPtr->ctlendpoints,	pctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	if(pforward_peers){
+		copy_hostport_pairs(basic_type::pAbsPtr->forward_peers,	pforward_peers,	FORWARD_PEER_MAX);
+	}
+	if(preverse_peers){
+		copy_hostport_pairs(basic_type::pAbsPtr->reverse_peers,	preverse_peers,	REVERSE_PEER_MAX);
+	}
 
 	return true;
 }
@@ -987,19 +1277,20 @@ bool chmpx_lap<T>::Close(int eqfd)
 }
 
 template<typename T>
-bool chmpx_lap<T>::InitializeServer(const char* hostname, const char* group, short port, short ctlport, const CHMPXSSL& ssl)
+bool chmpx_lap<T>::InitializeServer(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, short port, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl)
 {
-	return chmpx_lap<T>::Initialize(hostname, group, CHMPX_SERVER, port, ctlport, ssl);
+	return chmpx_lap<T>::Initialize(type, hostname, group, CHMPX_SERVER, port, ctlport, cuk, custom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers, ssl);
 }
 
 template<typename T>
-bool chmpx_lap<T>::InitializeServer(PCHMPXSVR chmpxsvr, const char* group)
+bool chmpx_lap<T>::InitializeServer(PCHMPXSVR chmpxsvr, const char* group, CHMPXID_SEED_TYPE type)
 {
 	if(!chmpxsvr || CHMEMPTYSTR(group)){
 		ERR_CHMPRN("Parameters are wrong.");
 		return false;
 	}
-	if(!chmpx_lap<T>::InitializeServer(chmpxsvr->name, group, chmpxsvr->port, chmpxsvr->ctlport, chmpxsvr->ssl)){
+
+	if(!chmpx_lap<T>::InitializeServer(type, chmpxsvr->name, group, chmpxsvr->port, chmpxsvr->ctlport, chmpxsvr->cuk, chmpxsvr->custom_seed, chmpxsvr->endpoints, chmpxsvr->ctlendpoints, chmpxsvr->forward_peers, chmpxsvr->reverse_peers, chmpxsvr->ssl)){
 		return false;
 	}
 	if(chmpxsvr->chmpxid != basic_type::pAbsPtr->chmpxid){
@@ -1037,9 +1328,9 @@ bool chmpx_lap<T>::InitializeServer(PCHMPXSVR chmpxsvr, const char* group)
 }
 
 template<typename T>
-bool chmpx_lap<T>::InitializeSlave(const char* hostname, const char* group, short ctlport, const CHMPXSSL& ssl)
+bool chmpx_lap<T>::InitializeSlave(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl)
 {
-	return chmpx_lap<T>::Initialize(hostname, group, CHMPX_SLAVE, CHM_INVALID_PORT, ctlport, ssl);
+	return chmpx_lap<T>::Initialize(type, hostname, group, CHMPX_SLAVE, CHM_INVALID_PORT, ctlport, cuk, custom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers, ssl);
 }
 
 template<typename T>
@@ -1232,7 +1523,7 @@ bool chmpx_lap<T>::UpdateLastStatusTime(void)
 }
 
 template<typename T>
-bool chmpx_lap<T>::Get(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const
+bool chmpx_lap<T>::Get(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport, std::string* pcuk, std::string* pcustom_seed, PCHMPXHP_RAWPAIR pendpoints, PCHMPXHP_RAWPAIR pctlendpoints, PCHMPXHP_RAWPAIR pforward_peers, PCHMPXHP_RAWPAIR preverse_peers) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPX does not set.");
@@ -1246,6 +1537,26 @@ bool chmpx_lap<T>::Get(std::string& name, chmpxid_t& chmpxid, short& port, short
 	chmpxid	= basic_type::pAbsPtr->chmpxid;
 	port	= basic_type::pAbsPtr->port;
 	ctlport	= basic_type::pAbsPtr->ctlport;
+
+	// following are optional
+	if(pcuk){
+		(*pcuk)			= basic_type::pAbsPtr->cuk;
+	}
+	if(pcustom_seed){
+		(*pcustom_seed)	= basic_type::pAbsPtr->custom_seed;
+	}
+	if(pendpoints){
+		copy_hostport_pairs(pendpoints,		basic_type::pAbsPtr->endpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		copy_hostport_pairs(pctlendpoints,	basic_type::pAbsPtr->ctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	if(pforward_peers){
+		copy_hostport_pairs(pforward_peers,	basic_type::pAbsPtr->forward_peers,	FORWARD_PEER_MAX);
+	}
+	if(preverse_peers){
+		copy_hostport_pairs(preverse_peers,	basic_type::pAbsPtr->reverse_peers,	REVERSE_PEER_MAX);
+	}
 	return true;
 }
 
@@ -1362,6 +1673,8 @@ bool chmpx_lap<T>::GetChmpxSvr(PCHMPXSVR chmpxsvr) const
 	}
 
 	strcpy(chmpxsvr->name,				basic_type::pAbsPtr->name);
+	strcpy(chmpxsvr->cuk,				basic_type::pAbsPtr->cuk);
+	strcpy(chmpxsvr->custom_seed,		basic_type::pAbsPtr->custom_seed);
 	strcpy(chmpxsvr->ssl.capath,		basic_type::pAbsPtr->capath);
 	strcpy(chmpxsvr->ssl.server_cert,	basic_type::pAbsPtr->server_cert);
 	strcpy(chmpxsvr->ssl.server_prikey,	basic_type::pAbsPtr->server_prikey);
@@ -1378,6 +1691,11 @@ bool chmpx_lap<T>::GetChmpxSvr(PCHMPXSVR chmpxsvr) const
 	chmpxsvr->ssl.is_ca_file			= basic_type::pAbsPtr->is_ca_file;
 	chmpxsvr->last_status_time			= basic_type::pAbsPtr->last_status_time;
 	chmpxsvr->status					= basic_type::pAbsPtr->status;
+
+	copy_hostport_pairs(chmpxsvr->endpoints,		basic_type::pAbsPtr->endpoints,		EXTERNAL_EP_MAX);
+	copy_hostport_pairs(chmpxsvr->ctlendpoints,		basic_type::pAbsPtr->ctlendpoints,	EXTERNAL_EP_MAX);
+	copy_hostport_pairs(chmpxsvr->forward_peers,	basic_type::pAbsPtr->forward_peers,	FORWARD_PEER_MAX);
+	copy_hostport_pairs(chmpxsvr->reverse_peers,	basic_type::pAbsPtr->reverse_peers,	REVERSE_PEER_MAX);
 
 	return true;
 }
@@ -1396,6 +1714,15 @@ bool chmpx_lap<T>::GetChmpxSvr(PCHMPXSVR chmpxsvr) const
 //					over wrote. The other case, the value is over wrote.(*1)
 // ctlport			If ctlsock member is an effective value, this value is not
 //					over wrote. The other case, the value is over wrote.(*1)
+// cuk				always overwrite. if chmpxid_type is CHMPXID_SEED_CUK,
+//					chmpxid will change.(*2)
+// custom_seed		always overwrite. if chmpxid_type is CHMPXID_SEED_CUSTOM,
+//					chmpxid will change.(*2)
+// endpoints		like port.
+// ctlendpoints		like ctlport. if chmpxid_type is CHMPXID_SEED_CTLENDPOINTS,
+//					chmpxid will change.(*2)
+// forward_peers	always overwrite
+// reverse_peers	always overwrite
 // about ssl 		If sock and ctlsock members are an effective value, these
 //					value are not over wrote. The other case, the values are
 //					over wrote.(*1)
@@ -1406,6 +1733,8 @@ bool chmpx_lap<T>::GetChmpxSvr(PCHMPXSVR chmpxsvr) const
 // (*1)
 // Should not be this case by upper layer, the upper layer should close sockets
 // before calling this function.
+// (*2)
+// In these case, the caller should make adjustments beforehand.
 //
 template<typename T>
 bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
@@ -1423,7 +1752,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 			strcpy(basic_type::pAbsPtr->name, chmpxsvr->name);
 			basic_type::pAbsPtr->chmpxid = chmpxsvr->chmpxid;
 		}
-		if(basic_type::pAbsPtr->port != chmpxsvr->port){
+		if(basic_type::pAbsPtr->port != chmpxsvr->port || !compare_hostport_pairs(basic_type::pAbsPtr->endpoints, chmpxsvr->endpoints, EXTERNAL_EP_MAX)){
 			if(basic_type::pAbsPtr->socklist){
 				chmsocklistlap	socklist(basic_type::pAbsPtr->socklist, basic_type::pShmBase, false);	// From Relative
 				chmsocklistlap	freesocklist(*abs_sock_frees, basic_type::pShmBase, false);				// From Relative
@@ -1453,9 +1782,12 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 				}
 				CHM_CLOSESOCK(basic_type::pAbsPtr->selfsock);
 			}
+
 			basic_type::pAbsPtr->port = chmpxsvr->port;
+			copy_hostport_pairs(basic_type::pAbsPtr->endpoints, chmpxsvr->endpoints, EXTERNAL_EP_MAX);
 		}
-		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport){
+
+		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport || !compare_hostport_pairs(basic_type::pAbsPtr->ctlendpoints, chmpxsvr->ctlendpoints, EXTERNAL_EP_MAX)){
 			if(CHM_INVALID_SOCK != basic_type::pAbsPtr->ctlsock){
 				WAN_CHMPRN("ctlport(%d) is opened(ctlsock:%d), it is closed.", basic_type::pAbsPtr->ctlport, basic_type::pAbsPtr->ctlsock);
 				if(CHM_INVALID_HANDLE != eqfd){
@@ -1470,7 +1802,9 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 				}
 				CHM_CLOSESOCK(basic_type::pAbsPtr->selfctlsock);
 			}
+
 			basic_type::pAbsPtr->ctlport = chmpxsvr->ctlport;
+			copy_hostport_pairs(basic_type::pAbsPtr->ctlendpoints, chmpxsvr->ctlendpoints, EXTERNAL_EP_MAX);
 		}
 
 	}else{
@@ -1480,7 +1814,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 		bool	is_overwrite_port	= false;
 		bool	is_overwrite_ctlport= false;
-		if(basic_type::pAbsPtr->port != chmpxsvr->port){
+		if(basic_type::pAbsPtr->port != chmpxsvr->port || !compare_hostport_pairs(basic_type::pAbsPtr->endpoints, chmpxsvr->endpoints, EXTERNAL_EP_MAX)){
 			if(basic_type::pAbsPtr->socklist){
 				ERR_CHMPRN("port(%d) is opened yet.", basic_type::pAbsPtr->port);
 				return false;
@@ -1491,7 +1825,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 			}
 			is_overwrite_port = true;
 		}
-		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport){
+		if(basic_type::pAbsPtr->ctlport != chmpxsvr->ctlport || !compare_hostport_pairs(basic_type::pAbsPtr->ctlendpoints, chmpxsvr->ctlendpoints, EXTERNAL_EP_MAX)){
 			if(CHM_INVALID_SOCK != basic_type::pAbsPtr->ctlsock){
 				ERR_CHMPRN("ctlport(%d) is opened(ctlsock:%d) yet.", basic_type::pAbsPtr->ctlport, basic_type::pAbsPtr->ctlsock);
 				return false;
@@ -1504,11 +1838,19 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 		if(is_overwrite_port){
 			basic_type::pAbsPtr->port = chmpxsvr->port;
+			copy_hostport_pairs(basic_type::pAbsPtr->endpoints, chmpxsvr->endpoints, EXTERNAL_EP_MAX);
 		}
 		if(is_overwrite_ctlport){
 			basic_type::pAbsPtr->ctlport = chmpxsvr->ctlport;
+			copy_hostport_pairs(basic_type::pAbsPtr->ctlendpoints, chmpxsvr->ctlendpoints, EXTERNAL_EP_MAX);
 		}
 	}
+
+	// others(always overwrite)
+	strncpy(basic_type::pAbsPtr->cuk,			chmpxsvr->cuk,			CUK_MAX);
+	strncpy(basic_type::pAbsPtr->custom_seed,	chmpxsvr->custom_seed,	CUSTOM_ID_SEED_MAX);
+	copy_hostport_pairs(basic_type::pAbsPtr->forward_peers, chmpxsvr->forward_peers, FORWARD_PEER_MAX);
+	copy_hostport_pairs(basic_type::pAbsPtr->reverse_peers, chmpxsvr->reverse_peers, REVERSE_PEER_MAX);
 
 	// [NOTICE]
 	// If base(pending) hash value is valid, set always pointer to chmpxlist array.
@@ -1572,13 +1914,22 @@ bool chmpx_lap<T>::GetSslStructure(CHMPXSSL& ssl) const
 // return > 0, means other is big
 //
 template<typename T>
-int chmpx_lap<T>::compare_name(const chmpx_lap<T>& other) const
+int chmpx_lap<T>::compare_order(const chmpx_lap<T>& other) const
 {
-	if(0 == strcmp(other.pAbsPtr->name, basic_type::pAbsPtr->name)){
-		return static_cast<int>(other.pAbsPtr->ctlport - basic_type::pAbsPtr->ctlport);
-	}else{
-		return strcmp(other.pAbsPtr->name, basic_type::pAbsPtr->name);
+	int	result;
+
+	if(0 == (result = strcmp(other.pAbsPtr->name, basic_type::pAbsPtr->name))){
+		if(other.pAbsPtr->ctlport == basic_type::pAbsPtr->ctlport){
+			if(0 == (result = strcmp(other.pAbsPtr->cuk, basic_type::pAbsPtr->cuk))){
+				result = strcmp(other.pAbsPtr->custom_seed, basic_type::pAbsPtr->custom_seed);
+			}
+		}else if(other.pAbsPtr->ctlport < basic_type::pAbsPtr->ctlport){
+			result = -1;
+		}else{
+			result = 1;
+		}
 	}
+	return result;
 }
 
 typedef	chmpx_lap<CHMPX>	chmpxlap;
@@ -2554,7 +2905,7 @@ bool chmpxlist_lap<T>::Insert(st_ptr_type ptr, bool is_abs)
 	st_ptr_type	last;
 	for(cur = basic_type::pAbsPtr, last = NULL; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type), last = cur){
 		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
-		if(0 > curchmpx.compare_name(target)){
+		if(0 > curchmpx.compare_order(target)){
 			st_ptr_type	prev= CHM_ABS(basic_type::pShmBase, cur->prev, st_ptr_type);
 			newptr->prev	= CHM_REL(basic_type::pShmBase, prev, st_ptr_type);
 			newptr->next	= CHM_REL(basic_type::pShmBase, cur, st_ptr_type);
@@ -4663,6 +5014,7 @@ class chmpxman_lap : public structure_lap<T>
 		PCHMPX* AbsPendArr(void) const { return (basic_type::pAbsPtr ? CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->chmpx_pend_srvs, PCHMPX*) : NULL); }
 		long* AbsSockFreeCnt(void) const { return (basic_type::pAbsPtr ? &(basic_type::pAbsPtr->sock_free_count) : NULL); }
 		PCHMSOCKLIST* AbsSockFrees(void) const { return (basic_type::pAbsPtr ? &(basic_type::pAbsPtr->sock_frees) : NULL); }
+		bool RawCheckContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const;
 
 	public:
 		chmpxman_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
@@ -4675,13 +5027,13 @@ class chmpxman_lap : public structure_lap<T>
 		void Free(st_ptr_type ptr) const;
 
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
-		bool Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend);
+		bool Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend);
 		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
 
 		bool GetSelfChmpxSvr(PCHMPXSVR chmpxsvr) const;
 		bool GetChmpxSvr(chmpxid_t chmpxid, PCHMPXSVR chmpxsvr) const;
 		bool GetChmpxSvrs(PCHMPXSVR* ppchmpxsvrs, long& count) const;
-		bool MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_client_join, bool is_remove = true, bool is_init_process = false, int eqfd = CHM_INVALID_HANDLE);
+		bool MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, CHMPXID_SEED_TYPE type, long count, bool is_client_join, bool is_remove = true, bool is_init_process = false, int eqfd = CHM_INVALID_HANDLE);
 
 		bool GetGroup(std::string& group) const;
 		bool IsServerMode(chmpxid_t chmpxid = CHM_INVALID_CHMPXID) const;
@@ -4695,12 +5047,13 @@ class chmpxman_lap : public structure_lap<T>
 		long GetUpServerCount(void) const;
 		chmpxpos_t GetSelfServerPos(void) const;
 		chmpxpos_t GetNextServerPos(chmpxpos_t startpos, chmpxpos_t nowpos, bool is_skip_self, bool is_cycle) const;
-		bool GetAllServerName(hnamesslmap_t& info) const;
+		bool CheckContainsChmpxSvrs(const char* hostname) const;
+		bool CheckStrictlyContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const;
 
 		bool IsOperating(void);
 		bool IsServerChmpxId(chmpxid_t chmpxid) const;
 		chmpxid_t GetChmpxIdBySock(int sock, int type = CLOSETG_BOTH) const;
-		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
+		chmpxid_t GetChmpxIdByToServerName(CHMPXID_SEED_TYPE type, const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
 		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
@@ -4708,8 +5061,9 @@ class chmpxman_lap : public structure_lap<T>
 		bool GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending, bool without_down = true, bool without_suspend = true);
 		bool GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, bool with_pending, bool without_down = true, bool without_suspend = true);
 		long GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, bool without_down = true, bool without_suspend = true) const;
-		bool GetServerBase(chmpxpos_t pos, std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
-		bool GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const;
+
+		bool GetServerBase(chmpxpos_t pos, std::string* pname = NULL, chmpxid_t* pchmpxid = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
+		bool GetServerBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
 		bool GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const;
 		bool GetServerSocks(chmpxid_t chmpxid, socklist_t& socklist, int& ctlsock) const;
 		bool GetServerHash(chmpxid_t chmpxid, chmhash_t& base, chmhash_t& pending) const;
@@ -4720,8 +5074,9 @@ class chmpxman_lap : public structure_lap<T>
 		bool GetSelfHash(chmhash_t& base, chmhash_t& pending) const;
 		chmpxsts_t GetSelfStatus(void) const;
 		bool GetSelfSsl(CHMPXSSL& ssl) const;
+		bool GetSelfBase(std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		long GetSlaveChmpxIds(chmpxidlist_t& list) const;
-		bool GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const;
+		bool GetSlaveBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		bool GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const;
 		chmpxsts_t GetSlaveStatus(chmpxid_t chmpxid) const;
 
@@ -4735,7 +5090,7 @@ class chmpxman_lap : public structure_lap<T>
 		bool SetSelfHash(chmhash_t base, chmhash_t pending, int type);
 		bool SetSelfStatus(chmpxsts_t status, bool is_client_join);
 
-		bool SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl);
+		bool SetSlaveBase(CHMPXID_SEED_TYPE type, chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl);
 		bool SetSlaveSock(chmpxid_t chmpxid, int sock);
 		bool SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock);
@@ -4987,7 +5342,7 @@ void chmpxman_lap<T>::Free(st_ptr_type ptr) const
 }
 
 template<typename T>
-bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend)
+bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend)
 {
 	if(!pchmcfg || !relchmpxlist || !pselfnode || !rel_pchmpxarrbase || !rel_pchmpxarrpend){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -5001,6 +5356,9 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 		ERR_CHMPRN("PCHMPXMAN does not set.");
 		return false;
 	}
+
+	// node name
+	std::string	strselfname = CHMEMPTYSTR(pselfname) ? pselfnode->name : pselfname;
 
 	strcpy(basic_type::pAbsPtr->group, pchmcfg->groupname.c_str());
 
@@ -5026,6 +5384,14 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 	basic_type::pAbsPtr->chmpx_slave_count	= 0;
 	basic_type::pAbsPtr->chmpx_slaves		= NULL;
 
+	// self node's buffers for temporary
+	std::string		self_cuk;
+	std::string		self_custom_seed;
+	CHMPXHP_RAWPAIR	self_endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	self_ctlendpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	self_forward_peers[FORWARD_PEER_MAX];
+	CHMPXHP_RAWPAIR	self_reverse_peers[REVERSE_PEER_MAX];
+
 	// self
 	{
 		// Get one PCHMPXLIST for self from front of free list
@@ -5035,16 +5401,23 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 		CHMPXSSL		ssl;
 		CVT_SSL_STRUCTURE(ssl, *pselfnode);
 
+		// get(convert) parameters wich checking by chmpxid seed type
+		if(!cvt_parameters_by_chmpxid_type(pselfnode, pchmcfg->chmpxid_type, self_cuk, self_custom_seed, self_endpoints, self_ctlendpoints, self_forward_peers, self_reverse_peers)){
+			ERR_CHMPRN("Failed to convert some parameters for self chmpx information from configuration.");
+			return false;
+		}
+
 		// Initialize self PCHMPX for server in self list
 		if(pchmcfg->is_server_mode){
-			selfchmpx.InitializeServer(pselfnode->name.c_str(), pchmcfg->groupname.c_str(), pselfnode->port, pselfnode->ctlport, ssl);
+			selfchmpx.InitializeServer(pchmcfg->chmpxid_type, strselfname.c_str(), pchmcfg->groupname.c_str(), pselfnode->port, pselfnode->ctlport, self_cuk.c_str(), self_custom_seed.c_str(), self_endpoints, self_ctlendpoints, self_forward_peers, self_reverse_peers, ssl);
+
 			basic_type::pAbsPtr->chmpx_servers		= selfchmpxlist.GetRelPtr();	// Set Self chmpxlist into servers
 			basic_type::pAbsPtr->chmpx_server_count	= 1;
 
 			// [NOTE]
 			// chmpx_bhash_count is 0, because InitializeServer sets status DOWN.
 		}else{
-			selfchmpx.InitializeSlave(pselfnode->name.c_str(), pchmcfg->groupname.c_str(), pselfnode->ctlport, ssl);
+			selfchmpx.InitializeSlave(pchmcfg->chmpxid_type, strselfname.c_str(), pchmcfg->groupname.c_str(), pselfnode->ctlport, self_cuk.c_str(), self_custom_seed.c_str(), self_endpoints, self_ctlendpoints, self_forward_peers, self_reverse_peers, ssl);
 		}
 		selfchmpxlist.SaveChmpxIdMap();												// Set chmpxid map
 		basic_type::pAbsPtr->chmpx_self = selfchmpxlist.GetRelPtr();				// Set Self chmpxlist
@@ -5054,10 +5427,32 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 	chmpxlistlap	cursvrlist;
 	chmpxlap		cursvrchmpx;
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfg->servers.begin(); iter != pchmcfg->servers.end(); ++iter){
+		// each node's buffers for temporary
+		std::string		cuk;
+		std::string		custom_seed;
+		CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+		CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+		CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];
+		CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];
+
+		// get(convert) parameters wich checking by chmpxid seed type
+		if(!cvt_parameters_by_chmpxid_type(&(*iter), pchmcfg->chmpxid_type, cuk, custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers)){
+			ERR_CHMPRN("Failed to convert some parameters for other server chmpx information from configuration.");
+			return false;
+		}
+
 		if(pchmcfg->is_server_mode){
 			// If server mode, already set self chmpx into server list.
-			// So skip it.(server name & ctlport are same)
-			if(iter->name == pselfnode->name && iter->ctlport == pselfnode->ctlport){
+			// So skip it.
+			if(	iter->name		== pselfnode->name		&&
+				iter->ctlport	== pselfnode->ctlport	&&
+				cuk				== self_cuk				&&
+				custom_seed		== self_custom_seed		&&
+				compare_hostport_pairs(endpoints,		endpoints,		EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(ctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(forward_peers,	forward_peers,	FORWARD_PEER_MAX)	&&
+				compare_hostport_pairs(reverse_peers,	reverse_peers,	REVERSE_PEER_MAX)	)
+			{
 				continue;
 			}
 		}
@@ -5067,7 +5462,7 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 		CVT_SSL_STRUCTURE(ssl, *iter);
 		cursvrlist.Reset(freechmpxlist.PopFront(), basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get one CHMPXLIST from Absolute
 		cursvrchmpx.Reset(cursvrlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);									// Get CHMPX from Absolute
-		cursvrchmpx.InitializeServer(iter->name.c_str(), pchmcfg->groupname.c_str(), iter->port, iter->ctlport, ssl);
+		cursvrchmpx.InitializeServer(pchmcfg->chmpxid_type, iter->name.c_str(), pchmcfg->groupname.c_str(), iter->port, iter->ctlport, cuk.c_str(), custom_seed.c_str(), endpoints, ctlendpoints, forward_peers, reverse_peers, ssl);
 
 		// inter CHMPX into servers list
 		if(basic_type::pAbsPtr->chmpx_servers){
@@ -5172,8 +5567,8 @@ bool chmpxman_lap<T>::GetChmpxSvr(chmpxid_t chmpxid, PCHMPXSVR chmpxsvr) const
 		MSG_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ") in servers list.", chmpxid);
 		return false;
 	}
-	chmpxlap		selfchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
-	return selfchmpx.GetChmpxSvr(chmpxsvr);
+	chmpxlap		svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
+	return svrchmpx.GetChmpxSvr(chmpxsvr);
 }
 
 template<typename T>
@@ -5208,7 +5603,7 @@ bool chmpxman_lap<T>::GetChmpxSvrs(PCHMPXSVR* ppchmpxsvrs, long& count) const
 }
 
 template<typename T>
-bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_client_join, bool is_remove, bool is_init_process, int eqfd)
+bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, CHMPXID_SEED_TYPE type, long count, bool is_client_join, bool is_remove, bool is_init_process, int eqfd)
 {
 	if(!pchmpxsvrs || count <= 0L){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -5352,7 +5747,8 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_c
 			basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
 
 			newchmpxlist.Clear();
-			if(!newchmpx.InitializeServer(&pchmpxsvrs[cnt], basic_type::pAbsPtr->group)){
+
+			if(!newchmpx.InitializeServer(&pchmpxsvrs[cnt], basic_type::pAbsPtr->group, type)){
 				WAN_CHMPRN("Failed to initialize CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR, but continue...", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
 			}
 
@@ -5682,40 +6078,141 @@ chmpxpos_t chmpxman_lap<T>::GetNextServerPos(chmpxpos_t startpos, chmpxpos_t now
 	return reinterpret_cast<chmpxpos_t>(svrchmpxlist.GetRelPtr());
 }
 
+//
+// Check strictly or generosity to exist in hostname(IP address) in all server nodes.
+//
+// [NOTE]
+// If both pctlport(and pcuk) is NULL, check for generosity.
+// If both pctlport(and pcuk) is not NULL, do a strict check.
+// In this case, if pssl is not NULL, the detected CHMPX SSL structure is copied.
+//
 template<typename T>
-bool chmpxman_lap<T>::GetAllServerName(hnamesslmap_t& info) const
+bool chmpxman_lap<T>::RawCheckContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const
 {
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
 		return false;
 	}
-	info.clear();
+
+	// strict
+	bool		is_strict;
+	std::string	strcuk;
+	if(pctlport){
+		is_strict = true;
+		if(!CHMEMPTYSTR(pcuk)){
+			strcuk = pcuk;
+		}
+	}else{
+		is_strict = false;
+	}
 
 	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative
 	bool			result;
 	for(result = svrchmpxlist.ToFirst(); result; result = svrchmpxlist.ToNext(false, false, false, false)){		// not cycle, all server(not only base hash servers, up/down servers), not allow same server
-		chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
-		std::string	name;
-		chmpxid_t	chmpxid;
-		short		port;
-		short		ctlport;
-		PCHMPXSSL	pssl;
+		chmpxlap		svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+		std::string		name;
+		chmpxid_t		chmpxid;
+		short			port;
+		short			ctlport;
+		std::string		cuk;
+		CHMPXHP_RAWPAIR	forward_peers[EXTERNAL_EP_MAX];
 
-		if(!svrchmpx.Get(name, chmpxid, port, ctlport)){
-			WAN_CHMPRN("Could not get name/chmpxid/port/ctlport.");
+		chmpxid = CHM_INVALID_CHMPXID;
+		if(!svrchmpx.Get(name, chmpxid, port, ctlport, &cuk, NULL, NULL, NULL, forward_peers, NULL)){
+			WAN_CHMPRN("Could not get name/chmpxid/port/ctlport/forward_peers.");
 			continue;
 		}
-		if(info.end() == info.find(name)){
-			info[name] = NULL;				// "hostname" = NULL
-		}
-		name += ":";
-		name += to_string(ctlport);
 
-		pssl = new CHMPXSSL;
-		svrchmpx.GetSslStructure(*pssl);
-		info[name] = pssl;					// "hostname:ctlport" = PCHMPXSSL
+		// check name
+		strlst_t	node_list;
+		std::string	globalname;
+		node_list.clear();
+		node_list.push_back(name);
+		if(IsInHostnameList(hostname, node_list, globalname, true)){
+			// matched
+			if(!is_strict){
+				if(pnormalizedname){
+					*pnormalizedname = globalname;
+				}
+				if(pssl){
+					svrchmpx.GetSslStructure(*pssl);
+				}
+				MSG_CHMPRN("Hostname(%s) is matched(not strictly) name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
+				return true;
+			}
+			if((CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
+				// strictly matched
+				if(pnormalizedname){
+					*pnormalizedname = globalname;
+				}
+				if(pssl){
+					svrchmpx.GetSslStructure(*pssl);
+				}
+				MSG_CHMPRN("Hostname(%s) is matched(strictly) name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
+				return true;
+			}
+		}
+
+		// check forward peers
+		node_list.clear();
+		for(int cnt = 0; cnt < EXTERNAL_EP_MAX; ++cnt){
+			if(CHMEMPTYSTR(forward_peers[cnt].name)){
+				continue;
+			}
+			node_list.push_back(std::string(forward_peers[cnt].name));
+		}
+		if(IsInHostnameList(hostname, node_list, globalname, true)){
+			// matched
+			if(!is_strict){
+				if(pnormalizedname){
+					*pnormalizedname = globalname;
+				}
+				if(pssl){
+					svrchmpx.GetSslStructure(*pssl);
+				}
+				MSG_CHMPRN("Hostname(%s) is matched(not strictly) forward peer in name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
+				return true;
+			}
+			if((CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
+				// strictly matched
+				if(pnormalizedname){
+					*pnormalizedname = globalname;
+				}
+				if(pssl){
+					svrchmpx.GetSslStructure(*pssl);
+				}
+				MSG_CHMPRN("Hostname(%s) is matched(strictly) forward peer in name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
+				return true;
+			}
+		}
 	}
-	return true;
+	return false;
+}
+
+//
+// Check generosity to exist in hostname(IP address) in all server nodes.
+//
+template<typename T>
+bool chmpxman_lap<T>::CheckContainsChmpxSvrs(const char* hostname) const
+{
+	return RawCheckContainsChmpxSvrs(hostname, NULL, NULL, NULL, NULL);
+}
+
+//
+// Check strictly to exist in hostname(IP address) in all server nodes.
+//
+template<typename T>
+bool chmpxman_lap<T>::CheckStrictlyContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const
+{
+	if(!pctlport){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	return RawCheckContainsChmpxSvrs(hostname, pctlport, pcuk, pnormalizedname, pssl);
 }
 
 template<typename T>
@@ -5761,7 +6258,7 @@ chmpxid_t chmpxman_lap<T>::GetChmpxIdBySock(int sock, int type) const
 }
 
 template<typename T>
-chmpxid_t chmpxman_lap<T>::GetChmpxIdByToServerName(const char* hostname, short ctlport) const
+chmpxid_t chmpxman_lap<T>::GetChmpxIdByToServerName(CHMPXID_SEED_TYPE type, const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
@@ -5769,7 +6266,7 @@ chmpxid_t chmpxman_lap<T>::GetChmpxIdByToServerName(const char* hostname, short 
 	}
 
 	chmpxid_t	chmpxid = CHM_INVALID_CHMPXID;
-	if(CHMEMPTYSTR(hostname) || CHM_INVALID_CHMPXID == (chmpxid = MakeChmpxId(basic_type::pAbsPtr->group, hostname, ctlport))){
+	if(CHMEMPTYSTR(hostname) || CHM_INVALID_CHMPXID == (chmpxid = MakeChmpxId(basic_type::pAbsPtr->group, type, hostname, ctlport, cuk, ctlendpoints, custom_seed))){
 		ERR_CHMPRN("Parameter are wrong.");
 		return CHM_INVALID_CHMPXID;
 	}
@@ -6097,20 +6594,48 @@ long chmpxman_lap<T>::GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, 
 }
 
 template<typename T>
-bool chmpxman_lap<T>::GetServerBase(chmpxpos_t pos, std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const
+bool chmpxman_lap<T>::GetServerBase(chmpxpos_t pos, std::string* pname, chmpxid_t* pchmpxid, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(CHM_INVALID_CHMPXLISTPOS == pos){
 		ERR_CHMPRN("pos is invalid.");
 		return false;
 	}
-	PCHMPXLIST	pchmpxlist = reinterpret_cast<PCHMPXLIST>(pos);
+	PCHMPXLIST		pchmpxlist = reinterpret_cast<PCHMPXLIST>(pos);
 	chmpxlistlap	svrchmpxlist(pchmpxlist, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
 	chmpxlap		svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);							// Get CHMPX from Absolute
-	return svrchmpx.Get(name, chmpxid, port, ctlport);
+
+	std::string		name;
+	chmpxid_t		chmpxid;
+	short			port;
+	short			ctlport;
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+	if(!svrchmpx.Get(name, chmpxid, port, ctlport, NULL, NULL, endpoints, ctlendpoints, NULL, NULL)){
+		return false;
+	}
+	if(pname){
+		*pname		= name;
+	}
+	if(pchmpxid){
+		*pchmpxid	= chmpxid;
+	}
+	if(pport){
+		*pport		= port;
+	}
+	if(pctlport){
+		*pctlport	= ctlport;
+	}
+	if(pendpoints){
+		rev_hostport_pairs(*pendpoints,		endpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		rev_hostport_pairs(*pctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	return true;
 }
 
 template<typename T>
-bool chmpxman_lap<T>::GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const
+bool chmpxman_lap<T>::GetServerBase(chmpxid_t chmpxid, std::string* pname, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
@@ -6124,8 +6649,32 @@ bool chmpxman_lap<T>::GetServerBase(chmpxid_t chmpxid, std::string& name, short&
 		ERR_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
-	chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
-	return svrchmpx.Get(name, chmpxid, port, ctlport);
+	chmpxlap		svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
+
+	std::string		name;
+	short			port;
+	short			ctlport;
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+	if(!svrchmpx.Get(name, chmpxid, port, ctlport, NULL, NULL, endpoints, ctlendpoints, NULL, NULL)){
+		return false;
+	}
+	if(pname){
+		*pname		= name;
+	}
+	if(pport){
+		*pport		= port;
+	}
+	if(pctlport){
+		*pctlport	= ctlport;
+	}
+	if(pendpoints){
+		rev_hostport_pairs(*pendpoints,		endpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		rev_hostport_pairs(*pctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	return true;
 }
 
 template<typename T>
@@ -6233,6 +6782,7 @@ bool chmpxman_lap<T>::GetSelfPorts(short& port, short& ctlport) const
 	chmpxlap		selfchmpx(selfchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 	std::string		name;		// tmp
 	chmpxid_t		chmpxid;	// tmp
+
 	return selfchmpx.Get(name, chmpxid, port, ctlport);
 }
 
@@ -6287,6 +6837,64 @@ bool chmpxman_lap<T>::GetSelfSsl(CHMPXSSL& ssl) const
 }
 
 template<typename T>
+bool chmpxman_lap<T>::GetSelfBase(std::string* pname, short* pport, short* pctlport, std::string* pcuk, std::string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
+{
+	if(!pname && !pport && !pctlport && !pcuk && !pcustom_seed && !pendpoints && !pctlendpoints && !pforward_peers && !preverse_peers){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPXMAN does not set.");
+		return false;
+	}
+	chmpxlistlap	selfchmpxlist(basic_type::pAbsPtr->chmpx_self, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// Get CHMPXLIST from Relative
+	chmpxlap		selfchmpx(selfchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+
+	std::string		name;
+	chmpxid_t		chmpxid;	// tmp
+	short			port;
+	short			ctlport;
+	std::string		cuk;
+	std::string		custom_seed;
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];
+	CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];
+	if(!selfchmpx.Get(name, chmpxid, port, ctlport, &cuk, &custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers)){
+		return false;
+	}
+
+	if(pname){
+		(*pname)		= name;
+	}
+	if(pport){
+		(*pport)		= port;
+	}
+	if(pctlport){
+		(*pctlport)		= ctlport;
+	}
+	if(pcuk){
+		(*pcuk)			= cuk;
+	}
+	if(pcustom_seed){
+		(*pcustom_seed)	= custom_seed;
+	}
+	if(pendpoints){
+		rev_hostport_pairs(*pendpoints,		endpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		rev_hostport_pairs(*pctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	if(pforward_peers){
+		rev_hostport_pairs(*pforward_peers,	forward_peers,	FORWARD_PEER_MAX);
+	}
+	if(preverse_peers){
+		rev_hostport_pairs(*preverse_peers,	reverse_peers,	REVERSE_PEER_MAX);
+	}
+	return true;
+}
+
+template<typename T>
 long chmpxman_lap<T>::GetSlaveChmpxIds(chmpxidlist_t& list) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
@@ -6301,7 +6909,7 @@ long chmpxman_lap<T>::GetSlaveChmpxIds(chmpxidlist_t& list) const
 }
 
 template<typename T>
-bool chmpxman_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const
+bool chmpxman_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string* pname, short* pctlport, std::string* pcuk, std::string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
@@ -6315,9 +6923,46 @@ bool chmpxman_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& 
 		//MSG_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
-	chmpxlap	slvchmpx(slvchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
-	short		port;
-	return slvchmpx.Get(name, chmpxid, port, ctlport);
+	chmpxlap		slvchmpx(slvchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);		// Get CHMPX from Absolute
+
+	std::string		name;
+	short			port;
+	short			ctlport;
+	std::string		cuk;
+	std::string		custom_seed;
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];
+	CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];
+	if(!slvchmpx.Get(name, chmpxid, port, ctlport, &cuk, &custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers)){
+		return false;
+	}
+
+	if(pname){
+		(*pname)		= name;
+	}
+	if(pctlport){
+		(*pctlport)		= ctlport;
+	}
+	if(pcuk){
+		(*pcuk)			= cuk;
+	}
+	if(pcustom_seed){
+		(*pcustom_seed)	= custom_seed;
+	}
+	if(pendpoints){
+		rev_hostport_pairs(*pendpoints,		endpoints,		EXTERNAL_EP_MAX);
+	}
+	if(pctlendpoints){
+		rev_hostport_pairs(*pctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+	}
+	if(pforward_peers){
+		rev_hostport_pairs(*pforward_peers,	forward_peers,	FORWARD_PEER_MAX);
+	}
+	if(preverse_peers){
+		rev_hostport_pairs(*preverse_peers,	reverse_peers,	REVERSE_PEER_MAX);
+	}
+	return true;
 }
 
 template<typename T>
@@ -6619,16 +7264,29 @@ bool chmpxman_lap<T>::SetSelfStatus(chmpxsts_t status, bool is_client_join)
 }
 
 template<typename T>
-bool chmpxman_lap<T>::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl)
+bool chmpxman_lap<T>::SetSlaveBase(CHMPXID_SEED_TYPE type, chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMPXMAN does not set.");
 		return false;
 	}
-	if(CHMEMPTYSTR(hostname) || !pssl || chmpxid != MakeChmpxId(basic_type::pAbsPtr->group, hostname, ctlport)){
+
+	// check
+	if(CHMEMPTYSTR(hostname) || !pssl || chmpxid != MakeChmpxId(basic_type::pAbsPtr->group, type, hostname, ctlport, cuk, get_hostports_string(ctlendpoints).c_str(), custom_seed)){
 		ERR_CHMPRN("Parameter are wrong.");
 		return false;
 	}
+
+	// buffers for temporary
+	CHMPXHP_RAWPAIR	tmp_endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	tmp_ctlendpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	tmp_forward_peers[FORWARD_PEER_MAX];
+	CHMPXHP_RAWPAIR	tmp_reverse_peers[REVERSE_PEER_MAX];
+
+	cvt_hostport_pairs(tmp_endpoints,		endpoints,		EXTERNAL_EP_MAX);
+	cvt_hostport_pairs(tmp_ctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+	cvt_hostport_pairs(tmp_forward_peers,	forward_peers,	FORWARD_PEER_MAX);
+	cvt_hostport_pairs(tmp_reverse_peers,	reverse_peers,	REVERSE_PEER_MAX);
 
 	bool			is_new = true;
 	chmpxlistlap	slvchmpxlist;
@@ -6653,7 +7311,7 @@ bool chmpxman_lap<T>::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, shor
 		basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
 
 		// Add
-		newchmpx.InitializeSlave(hostname, basic_type::pAbsPtr->group, ctlport, *pssl);
+		newchmpx.InitializeSlave(type, hostname, basic_type::pAbsPtr->group, ctlport, cuk, custom_seed, tmp_endpoints, tmp_ctlendpoints, tmp_forward_peers, tmp_reverse_peers, *pssl);
 		if(basic_type::pAbsPtr->chmpx_slaves){
 			slvchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true);							// From abs
 			basic_type::pAbsPtr->chmpx_slave_count++;
@@ -6666,7 +7324,7 @@ bool chmpxman_lap<T>::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, shor
 	}else{
 		// overwrite slave chmpx
 		chmpxlap	slvchmpx(slvchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
-		slvchmpx.InitializeSlave(hostname, basic_type::pAbsPtr->group, ctlport, *pssl);
+		slvchmpx.InitializeSlave(type, hostname, basic_type::pAbsPtr->group, ctlport, cuk, custom_seed, tmp_endpoints, tmp_ctlendpoints, tmp_forward_peers, tmp_reverse_peers, *pssl);
 	}
 	return true;
 }
@@ -6884,10 +7542,11 @@ class chminfo_lap : public structure_lap<T>
 		void Free(st_ptr_type ptr) const;
 
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
-		bool Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend);
+		bool Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend);
 		bool IsSafeCurrentVersion(void) const;
 		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
 
+		CHMPXID_SEED_TYPE GetChmpxSeedType(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->chmpxid_type : CHMPXID_SEED_NAME); }
 		msgid_t GetBaseMsgId(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->base_msgid : 0L ); }
 		msgid_t GetRandomMsgId(bool is_chmpx, bool is_activated = true);						// get msgid from assigned list
 		msgid_t AssignMsg(bool is_chmpx, bool is_activated);									// Assign msgid
@@ -6944,20 +7603,21 @@ class chminfo_lap : public structure_lap<T>
 		long GetUpServerCount(void) const;
 		chmpxpos_t GetSelfServerPos(void) const;
 		chmpxpos_t GetNextServerPos(chmpxpos_t startpos, chmpxpos_t nowpos, bool is_skip_self, bool is_cycle) const;
-		bool GetAllServerName(hnamesslmap_t& info) const;
+		bool CheckContainsChmpxSvrs(const char* hostname) const;
+		bool CheckStrictlyContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const;
 
 		bool IsOperating(void);
 		bool IsServerChmpxId(chmpxid_t chmpxid) const;
 		chmpxid_t GetChmpxIdBySock(int sock, int type = CLOSETG_BOTH) const;
-		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
+		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
 		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
 		bool GetServerChmHashsByHashs(chmhash_t hash, chmhashlist_t& basehashs, bool with_pending, bool without_down = true, bool without_suspend = true);
 		bool GetServerChmpxIdByHashs(chmhash_t hash, chmpxidlist_t& chmpxids, bool with_pending, bool without_down = true, bool without_suspend = true);
 		long GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, bool without_down = true, bool without_suspend = true) const;
-		bool GetServerBase(chmpxpos_t pos, std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
-		bool GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const;
+		bool GetServerBase(chmpxpos_t pos, std::string* pname = NULL, chmpxid_t* pchmpxid = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
+		bool GetServerBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
 		bool GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const;
 		bool GetServerSocks(chmpxid_t chmpxid, socklist_t& socklist, int& ctlsock) const;
 		bool GetServerHash(chmpxid_t chmpxid, chmhash_t& base, chmhash_t& pending) const;
@@ -6968,8 +7628,9 @@ class chminfo_lap : public structure_lap<T>
 		bool GetSelfHash(chmhash_t& base, chmhash_t& pending) const;
 		chmpxsts_t GetSelfStatus(void) const;
 		bool GetSelfSsl(CHMPXSSL& ssl) const;
+		bool GetSelfBase(std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		long GetSlaveChmpxIds(chmpxidlist_t& list) const;
-		bool GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const;
+		bool GetSlaveBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		bool GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const;
 		chmpxsts_t GetSlaveStatus(chmpxid_t chmpxid) const;
 
@@ -6982,7 +7643,7 @@ class chminfo_lap : public structure_lap<T>
 		bool SetSelfSocks(int sock, int ctlsock);
 		bool SetSelfHash(chmhash_t base, chmhash_t pending, int type);
 		bool SetSelfStatus(chmpxsts_t status);
-		bool SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl);
+		bool SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl);
 		bool SetSlaveSock(chmpxid_t chmpxid, int sock);
 		bool SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock, bool is_remove_empty = true);
@@ -7020,6 +7681,7 @@ bool chminfo_lap<T>::Initialize(void)
 	basic_type::pAbsPtr->chminfo_size			= sizeof(CHMINFO);
 	basic_type::pAbsPtr->pid					= CHM_INVALID_PID;
 	basic_type::pAbsPtr->start_time				= 0;
+	basic_type::pAbsPtr->chmpxid_type			= CHMPXID_SEED_NAME;
 	basic_type::pAbsPtr->is_random_deliver		= false;
 	basic_type::pAbsPtr->is_auto_merge			= false;
 	basic_type::pAbsPtr->is_auto_merge_suspend	= false;
@@ -7078,16 +7740,23 @@ bool chminfo_lap<T>::IsSafeCurrentVersion(void) const
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
-	// check prefix for version string
-	if(0 != strncmp(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_VERSION_PREFIX, strlen(CHM_CHMINFO_VERSION_PREFIX))){
-		MSG_CHMPRN("CHMINFO structure maybe old version before CHMPX version 1.0.59.");
-		return false;
-	}
-	// [NOTE]
-	// Now we do not check CHMINFO structure version.
-	//
 
-	return true;
+	// check prefix for version string
+	if(0 == strncmp(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_CUR_VERSION_STR, strlen(CHM_CHMINFO_CUR_VERSION_STR))){
+		// CHMINFO structure is as same as current version.
+		return true;
+	}
+
+	// check old version for messaging
+	std::string	old_ver_1_0(CHM_CHMINFO_VERSION_PREFIX " " CHM_CHMINFO_OLD_VERSION_1_0);	// 1.0
+	if(0 != strncmp(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_VERSION_PREFIX, strlen(CHM_CHMINFO_VERSION_PREFIX))){
+		ERR_CHMPRN("CHMINFO structure maybe old version before CHMPX version 1.0.59.");
+	}else if(0 == strncmp(basic_type::pAbsPtr->chminfo_version, old_ver_1_0.c_str(), old_ver_1_0.length())){
+		ERR_CHMPRN("CHMINFO structure is older version before CHMPX version 1.0.71.");
+	}else{
+		ERR_CHMPRN("CHMINFO structure meybe newer version than current CHMPX version.");
+	}
+	return false;
 }
 
 template<typename T>
@@ -7107,6 +7776,7 @@ bool chminfo_lap<T>::Dump(std::stringstream& sstream, const char* spacer) const
 	sstream << (spacer ? spacer : "") << "CHMINFO size         = " << basic_type::pAbsPtr->chminfo_size			<< std::endl;
 	sstream << (spacer ? spacer : "") << "pid                  = " << basic_type::pAbsPtr->pid					<< std::endl;
 	sstream << (spacer ? spacer : "") << "start_time           = " << basic_type::pAbsPtr->start_time			<< std::endl;
+	sstream << (spacer ? spacer : "") << "chmpxid_type         = " << get_chmpxid_seed_type_string(basic_type::pAbsPtr->chmpxid_type)	<< std::endl;
 	sstream << (spacer ? spacer : "") << "is_random_deliver    = " << (basic_type::pAbsPtr->is_random_deliver		? "true" : "false")	<< std::endl;
 	sstream << (spacer ? spacer : "") << "automerge in conf    = " << (basic_type::pAbsPtr->is_auto_merge			? "yes" : "no")		<< std::endl;
 	sstream << (spacer ? spacer : "") << "suspend automerge    = " << (basic_type::pAbsPtr->is_auto_merge_suspend	? "yes" : "no")		<< std::endl;
@@ -7216,6 +7886,7 @@ typename chminfo_lap<T>::st_ptr_type chminfo_lap<T>::Dup(void)
 	pdst->chminfo_size			= basic_type::pAbsPtr->chminfo_size;
 	pdst->pid					= basic_type::pAbsPtr->pid;
 	pdst->start_time			= basic_type::pAbsPtr->start_time;
+	pdst->chmpxid_type			= basic_type::pAbsPtr->chmpxid_type;
 	pdst->is_random_deliver		= basic_type::pAbsPtr->is_random_deliver;
 	pdst->is_auto_merge			= basic_type::pAbsPtr->is_auto_merge;
 	pdst->is_auto_merge_suspend	= basic_type::pAbsPtr->is_auto_merge_suspend;
@@ -7306,7 +7977,7 @@ void chminfo_lap<T>::Free(st_ptr_type ptr) const
 }
 
 template<typename T>
-bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend)
+bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend)
 {
 	if(!pchmcfg || !rel_chmpxmsgarea || !relchmpxlist || !pselfnode || !relcltproclist || !relchmsockarea || !pchmpxarrbase || !pchmpxarrpend){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -7321,6 +7992,9 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 		return false;
 	}
 
+	// node name
+	std::string	strselfname = CHMEMPTYSTR(pselfname) ? pselfnode->name : pselfname;
+
 	memset(basic_type::pAbsPtr->chminfo_version, 0, CHM_CHMINFO_VERSION_BUFLEN);
 	strcpy(basic_type::pAbsPtr->chminfo_version, CHM_CHMINFO_CUR_VERSION_STR);
 	strcpy(basic_type::pAbsPtr->nssdb_dir, pchmcfg->nssdb_dir.c_str());
@@ -7328,6 +8002,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 	basic_type::pAbsPtr->chminfo_size			= sizeof(CHMINFO);
 	basic_type::pAbsPtr->pid					= getpid();
 	basic_type::pAbsPtr->start_time				= time(NULL);
+	basic_type::pAbsPtr->chmpxid_type			= pchmcfg->chmpxid_type;
 	basic_type::pAbsPtr->is_random_deliver		= pchmcfg->is_random_mode;
 	basic_type::pAbsPtr->is_auto_merge			= pchmcfg->is_auto_merge;
 	basic_type::pAbsPtr->is_auto_merge_suspend	= false;					// default at loading configuration
@@ -7350,7 +8025,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 	basic_type::pAbsPtr->mq_retrycnt			= pchmcfg->mq_retrycnt;
 	basic_type::pAbsPtr->timeout_wait_mq		= pchmcfg->timeout_wait_mq;
 	basic_type::pAbsPtr->timeout_merge			= pchmcfg->timeout_merge;
-	basic_type::pAbsPtr->base_msgid				= MakeBaseMsgId(pchmcfg->groupname.c_str(), pselfnode->name.c_str(), pselfnode->ctlport);
+	basic_type::pAbsPtr->base_msgid				= MakeBaseMsgId(pchmcfg->groupname.c_str(), pchmcfg->chmpxid_type, strselfname.c_str(), pselfnode->ctlport, pselfnode->cuk.c_str(), get_hostports_string(pselfnode->ctlendpoints).c_str(), pselfnode->custom_seed.c_str());
 	basic_type::pAbsPtr->chmpx_msg_count		= 0L;
 	basic_type::pAbsPtr->chmpx_msgs				= NULL;
 	basic_type::pAbsPtr->activated_msg_count	= 0L;
@@ -7372,7 +8047,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 	basic_type::pAbsPtr->histlog_count			= pchmcfg->max_histlog_count;
 
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	if(!tmpchmpxman.Initialize(pchmcfg, pselfnode, relchmpxlist, relchmsockarea, pchmpxarrbase, pchmpxarrpend)){
+	if(!tmpchmpxman.Initialize(pchmcfg, pselfnode, pselfname, relchmpxlist, relchmsockarea, pchmpxarrbase, pchmpxarrpend)){
 		ERR_CHMPRN("Failed to initialize CHMPXMAN.");
 		return false;
 	}
@@ -7405,6 +8080,11 @@ bool chminfo_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
 	}
 	if(basic_type::pAbsPtr->is_random_deliver != pchmcfg->is_random_mode){
 		WAN_CHMPRN("chmpx mode(random/hash) could not be changed.");
+	}
+	if(basic_type::pAbsPtr->chmpxid_type != pchmcfg->chmpxid_type){
+		// Must be same chmpxid seed type.
+		ERR_CHMPRN("CHMPXID Seed type is different(Current:%s vs New configuration:%s).", get_chmpxid_seed_type_string(basic_type::pAbsPtr->chmpxid_type), get_chmpxid_seed_type_string(pchmcfg->chmpxid_type));
+		return false;
 	}
 
 	// reset
@@ -7980,7 +8660,7 @@ bool chminfo_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_re
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.MergeChmpxSvrs(pchmpxsvrs, count, (NULL != basic_type::pAbsPtr->client_pids), is_remove, is_init_process, eqfd);
+	return tmpchmpxman.MergeChmpxSvrs(pchmpxsvrs, basic_type::pAbsPtr->chmpxid_type, count, (NULL != basic_type::pAbsPtr->client_pids), is_remove, is_init_process, eqfd);
 }
 
 template<typename T>
@@ -8127,14 +8807,25 @@ chmpxpos_t chminfo_lap<T>::GetNextServerPos(chmpxpos_t startpos, chmpxpos_t nowp
 }
 
 template<typename T>
-bool chminfo_lap<T>::GetAllServerName(hnamesslmap_t& info) const
+bool chminfo_lap<T>::CheckContainsChmpxSvrs(const char* hostname) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetAllServerName(info);
+	return tmpchmpxman.CheckContainsChmpxSvrs(hostname);
+}
+
+template<typename T>
+bool chminfo_lap<T>::CheckStrictlyContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
+	return tmpchmpxman.CheckStrictlyContainsChmpxSvrs(hostname, pctlport, pcuk, pnormalizedname, pssl);
 }
 
 template<typename T>
@@ -8161,14 +8852,14 @@ chmpxid_t chminfo_lap<T>::GetChmpxIdBySock(int sock, int type) const
 }
 
 template<typename T>
-chmpxid_t chminfo_lap<T>::GetChmpxIdByToServerName(const char* hostname, short ctlport) const
+chmpxid_t chminfo_lap<T>::GetChmpxIdByToServerName(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return CHM_INVALID_CHMPXID;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetChmpxIdByToServerName(hostname, ctlport);
+	return tmpchmpxman.GetChmpxIdByToServerName(basic_type::pAbsPtr->chmpxid_type, hostname, ctlport, cuk, ctlendpoints, custom_seed);
 }
 
 //
@@ -8241,25 +8932,25 @@ long chminfo_lap<T>::GetServerChmpxIds(chmpxidlist_t& list, bool with_pending, b
 }
 
 template<typename T>
-bool chminfo_lap<T>::GetServerBase(chmpxpos_t pos, std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const
+bool chminfo_lap<T>::GetServerBase(chmpxpos_t pos, std::string* pname, chmpxid_t* pchmpxid, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetServerBase(pos, name, chmpxid, port, ctlport);
+	return tmpchmpxman.GetServerBase(pos, pname, pchmpxid, pport, pctlport, pendpoints, pctlendpoints);
 }
 
 template<typename T>
-bool chminfo_lap<T>::GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const
+bool chminfo_lap<T>::GetServerBase(chmpxid_t chmpxid, std::string* pname, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetServerBase(chmpxid, name, port, ctlport);
+	return tmpchmpxman.GetServerBase(chmpxid, pname, pport, pctlport, pendpoints, pctlendpoints);
 }
 
 template<typename T>
@@ -8373,6 +9064,17 @@ bool chminfo_lap<T>::GetSelfSsl(CHMPXSSL& ssl) const
 }
 
 template<typename T>
+bool chminfo_lap<T>::GetSelfBase(std::string* pname, short* pport, short* pctlport, std::string* pcuk, std::string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
+{
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMINFO does not set.");
+		return false;
+	}
+	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
+	return tmpchmpxman.GetSelfBase(pname, pport, pctlport, pcuk, pcustom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers);
+}
+
+template<typename T>
 long chminfo_lap<T>::GetSlaveChmpxIds(chmpxidlist_t& list) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
@@ -8384,14 +9086,14 @@ long chminfo_lap<T>::GetSlaveChmpxIds(chmpxidlist_t& list) const
 }
 
 template<typename T>
-bool chminfo_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const
+bool chminfo_lap<T>::GetSlaveBase(chmpxid_t chmpxid, std::string* pname, short* pctlport, std::string* pcuk, std::string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.GetSlaveBase(chmpxid, name, ctlport);
+	return tmpchmpxman.GetSlaveBase(chmpxid, pname, pctlport, pcuk, pcustom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers);
 }
 
 template<typename T>
@@ -8527,14 +9229,14 @@ bool chminfo_lap<T>::SetSelfStatus(chmpxsts_t status)
 }
 
 template<typename T>
-bool chminfo_lap<T>::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl)
+bool chminfo_lap<T>::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl)
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PCHMINFO does not set.");
 		return false;
 	}
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	return tmpchmpxman.SetSlaveBase(chmpxid, hostname, ctlport, pssl);
+	return tmpchmpxman.SetSlaveBase(basic_type::pAbsPtr->chmpxid_type, chmpxid, hostname, ctlport, cuk, custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers, pssl);
 }
 
 template<typename T>

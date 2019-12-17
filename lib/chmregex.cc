@@ -38,6 +38,16 @@
 using namespace	std;
 
 //---------------------------------------------------------
+// Symbols
+//---------------------------------------------------------
+// Keywords
+#define	SIMPLE_REG_BRACKET_START		'['
+#define	SIMPLE_REG_BRACKET_END			']'
+#define	SIMPLE_REG_AREA_PARSER			'-'
+#define	SIMPLE_REG_MULTI_PARSER			','
+#define	SIMPLE_REG_MULTIHOST_SEP		','
+
+//---------------------------------------------------------
 // Simple regex
 //---------------------------------------------------------
 // Chmpx configuration allows FQDN and custom simple regex
@@ -81,7 +91,7 @@ static bool expand_simple_regex_string(const string& str_part_regex, strlst_t& e
 
 	// parse ','
 	for(strtarget = trim(str_part_regex); strtarget.length(); strtarget = trim(strtarget)){
-		if(string::npos == (pos = strtarget.find(","))){
+		if(string::npos == (pos = strtarget.find(SIMPLE_REG_MULTI_PARSER))){
 			sep_commma_lst.push_back(strtarget);
 			strtarget = "";
 		}else{
@@ -108,7 +118,7 @@ static bool expand_simple_regex_string(const string& str_part_regex, strlst_t& e
 				MSG_CHMPRN("Area strings separated are empty.");
 				return false;
 			}
-			if(string::npos != tmp2.find("-")){
+			if(string::npos != tmp2.find(SIMPLE_REG_AREA_PARSER)){
 				MSG_CHMPRN("Found many area separator.");
 				return false;
 			}
@@ -159,9 +169,9 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 		simple_regex_lst.pop_front();
 
 		string::size_type	pos;
-		string::size_type	pos2 = one_simple_regex.find("]");
+		string::size_type	pos2 = one_simple_regex.find(SIMPLE_REG_BRACKET_END);
 
-		if(string::npos == (pos = one_simple_regex.find("["))){
+		if(string::npos == (pos = one_simple_regex.find(SIMPLE_REG_BRACKET_START))){
 			if(string::npos != pos2){
 				MSG_CHMPRN("Found \']\' separator word without \'[\' word.");
 				return false;
@@ -178,7 +188,7 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 				return false;
 			}
 
-			if(string::npos == (pos = one_simple_regex.find("]"))){
+			if(string::npos == (pos = one_simple_regex.find(SIMPLE_REG_BRACKET_END))){
 				MSG_CHMPRN("Not found \']\' separator word.");
 				return false;
 			}
@@ -191,7 +201,7 @@ static bool expand_simple_regex(const string& simple_regex, strlst_t& expand_lst
 				return false;
 			}
 
-			if(string::npos != str_part_regex.find("[")){
+			if(string::npos != str_part_regex.find(SIMPLE_REG_BRACKET_START)){
 				MSG_CHMPRN("Found many \'[\' separator word.");
 				return false;
 			}
@@ -222,8 +232,8 @@ static bool expand_simple_regexes(const string& simple_regexes, strlst_t& expand
 	strlst_t	regex_lst;
 	string		before_part;
 	for(string tmp_regexes = simple_regexes; !tmp_regexes.empty(); ){
-		string::size_type	pos_comma	= tmp_regexes.find(',');
-		string::size_type	pos_bracket	= tmp_regexes.find('[');
+		string::size_type	pos_comma	= tmp_regexes.find(SIMPLE_REG_MULTIHOST_SEP);
+		string::size_type	pos_bracket	= tmp_regexes.find(SIMPLE_REG_BRACKET_START);
 
 		if(string::npos == pos_comma && string::npos == pos_bracket){
 			// not found both
@@ -245,7 +255,8 @@ static bool expand_simple_regexes(const string& simple_regexes, strlst_t& expand
 			tmp_regexes	= tmp_regexes.substr(pos_bracket + 1);
 
 			// search end of bracket
-			string::size_type	pos_end_bracket	= tmp_regexes.find(']');
+			string::size_type	pos_end_bracket	= tmp_regexes.find(SIMPLE_REG_BRACKET_END);
+
 			if(string::npos != pos_end_bracket){
 				before_part	+= tmp_regexes.substr(0, pos_end_bracket + 1);
 				tmp_regexes	= tmp_regexes.substr(pos_end_bracket + 1);

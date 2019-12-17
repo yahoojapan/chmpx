@@ -30,7 +30,7 @@
 #include <ssl.h>
 #include <prerror.h>
 #include <cert.h>
-#include <key.h>
+#include <keyhi.h>
 #include <prinit.h>
 #include <secmod.h>
 #include <secerr.h>

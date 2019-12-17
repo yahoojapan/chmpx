@@ -87,7 +87,7 @@ class ChmCntrl
 		ChmEventSock* GetEventSockObj(void) { return pEventSock; }
 		ChmEventShm* GetEventShmObj(void) { return pEventShm; }
 
-		bool Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT);
+		bool Initialize(const char* cfgfile, CHMCNTRLTYPE type, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 		bool ReInitialize(long waitms = 0L, int trycnt = 1);
 		bool IsInitialized(void) const;
 		bool InitializeEventFd(void);
@@ -118,12 +118,12 @@ class ChmCntrl
 
 		bool Clean(bool is_clean_bup = true);
 																												// For chmpx process
-		bool InitializeOnChmpx(const char* cfgfile, short ctlport = CHM_INVALID_PORT) { return Initialize(cfgfile, CHMCHNTL_TYPE_CHMPXPROC, false, NULL, NULL, NULL, ctlport); }
+		bool InitializeOnChmpx(const char* cfgfile, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL) { return Initialize(cfgfile, CHMCHNTL_TYPE_CHMPXPROC, false, NULL, NULL, NULL, ctlport, cuk); }
 																												// For server process on library
-		bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT) { return Initialize(cfgfile, CHMCHNTL_TYPE_CLIENT_ONSERVER, is_auto_rejoin, getfp, setfp, lastupdatefp, ctlport); }
+		bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL) { return Initialize(cfgfile, CHMCHNTL_TYPE_CLIENT_ONSERVER, is_auto_rejoin, getfp, setfp, lastupdatefp, ctlport, cuk); }
 																												// For client process on library
-		bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT) { return Initialize(cfgfile, CHMCHNTL_TYPE_CLIENT_ONSLAVE, is_auto_rejoin, NULL, NULL, NULL, ctlport); }
-		bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT);
+		bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL) { return Initialize(cfgfile, CHMCHNTL_TYPE_CLIENT_ONSLAVE, is_auto_rejoin, NULL, NULL, NULL, ctlport, cuk); }
+		bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 		void AllowSelfCert(void);			// For only debugging
 

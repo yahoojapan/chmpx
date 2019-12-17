@@ -23,6 +23,7 @@
 #ifndef	CHMNETDB_H
 #define	CHMNETDB_H
 
+#include <regex.h>
 #include <fullock/flckstructure.h>
 #include <fullock/flckbaselist.tcc>
 
@@ -49,14 +50,17 @@ typedef std::list<struct addrinfo*>			addrinfolist_t;
 class ChmNetDb
 {
 	protected:
-		static const time_t	ALIVE_TIME = 60;	// default 60s
+		static const time_t	ALIVE_TIME	= 60;	// default 60s
 		static int			lockval;			// like mutex
+		static const size_t	PORT_NMATCH	= 5;	// maximum 3 matches + 2(reserve)
 
 		chmndbmap_t			cachemap;
 		time_t				timeout;			// 0 means no timeout
 		std::string			fulllocalname;		// local hostname from uname(gethostname), this is Full FQDN.
 		strlst_t			localaddrs;			// local ip addresses
 		strlst_t			localnames;			// local hostname from getnameinfo, sometimes this name is without domain name if set in /etc/hosts.
+		regex_t				regobj_checkport;	// for checking regular expression for port specification
+		bool				is_init_regobj;		//
 
 	protected:
 		ChmNetDb();
@@ -95,6 +99,7 @@ class ChmNetDb
 		static void FreeAddrInfoList(addrinfolist_t& infolist);
 		static std::string GetNoZoneIndexIpAddress(const std::string& ipaddr);
 		static bool IsLocalhostKeyword(const char* host);
+		static bool ParseHostPortString(const std::string& target, short default_port, std::string& strHost, short& port);
 
 		bool GetAddrInfo(const char* target, short port, struct addrinfo** ppaddrinfo, bool is_cvt_localhost);	// Must freeaddrinfo for *ppaddrinfo
 		bool GetAddrInfoList(const char* target, short port, addrinfolist_t& infolist, bool is_cvt_localhost);	// Must FreeAddrInfoList for clear

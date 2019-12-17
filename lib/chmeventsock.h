@@ -30,6 +30,7 @@
 #include "chmeventbase.h"
 #include "chmthread.h"
 #include "chmlockmap.tcc"
+#include "chmconf.h"
 
 //---------------------------------------------------------
 // Symbols (must be defined before chmss.h)
@@ -136,6 +137,8 @@ class ChmEventSock : public ChmEventBase
 		int							con_retry_count;						// cache value for retry count for connect
 		suseconds_t					sock_wait_time;							// cache value for timeout/count for send and receive
 		suseconds_t					con_wait_time;							// cache value for total timeout for connect
+		comver_t					comproto_ver;							// communication protocol version available for RING
+		bool						is_merge_done_processing;				// flag for processing to merge done
 
 	protected:
 		static bool SetNonblocking(int sock);
@@ -212,6 +215,7 @@ class ChmEventSock : public ChmEventBase
 		bool IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t next_chmpxid);
 		bool Accept(int sock);
 		bool AcceptCtlport(int ctlsock);
+		bool InitialComVersion(int sock, chmpxid_t chmpxid, comver_t& com_proto_version);
 		bool Processing(int sock, const char* pCommand);
 
 		// for merge
@@ -251,7 +255,7 @@ class ChmEventSock : public ChmEventBase
 		bool CtlComMergeSuspend(std::string& strResponse);
 		bool CtlComMergeNoSuspend(std::string& strResponse);
 		bool CtlComServiceIn(std::string& strResponse);
-		bool CtlComServiceOut(const char* hostname, short ctlport, const char* pOrgCommand, std::string& strResponse);
+		bool CtlComServiceOut(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed, const char* pOrgCommand, std::string& strResponse);
 		bool CtlComSelfStatus(std::string& strResponse);
 		bool CtlComAllServerStatus(std::string& strResponse);
 		bool CtlComUpdateStatus(std::string& strResponse);
@@ -263,8 +267,8 @@ class ChmEventSock : public ChmEventBase
 		bool PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, bool is_init_process = false);
 		bool PxComSendConinitReq(int sock, chmpxid_t chmpxid);
-		bool PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, chmpxid_t& from_chmpxid, short& ctlport);
-		bool PxComSendConinitRes(int sock, chmpxid_t chmpxid, pxcomres_t result);
+		bool PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& comver, std::string& name, chmpxid_t& from_chmpxid, short& ctlport, std::string& cuk, std::string& custom_seed, hostport_list_t& endpoints, hostport_list_t& ctlendpoints, hostport_list_t& forward_peers, hostport_list_t& reverse_peers);
+		bool PxComSendConinitRes(int sock, chmpxid_t chmpxid, comver_t comver, pxcomres_t result);
 		bool PxComReceiveConinitRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, pxcomres_t& result);
 		bool PxComSendJoinRing(chmpxid_t chmpxid, PCHMPXSVR pserver);
 		bool PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
@@ -297,6 +301,9 @@ class ChmEventSock : public ChmEventBase
 		bool PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComReceiveResUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
 		bool PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
+		bool PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_sock_close);											// 1.0.71 or later
+		bool PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, PPXCOM_ALL pComAll);											// 1.0.71 or later
+		bool PxComReceiveVersionRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& com_proto_version);	// 1.0.71 or later
 
 	public:
 		static void AllowSelfSignedCert(void);
