@@ -108,13 +108,19 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 		if(bcount <= bcnt){
 			return false;
 		}
-		if(	0 != strcmp(pbase[bcnt].name, pmerge[mcnt].name)						||
-			(is_status && pbase[bcnt].base_hash != pmerge[mcnt].base_hash)			||
-			(is_status && pbase[bcnt].pending_hash	!= pmerge[mcnt].pending_hash)	||
-			pbase[bcnt].port		!= pmerge[mcnt].port							||
-			pbase[bcnt].ctlport		!= pmerge[mcnt].ctlport							||
-			!CMP_CHMPXSSL(pbase[bcnt].ssl, pmerge[mcnt].ssl)						||
-			(is_status && pbase[bcnt].status != pmerge[mcnt].status)				)
+		if(	0 != strncmp(pbase[bcnt].name,						pmerge[mcnt].name,			NI_MAXHOST)			||
+			0 != strncmp(pbase[bcnt].cuk,						pmerge[mcnt].cuk,			CUK_MAX)			||
+			0 != strncmp(pbase[bcnt].custom_seed,				pmerge[mcnt].custom_seed,	CUSTOM_ID_SEED_MAX)	||
+			!CMP_CHMPXSSL(pbase[bcnt].ssl,						pmerge[mcnt].ssl)								||
+			!compare_hostport_pairs(pbase[bcnt].endpoints,		pbase[bcnt].endpoints,		EXTERNAL_EP_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].ctlendpoints,	pbase[bcnt].ctlendpoints,	EXTERNAL_EP_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].forward_peers,	pbase[bcnt].forward_peers,	FORWARD_PEER_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].reverse_peers,	pbase[bcnt].reverse_peers,	REVERSE_PEER_MAX)	||
+			pbase[bcnt].port									!= pmerge[mcnt].port							||
+			pbase[bcnt].ctlport									!= pmerge[mcnt].ctlport							||
+			(is_status && pbase[bcnt].base_hash					!= pmerge[mcnt].base_hash)						||
+			(is_status && pbase[bcnt].pending_hash				!= pmerge[mcnt].pending_hash)					||
+			(is_status && pbase[bcnt].status					!= pmerge[mcnt].status)							)
 		{
 			return false;
 		}
@@ -526,15 +532,16 @@ bool ChmIMData::InitializeShm(void)
 	}
 
 	CHMNODE_CFGINFO	self;
-	if(!pConfObj->GetSelfNodeInfo(self)){
+	string			normalizedname;
+	if(!pConfObj->GetSelfNodeInfo(self, normalizedname)){
 		ERR_CHMPRN("Could not get self node information.");
 		return false;
 	}
 
-	return InitializeShmEx(chmcfg, &self);
+	return InitializeShmEx(chmcfg, &self, normalizedname.c_str());
 }
 
-bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself)
+bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself, const char* pnormalizedname)
 {
 	if(	MAX_GROUP_LENGTH <= chmcfg.groupname.length() || MAX_CHMPX_COUNT < chmcfg.max_chmpx_count || 
 		MAX_SERVER_MQ_CNT < chmcfg.max_server_mq_cnt || MAX_CLIENT_MQ_CNT < chmcfg.max_client_mq_cnt || 
@@ -710,7 +717,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 
 		// CHMSHM.CHMINFO
 		chminfolap	tmpchminfo(&pChmBase->info, shmbase);
-		if(!tmpchminfo.Initialize(&chmcfg, rel_chmpxmsgarea, pself, rel_chmpxarea, rel_chmpxpidarea, rel_chmsockarea, rel_pchmpxarr_base, rel_pchmpxarr_pend)){
+		if(!tmpchminfo.Initialize(&chmcfg, rel_chmpxmsgarea, pself, pnormalizedname, rel_chmpxarea, rel_chmpxpidarea, rel_chmsockarea, rel_pchmpxarr_base, rel_pchmpxarr_pend)){
 			ERR_CHMPRN("Failed to initialize CHMINFO.");
 			CHM_MUMMAP(fd, shmbase, total_shmsize);
 			return false;
@@ -817,9 +824,6 @@ bool ChmIMData::InitializeOther(void)
 		ERR_CHMPRN("Could not get configuration information structure.");
 		return false;
 	}
-	// clear hostname:ctlport cache
-	FREE_HNAMESSLMAP(hnamesslmap);
-
 	return true;
 }
 
@@ -1593,7 +1597,7 @@ chmpxpos_t ChmIMData::GetNextServerPos(chmpxpos_t startpos, chmpxpos_t nowpos, b
 	return tmpchminfo.GetNextServerPos(startpos, nowpos, is_skip_self, is_cycle);
 }
 
-bool ChmIMData::GetNextServerBase(string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const
+bool ChmIMData::GetNextServerBase(string* pname, chmpxid_t* pchmpxid, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1607,7 +1611,7 @@ bool ChmIMData::GetNextServerBase(string& name, chmpxid_t& chmpxid, short& port,
 		ERR_CHMPRN("Could not get next chmpx pos in server list.");
 		return false;
 	}
-	return tmpchminfo.GetServerBase(nextpos, name, chmpxid, port, ctlport);
+	return tmpchminfo.GetServerBase(nextpos, pname, pchmpxid, pport, pctlport, pendpoints, pctlendpoints);
 }
 
 chmpxid_t ChmIMData::GetNextServerChmpxId(void) const
@@ -1616,7 +1620,8 @@ chmpxid_t ChmIMData::GetNextServerChmpxId(void) const
 	chmpxid_t	chmpxid = CHM_INVALID_CHMPXID;
 	short		port;
 	short		ctlport;
-	if(!GetNextServerBase(name, chmpxid, port, ctlport)){
+
+	if(!GetNextServerBase(&name, &chmpxid, &port, &ctlport, NULL, NULL)){
 		return CHM_INVALID_CHMPXID;
 	}
 	return chmpxid;
@@ -1658,7 +1663,7 @@ chmpxid_t ChmIMData::GetChmpxIdBySock(int sock, int type) const
 	return tmpchminfo.GetChmpxIdBySock(sock, type);
 }
 
-chmpxid_t ChmIMData::GetChmpxIdByToServerName(const char* hostname, short ctlport) const
+chmpxid_t ChmIMData::GetChmpxIdByToServerName(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1667,7 +1672,7 @@ chmpxid_t ChmIMData::GetChmpxIdByToServerName(const char* hostname, short ctlpor
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.GetChmpxIdByToServerName(hostname, ctlport);
+	return tmpchminfo.GetChmpxIdByToServerName(hostname, ctlport, cuk, ctlendpoints, custom_seed);
 }
 
 chmpxid_t ChmIMData::GetChmpxIdByStatus(chmpxsts_t status, bool part_match) const
@@ -1804,7 +1809,7 @@ long ChmIMData::GetServerChmpxIds(chmpxidlist_t& list) const
 	return tmpchminfo.GetServerChmpxIds(list, true, true, true);						// with pending, without down server, without suspend server
 }
 
-bool ChmIMData::GetServerBase(long pos, string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const
+bool ChmIMData::GetServerBase(long pos, string* pname, chmpxid_t* pchmpxid, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1813,10 +1818,10 @@ bool ChmIMData::GetServerBase(long pos, string& name, chmpxid_t& chmpxid, short&
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.GetServerBase(pos, name, chmpxid, port, ctlport);
+	return tmpchminfo.GetServerBase(pos, pname, pchmpxid, pport, pctlport, pendpoints, pctlendpoints);
 }
 
-bool ChmIMData::GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const
+bool ChmIMData::GetServerBase(chmpxid_t chmpxid, string* pname, short* pport, short* pctlport, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1825,7 +1830,7 @@ bool ChmIMData::GetServerBase(chmpxid_t chmpxid, std::string& name, short& port,
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.GetServerBase(chmpxid, name, port, ctlport);
+	return tmpchminfo.GetServerBase(chmpxid, pname, pport, pctlport, pendpoints, pctlendpoints);
 }
 
 bool ChmIMData::GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const
@@ -2128,6 +2133,22 @@ bool ChmIMData::GetSelfSsl(CHMPXSSL& ssl) const
 	return tmpchminfo.GetSelfSsl(ssl);
 }
 
+bool ChmIMData::GetSelfBase(string* pname, short* pport, short* pctlport, string* pcuk, string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
+{
+	if(!pname && !pport && !pctlport && !pcuk && !pcustom_seed && !pendpoints && !pctlendpoints && !pforward_peers && !preverse_peers){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
+
+	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.GetSelfBase(pname, pport, pctlport, pcuk, pcustom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers);
+}
+
 long ChmIMData::GetSlaveChmpxIds(chmpxidlist_t& list) const
 {
 	if(!IsAttachedShm()){
@@ -2140,7 +2161,7 @@ long ChmIMData::GetSlaveChmpxIds(chmpxidlist_t& list) const
 	return tmpchminfo.GetSlaveChmpxIds(list);
 }
 
-bool ChmIMData::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const
+bool ChmIMData::GetSlaveBase(chmpxid_t chmpxid, string* pname, short* pctlport, string* pcuk, string* pcustom_seed, hostport_list_t* pendpoints, hostport_list_t* pctlendpoints, hostport_list_t* pforward_peers, hostport_list_t* preverse_peers) const
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -2149,7 +2170,7 @@ bool ChmIMData::GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlpor
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_READ);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.GetSlaveBase(chmpxid, name, ctlport);
+	return tmpchminfo.GetSlaveBase(chmpxid, pname, pctlport, pcuk, pcustom_seed, pendpoints, pctlendpoints, pforward_peers, preverse_peers);
 }
 
 bool ChmIMData::GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const
@@ -2296,7 +2317,7 @@ bool ChmIMData::SetSelfStatus(chmpxsts_t status)
 	return tmpchminfo.SetSelfStatus(status);
 }
 
-bool ChmIMData::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl)
+bool ChmIMData::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -2305,7 +2326,7 @@ bool ChmIMData::SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlp
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_WRITE);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.SetSlaveBase(chmpxid, hostname, ctlport, pssl);
+	return tmpchminfo.SetSlaveBase(chmpxid, hostname, ctlport, cuk, custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers, pssl);
 }
 
 bool ChmIMData::SetSlaveSock(chmpxid_t chmpxid, int sock)
@@ -2336,7 +2357,7 @@ bool ChmIMData::SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status)
 // Must call this method instead of SetSlaveBase and SetSlaveSock and SetSlaveStatus.
 // Because we run chmpx on multi-thread, so this method processes these function with locking.
 //
-bool ChmIMData::SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl, int sock, chmpxsts_t status)
+bool ChmIMData::SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t* pendpoints, const hostport_list_t* pctlendpoints, const hostport_list_t* pforward_peers, const hostport_list_t* preverse_peers, const PCHMPXSSL pssl, int sock, chmpxsts_t status)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -2347,11 +2368,41 @@ bool ChmIMData::SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlpo
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
 
 	// check for existing
-	string		tmpname;
-	short		tmpctlport = CHM_INVALID_PORT;
-	if(!tmpchminfo.GetSlaveBase(chmpxid, tmpname, tmpctlport) || tmpname != hostname || tmpctlport != ctlport){
+	string			tmpname;
+	short			tmpctlport = CHM_INVALID_PORT;
+	string			tmpcuk;
+	string			tmpcustom_seed;
+	hostport_list_t	tmpendpoints;
+	hostport_list_t	tmpctlendpoints;
+	hostport_list_t	tmpforward_peers;
+	hostport_list_t	tmpreverse_peers;
+
+	hostport_list_t	dummylist;
+	if(!pendpoints){
+		pendpoints		= &dummylist;
+	}
+	if(!pctlendpoints){
+		pctlendpoints	= &dummylist;
+	}
+	if(!pforward_peers){
+		pforward_peers	= &dummylist;
+	}
+	if(!preverse_peers){
+		preverse_peers	= &dummylist;
+	}
+
+	if(	!tmpchminfo.GetSlaveBase(chmpxid, &tmpname, &tmpctlport, &tmpcuk, &tmpcustom_seed, &tmpendpoints, &tmpctlendpoints, &tmpforward_peers, &tmpreverse_peers) ||
+		tmpname			!= hostname							||
+		tmpctlport		!= ctlport							||
+		tmpcuk			!= cuk								||
+		tmpcustom_seed	!= custom_seed						||
+		!compare_hostports(tmpendpoints,	*pendpoints)	||
+		!compare_hostports(tmpctlendpoints,	*pctlendpoints)	||
+		!compare_hostports(tmpforward_peers,*pforward_peers)||
+		!compare_hostports(tmpreverse_peers,*preverse_peers))
+	{
 		// there is no same slave in chmshm, so set new slave.
-		if(!tmpchminfo.SetSlaveBase(chmpxid, hostname, ctlport, pssl)){
+		if(!tmpchminfo.SetSlaveBase(chmpxid, hostname, ctlport, cuk, custom_seed, *pendpoints, *pctlendpoints, *pforward_peers, *preverse_peers, pssl)){
 			return false;
 		}
 	}else{
@@ -2686,7 +2737,18 @@ bool ChmIMData::IsNeedDetach(void) const
 //---------------------------------------------------------
 // Methods for Others
 //---------------------------------------------------------
-bool ChmIMData::IsAllowHostname(const char* hostname, const short* pport, PCHMPXSSL* ppssl)
+CHMPXID_SEED_TYPE ChmIMData::GetChmpxSeedType(void) const
+{
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return CHMPXID_SEED_NAME;
+	}
+
+	chminfolap		tmpchminfo(&pChmShm->info, pChmShm);
+	return tmpchminfo.GetChmpxSeedType();
+}
+
+bool ChmIMData::IsAllowHost(const char* hostname)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -2697,41 +2759,40 @@ bool ChmIMData::IsAllowHostname(const char* hostname, const short* pport, PCHMPX
 		return false;
 	}
 
-	// for cache key
-	string	strhname(hostname);
-	if(pport && CHM_INVALID_PORT != *pport){
-		strhname += ":";
-		strhname += to_string(*pport);
-	}
-
-	// check cache
-	if(hnamesslmap.end() != hnamesslmap.find(strhname)){
-		// found in cache
-		if(ppssl){
-			*ppssl = hnamesslmap[strhname];
-		}
+	// check name in server node list.(from CHMINFO)
+	chminfolap		tmpchminfo(&pChmShm->info, pChmShm);
+	if(tmpchminfo.CheckContainsChmpxSvrs(hostname)){
+		// allowed
+		MSG_CHMPRN("Hostname(%s) is found in server node list from CHMINFO.", hostname);
 		return true;
 	}
 
-	// check name in server node list.
-	chminfolap		tmpchminfo(&pChmShm->info, pChmShm);
-	hnamesslmap_t	info;
-	if(!tmpchminfo.GetAllServerName(info)){
-		ERR_CHMPRN("Could not get server node names.");
-		FREE_HNAMESSLMAP(info);
+	// check name in configuration server/slave list.(from configuration)
+	if(pConfObj->CheckContainsNodeInfoList(hostname, NULL, NULL, true)){		// with update configuration
+		// allowed
+		MSG_CHMPRN("Hostname(%s) is found in server/slave list from configuration..", hostname);
+		return true;
+	}
+	return false;
+}
+
+bool ChmIMData::IsAllowHostStrictly(const char* hostname, short ctlport, const char* cuk, string& normalizedname, PCHMPXSSL pssl)
+{
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
 		return false;
 	}
-	if(info.end() != info.find(strhname)){
-		// found & set cache
-		hnamesslmap[strhname] = info[strhname];
-		if(ppssl){
-			*ppssl = hnamesslmap[strhname];
-		}
-		info[strhname] = NULL;
-		FREE_HNAMESSLMAP(info);
+	if(!IsAttachedShm()){
+		ERR_CHMPRN("There is no attached ChmShm.");
+		return false;
+	}
+
+	// check name in server node list.(from CHMINFO)
+	chminfolap		tmpchminfo(&pChmShm->info, pChmShm);
+	if(tmpchminfo.CheckStrictlyContainsChmpxSvrs(hostname, &ctlport, cuk, &normalizedname, pssl)){
+		// found
 		return true;
 	}
-	FREE_HNAMESSLMAP(info);
 
 	// check name in configuration server/slave list.
 	//
@@ -2739,17 +2800,10 @@ bool ChmIMData::IsAllowHostname(const char* hostname, const short* pport, PCHMPX
 	// At first using hostname in list(means using cache), next check DNS for server name if the first checking failed.
 	//
 	CHMNODE_CFGINFO	nodeinfo;
-	if(pConfObj->GetNodeInfo(hostname, pport ? *pport : CHM_INVALID_PORT, nodeinfo, false, false) || pConfObj->GetNodeInfo(hostname, pport ? *pport : CHM_INVALID_PORT, nodeinfo, false, true)){
+	if(pConfObj->GetNodeInfo(hostname, ctlport, cuk, nodeinfo, normalizedname, false, false) || pConfObj->GetNodeInfo(hostname, ctlport, cuk, nodeinfo, normalizedname, false, true)){
 		// found
-		if(pport){
-			PCHMPXSSL	pssl = new CHMPXSSL;
+		if(pssl){
 			CVT_SSL_STRUCTURE(*pssl, nodeinfo);
-			hnamesslmap[strhname] = pssl;
-		}else{
-			hnamesslmap[strhname] = NULL;
-		}
-		if(ppssl){
-			*ppssl = hnamesslmap[strhname];
 		}
 		return true;
 	}

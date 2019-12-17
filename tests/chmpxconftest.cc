@@ -49,6 +49,7 @@ static void Help(char* progname)
 	printf("Usage: %s [options]\n", progname ? progname : "program");
 	printf("Option  -conf [file name]       Configuration file( .ini / .json / .yaml ) path\n");
 	printf("        -json [json string]     Configuration JSON string\n");
+	printf("        -no_check_update        not check configration file updating\n");
 	printf("        -print_default          print default datas\n");
 	printf("        -d [debug level]        \"ERR\" / \"WAN\" / \"INF\"\n");
 	printf("        -h                      display help\n");
@@ -64,13 +65,22 @@ static bool LoadConfTest(CHMConf* pconfobj)
 	CHMCFGINFO	chmcfg;
 	if(!pconfobj->GetConfiguration(chmcfg, true)){
 		ERR_CHMPRN("Failed load configuration.");
+		printf("\n[NOTICE]\n");
+		printf("If \"MODE = SERVER\" is specified in the configuration file, could not print loading configuration if the host running this program does not exist in the server node list.\n");
+		printf("In this case, the error can be avoided by setting \"MODE = SLAVE\".\n\n");
 		return false;
 	}
 
 	// Dump
 	printf("configuration{\n");
-	printf("\tGROUP           = %s\n", chmcfg.groupname.c_str());
+	printf("\tGROUP           = %s\n",  chmcfg.groupname.c_str());
 	printf("\tREVISION        = %ld\n", chmcfg.revision);
+	printf("\tDATE            = %jd\n", static_cast<intmax_t>(chmcfg.date));
+	printf("\tMODE            = %s\n",  chmcfg.is_server_mode ? "SERVER" : "SLAVE");
+	printf("\tDELIVER MODE    = %s\n",  chmcfg.is_random_mode ? "RANDOM" : "HASH");
+	printf("\tSELF CTLPORT    = %d\n",  chmcfg.self_ctlport);
+	printf("\tSELF CUK        = %s\n",  chmcfg.self_cuk.empty() ? "n/a" : chmcfg.self_cuk.c_str());
+	printf("\tCHMPXID TYPE    = %s\n",  CHMConf::GetChmpxidTypeString(chmcfg.chmpxid_type).c_str());
 	printf("\tMAXCHMPX        = %ld\n", chmcfg.max_chmpx_count);
 	printf("\tREPLICA         = %ld\n", chmcfg.replica_count);
 	printf("\tMAXMQSERVER     = %ld\n", chmcfg.max_server_mq_cnt);
@@ -80,7 +90,25 @@ static bool LoadConfTest(CHMConf* pconfobj)
 	printf("\tMAXQPERCLIENTMQ = %ld\n", chmcfg.max_q_per_clientmq);
 	printf("\tMAXMQPERCLIENT  = %ld\n", chmcfg.max_mq_per_client);
 	printf("\tMAXHISTLOG      = %ld\n", chmcfg.max_histlog_count);
-	printf("\tDATE            = %jd\n", static_cast<intmax_t>(chmcfg.date));
+	printf("\tRWTIMEOUT       = %d\n",  chmcfg.timeout_wait_socket);
+	printf("\tRETRYCNT        = %d\n",  chmcfg.retrycnt);
+	printf("\tCONTIMEOUT      = %d\n",  chmcfg.timeout_wait_connect);
+	printf("\tMQRWTIMEOUT     = %d\n",  chmcfg.timeout_wait_mq);
+	printf("\tMQRETRYCNT      = %d\n",  chmcfg.mq_retrycnt);
+	printf("\tMQACK           = %s\n",  chmcfg.mq_ack ? "on" : "off");
+	printf("\tDOMERGE         = %s\n",  chmcfg.is_do_merge ? "on" : "off");
+	printf("\tAUTOMERGE       = %s\n",  chmcfg.is_auto_merge ? "on" : "off");
+	printf("\tMERGETIMEOUT    = %zd\n", chmcfg.timeout_merge);
+	printf("\tSOCKTHREADCNT   = %d\n",  chmcfg.sock_thread_cnt);
+	printf("\tMQTHREADCNT     = %d\n",  chmcfg.mq_thread_cnt);
+	printf("\tMAXSOCKPOOL     = %d\n",  chmcfg.max_sock_pool);
+	printf("\tSOCKPOOLTIMEOUT = %zd\n", chmcfg.sock_pool_timeout);
+	printf("\tK2HFULLMAP      = %s\n",  chmcfg.k2h_fullmap ? "yes" : "no");
+	printf("\tK2HMASKBIT      = %d\n",  chmcfg.k2h_mask_bitcnt);
+	printf("\tK2HCMASKBIT     = %d\n",  chmcfg.k2h_cmask_bitcnt);
+	printf("\tK2HMAXELE       = %d\n",  chmcfg.k2h_max_element);
+	printf("\tSSL_MIN_VER     = %s\n",  CHMConf::GetSslVersionString(chmcfg.ssl_min_ver).c_str());
+	printf("\tNSSDB_DIR       = %s\n",  chmcfg.nssdb_dir.empty() ? "n/a" : chmcfg.nssdb_dir.c_str());
 
 	int count = 1;
 	chmnode_cfginfos_t::const_iterator	iter;
@@ -89,6 +117,36 @@ static bool LoadConfTest(CHMConf* pconfobj)
 		printf("\t\tNAME          = %s\n", iter->name.c_str());
 		printf("\t\tPORT          = %d\n", iter->port);
 		printf("\t\tCTLPORT       = %d\n", iter->ctlport);
+		printf("\t\tENDPOINTS     = %s\n", iter->endpoints.empty() ? "n/a" : "{");
+		if(!iter->endpoints.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->endpoints.begin(); iter->endpoints.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s ( %d )\n", hpiter->host.c_str(), hpiter->port);
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tCTLENDPOINTS  = %s\n", iter->ctlendpoints.empty() ? "n/a" : "{");
+		if(!iter->ctlendpoints.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->ctlendpoints.begin(); iter->ctlendpoints.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s ( %d )\n", hpiter->host.c_str(), hpiter->port);
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tFORWARD_PEERS = %s\n", iter->forward_peers.empty() ? "n/a" : "{");
+		if(!iter->forward_peers.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->forward_peers.begin(); iter->forward_peers.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s\n", hpiter->host.c_str());
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tREVERSE_PEERS = %s\n", iter->reverse_peers.empty() ? "n/a" : "{");
+		if(!iter->reverse_peers.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->reverse_peers.begin(); iter->reverse_peers.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s\n", hpiter->host.c_str());
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tCUK           = %s\n", iter->cuk.empty() ? "n/a" : iter->cuk.c_str());
+		printf("\t\tCUSTOM_ID_SEED= %s\n", iter->custom_seed.empty() ? "n/a" : iter->custom_seed.c_str());
 		printf("\t\tSSL           = %s\n", iter->is_ssl ? "yes" : "no");
 		if(iter->is_ssl){
 			printf("\t\tVERIFY_PEER   = %s\n", iter->verify_peer ? "yes" : "no");
@@ -104,10 +162,33 @@ static bool LoadConfTest(CHMConf* pconfobj)
 
 	count = 1;
 	for(iter = chmcfg.slaves.begin(); iter != chmcfg.slaves.end(); ++iter, ++count){
-		printf("\tserver[%d]{\n", count);
+		printf("\tslave[%d]{\n", count);
 		printf("\t\tNAME          = %s\n", iter->name.c_str());
 		printf("\t\tPORT          = %d\n", iter->port);
 		printf("\t\tCTLPORT       = %d\n", iter->ctlport);
+		printf("\t\tCTLENDPOINTS  = %s\n", iter->ctlendpoints.empty() ? "n/a" : "{");
+		if(!iter->ctlendpoints.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->ctlendpoints.begin(); iter->ctlendpoints.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s ( %d )\n", hpiter->host.c_str(), hpiter->port);
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tFORWARD_PEERS = %s\n", iter->forward_peers.empty() ? "n/a" : "{");
+		if(!iter->forward_peers.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->forward_peers.begin(); iter->forward_peers.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s\n", hpiter->host.c_str());
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tREVERSE_PEERS = %s\n", iter->reverse_peers.empty() ? "n/a" : "{");
+		if(!iter->reverse_peers.empty()){
+			for(hostport_list_t::const_iterator hpiter = iter->reverse_peers.begin(); iter->reverse_peers.end() != hpiter; ++hpiter){
+				printf("\t\t\t%s\n", hpiter->host.c_str());
+			}
+			printf("\t\t}\n");
+		}
+		printf("\t\tCUK           = %s\n", iter->cuk.empty() ? "n/a" : iter->cuk.c_str());
+		printf("\t\tCUSTOM_ID_SEED= %s\n", iter->custom_seed.empty() ? "n/a" : iter->custom_seed.c_str());
 		printf("\t\tSSL           = %s\n", iter->is_ssl ? "yes" : "no");
 		if(iter->is_ssl){
 			printf("\t\tVERIFY_PEER   = %s\n", iter->verify_peer ? "yes" : "no");
@@ -223,6 +304,12 @@ int main(int argc, char** argv)
 		}
 	}
 
+	// check updating
+	bool	is_check_updating = true;
+	if(opts.Find("no_check_update")){
+		is_check_updating = false;
+	}
+
 	// print default data
 	if(opts.Find("print_default")){
 		print_initial_datas();
@@ -245,7 +332,10 @@ int main(int argc, char** argv)
 	}
 
 	// get conf object
-	CHMConf*	pconfobj = CHMConf::GetCHMConf(eventfd, NULL, config.c_str(), CHM_INVALID_PORT, true, &config);
+	//
+	// port/cuk is no specified, because this tool tests only configuration contents.
+	//
+	CHMConf*	pconfobj = CHMConf::GetCHMConf(eventfd, NULL, config.c_str(), CHM_INVALID_PORT, NULL, true, &config);
 	if(!pconfobj){
 		ERR_CHMPRN("Could not build configuration object.");
 		close(eventfd);
@@ -258,12 +348,23 @@ int main(int argc, char** argv)
 	}
 
 	// inotify set
-	if(!pconfobj->SetEventQueueFd(eventfd) || pconfobj->SetEventQueue()){
+	if(!pconfobj->SetEventQueueFd(eventfd) || !pconfobj->SetEventQueue()){
 		ERR_CHMPRN("Failed to set eventfd for inotify.");
 		pconfobj->UnsetEventQueue();
 		delete pconfobj;
 		close(eventfd);
 		exit(EXIT_FAILURE);
+	}
+
+	if(!is_check_updating){
+		pconfobj->UnsetEventQueue();
+		delete pconfobj;
+		close(eventfd);
+		exit(EXIT_SUCCESS);
+	}else{
+		printf("\n");
+		printf("->Start to watch configuratin file updating...\n");
+		printf(" (Input \"^C\" to stop)\n");
 	}
 
 	// Signal block test

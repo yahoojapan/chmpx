@@ -25,10 +25,10 @@
 #
 GLOBAL:
     {
-            FILEVERSION:        2,
-            DATE:               "Tue, 15 Nov 2016 09:03:24 +0900",
+            FILEVERSION:        3,
+            DATE:               "Thu, 05 Dec 2019 10:00:00 +0900",
             GROUP:              TESTSCRPT,
-            MODE:               SLAVE,
+            MODE:               SERVER,
             DELIVERMODE:        random,
             MAXCHMPX:           4,
             REPLICA:            0,
@@ -40,8 +40,9 @@ GLOBAL:
             MAXMQPERCLIENT:     1,
             MAXHISTLOG:         10000,
             PORT:               8020,
-            CTLPORT:            8022,
-            SELFCTLPORT:        8022,
+            CTLPORT:            8021,
+            SELFCTLPORT:        8021,
+            SELFCUK:            8eea94179dc383bcdd552fa488f43ec2,
             RWTIMEOUT:          100,
             RETRYCNT:           1000,
             CONTIMEOUT:         500000,
@@ -64,6 +65,11 @@ SVRNODE:
             NAME:               localhost,
             PORT:               8020,
             CTLPORT:            8021,
+            CUK:                8eea94179dc383bcdd552fa488f43ec2,
+            ENDPOINTS:          "127.0.0.1:18020",
+            CTLENDPOINTS:       "127.0.0.1:18021",
+            FORWARD_PEERS:      127.0.0.1,
+            REVERSE_PEERS:      127.0.0.1,
             SSL:                no
         }
     ]
@@ -75,9 +81,14 @@ SLVNODE:
     [
         {
             NAME:               "[.]*",
-            CTLPORT:            8022
+            CTLPORT:            8022,
+            CUK:                18608d9ac0caef6f12386c03f81ca090,
+            CTLENDPOINTS:       "127.0.0.2:18022",
+            FORWARD_PEERS:      127.0.0.2,
+            REVERSE_PEERS:      127.0.0.2
         }
     ]
+
 #
 # EOF
 #

@@ -42,6 +42,9 @@ time_t rfcdate_time(const char* rfcdate);
 // is_xxx
 bool is_string_alpha(const char* str);
 bool is_string_number(const char* str);
+bool is_string_number_ex(const char* str, int max, bool allow_empty, bool is_decimal);
+bool cvt_string_to_number_raw(const char* pbase, uint64_t* presult, bool is_decimal);
+uint64_t cvt_string_to_number(const char* pbase, bool is_decimal);
 
 // array / mapping
 typedef std::list<std::string>				strlst_t;

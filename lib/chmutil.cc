@@ -152,6 +152,61 @@ bool is_string_number(const char* str)
 	return true;
 }
 
+bool is_string_number_ex(const char* str, int max, bool allow_empty, bool is_decimal)
+{
+	if(CHMEMPTYSTR(str)){
+		return allow_empty;
+	}
+	uint64_t	result = 0;
+	if(!cvt_string_to_number_raw(str, &result, is_decimal)){
+		return false;
+	}
+	if(static_cast<uint64_t>(max) < result){
+		return false;
+	}
+	return true;
+}
+
+bool cvt_string_to_number_raw(const char* pbase, uint64_t* presult, bool is_decimal)
+{
+
+	if(CHMEMPTYSTR(pbase) || !presult){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	(*presult) = 0;
+	for(const char* ptmp = pbase; '\0' != *ptmp; ++ptmp){
+		if(is_decimal){
+			(*presult) *= 10;
+			if(*ptmp < '0' || '9' < *ptmp){
+				ERR_CHMPRN("%s is not decimal string, then could not convert to number.", pbase);
+				return false;
+			}
+			(*presult) += static_cast<uint64_t>(*ptmp - '0');
+		}else{
+			(*presult) *= 16;
+			if('0' <= *ptmp && *ptmp <= '9'){
+				(*presult) += static_cast<uint64_t>(*ptmp - '0');
+			}else if('a' <= *ptmp && *ptmp <= 'f'){
+				(*presult) += (static_cast<uint64_t>(*ptmp - 'a') + 10);
+			}else if('A' <= *ptmp && *ptmp <= 'F'){
+				(*presult) += (static_cast<uint64_t>(*ptmp - 'A') + 10);
+			}else{
+				ERR_CHMPRN("%s is not hex string, then could not convert to number.", pbase);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+uint64_t cvt_string_to_number(const char* pbase, bool is_decimal)
+{
+	uint64_t	result = 0;
+	cvt_string_to_number_raw(pbase, &result, is_decimal);
+	return result;
+}
+
 bool str_paeser(const char* pbase, strlst_t& strarr, const char* psep, bool istrim)
 {
 	strarr.clear();
