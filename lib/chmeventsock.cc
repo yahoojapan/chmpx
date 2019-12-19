@@ -49,6 +49,9 @@ using namespace	std;
 //---------------------------------------------------------
 // Symbols
 //---------------------------------------------------------
+// Environment name for communication backward compatibility
+#define	CHMPX_COMPROTO_VERSION				"CHMPX_COM_PROTO_VER"
+
 #define	CHMEVSOCK_MERGE_THREAD_NAME			"ChmEventSock-Merge"
 #define	CHMEVSOCK_SOCK_THREAD_NAME			"ChmEventSock-Socket"
 
@@ -123,6 +126,104 @@ using namespace	std;
 #define	CTL_RES_ERROR_TRACE_VIEW_INTERR		"ERROR: Internal error is occured for TRACEVIEW.\n"
 #define	CTL_RES_INT_ERROR					"INTERNAL ERROR: Something error is occured.\n"
 #define	CTL_RES_INT_ERROR_NOTGETCHMPX		"INTERNAL ERROR: Could not get chmpx servers information.\n"
+
+#define	CTLCOM_SERVICEOUT_ERRMSG			\
+	"%s command format error.\n" \
+	"Specify in one of the following formats depending on the value of CHMPXIDTYPE:\n" \
+	"CHMPXIDTYPE=NAME         <servername>:<control port>[:<cuk>]\n" \
+	"CHMPXIDTYPE=CUK          <servername>:<control port>:<cuk>\n" \
+	"CHMPXIDTYPE=CTLENDPOINTS <servername>:<control port>:<control port endpoints(*1)>\n" \
+	"CHMPXIDTYPE=CUSTOM       <servername>:<control port>:<custom id seed>\n" \
+	"(*1) Specify the description of control port endpoints in the same format as configuration."
+
+//---------------------------------------------------------
+// Utilities
+//---------------------------------------------------------
+static bool get_comproto_version_env(comver_t& comver)
+{
+	string	value;
+	if(!k2h_getenv(CHMPX_COMPROTO_VERSION, value) || value.empty()){
+		return false;
+	}
+	comver_t	result = 0;
+	if(!cvt_string_to_number_raw(value.c_str(), &result, true)){
+		return false;
+	}
+	if(COM_VERSION_1 != result){
+		return false;
+	}
+	comver = COM_VERSION_1;
+	return true;
+}
+
+// [NOTE]
+// STRPXCOMTYPE() and DUMPCOM_COMPKT_TYPE() were originally macros defined in
+// chmcomstructure.h.
+// STRPXCOMTYPE() was a macro that returned a string similar to the
+// SIZEOF_CHMPX_COM() macro. However, since "literalWithCharPtrCompare" warning
+// in only STRPXCOMTYPE() is output by cppcheck checking, it is moved to this
+// file and changed to an inline function.
+// DUMPCOM_COMPKT_TYPE() is a macro that calls STRPXCOMTYPE() internally, so it
+// is moved to this file as well.
+//
+static const char*	str_pxcom_head_type[] = {
+	"CHMPX_COM_UNKNOWN",
+	"CHMPX_COM_STATUS_REQ",
+	"CHMPX_COM_STATUS_RES",
+	"CHMPX_COM_CONINIT_REQ",
+	"CHMPX_COM_CONINIT_RES",
+	"CHMPX_COM_JOIN_RING",
+	"CHMPX_COM_STATUS_UPDATE",
+	"CHMPX_COM_STATUS_CONFIRM",
+	"CHMPX_COM_STATUS_CHANGE",
+	"CHMPX_COM_MERGE_START",
+	"CHMPX_COM_MERGE_ABORT",
+	"CHMPX_COM_MERGE_COMPLETE",
+	"CHMPX_COM_SERVER_DOWN",
+	"CHMPX_COM_REQ_UPDATEDATA",
+	"CHMPX_COM_RES_UPDATEDATA",
+	"CHMPX_COM_RESULT_UPDATEDATA",
+	"CHMPX_COM_MERGE_SUSPEND",
+	"CHMPX_COM_MERGE_NOSUSPEND",
+	"CHMPX_COM_MERGE_SUSPEND_GET",
+	"CHMPX_COM_MERGE_SUSPEND_RES",
+	"CHMPX_COM_VERSION_REQ",
+	"CHMPX_COM_VERSION_RES",
+	"CHMPX_COM_N2_STATUS_REQ",
+	"CHMPX_COM_N2_STATUS_RES",
+	"CHMPX_COM_N2_CONINIT_REQ",
+	"CHMPX_COM_N2_CONINIT_RES",
+	"CHMPX_COM_N2_JOIN_RING",
+	"CHMPX_COM_N2_STATUS_UPDATE",
+	"CHMPX_COM_N2_STATUS_CONFIRM",
+	"CHMPX_COM_N2_STATUS_CHANGE"
+};
+
+static inline const char* STRPXCOMTYPE(pxcomtype_t type)
+{
+	if(static_cast<pxcomtype_t>(sizeof(str_pxcom_head_type) / sizeof(const char*)) <= type){
+		return "NOT_DEFINED_TYPE";
+	}
+	return str_pxcom_head_type[type];
+}
+
+static inline void DUMPCOM_COMPKT_TYPE(const char* action, PCOMPKT pComPkt)
+{
+	if(!action || !pComPkt){
+		ERR_CHMPRN("Parameters are wrong.");
+	}
+
+	if(chm_debug_mode >= CHMDBG_DUMP){
+		if(COM_PX2PX == pComPkt->head.type){
+			PPXCOM_ALL	pComAll = CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+			MSG_CHMPRN("%s COMPKT type(%s) : PXCOM_ALL type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE(pComPkt->head.type), STRPXCOMTYPE(pComAll->val_head.type));
+		}else if(COM_C2C == pComPkt->head.type){ \
+			MSG_CHMPRN("%s COMPKT type(%s) : COM_C2C type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE(pComPkt->head.type), STRCOMC2CTYPE(pComPkt->head.c2ctype));
+		}else{
+			MSG_CHMPRN("%s COMPKT type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE(pComPkt->head.type));
+		}
+	}
+}
 
 //---------------------------------------------------------
 // Class variables
@@ -863,9 +964,9 @@ bool ChmEventSock::hton(PCOMPKT pComPkt, size_t& length)
 		}else if(CHMPX_COM_STATUS_RES == comtype){
 			PPXCOM_STATUS_RES	pComContents = CVT_COMPTR_STATUS_RES(pComPacket);
 			// hton each chmpxsvr
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+				HTON_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 			HTON_PPXCOM_STATUS_RES(pComContents);
 
@@ -884,18 +985,18 @@ bool ChmEventSock::hton(PCOMPKT pComPkt, size_t& length)
 		}else if(CHMPX_COM_STATUS_UPDATE == comtype){
 			PPXCOM_STATUS_UPDATE	pComContents = CVT_COMPTR_STATUS_UPDATE(pComPacket);
 			// hton each chmpxsvr
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+				HTON_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 			HTON_PPXCOM_STATUS_UPDATE(pComContents);
 
 		}else if(CHMPX_COM_STATUS_CONFIRM == comtype){
 			PPXCOM_STATUS_CONFIRM	pComContents = CVT_COMPTR_STATUS_CONFIRM(pComPacket);
 			// hton each chmpxsvr
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+				HTON_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 			HTON_PPXCOM_STATUS_CONFIRM(pComContents);
 
@@ -952,6 +1053,60 @@ bool ChmEventSock::hton(PCOMPKT pComPkt, size_t& length)
 			PPXCOM_MERGE_SUSPEND_RES	pComContents = CVT_COMPTR_MERGE_SUSPEND_RES(pComPacket);
 			HTON_PPXCOM_MERGE_SUSPEND_RES(pComContents);
 
+		}else if(CHMPX_COM_VERSION_REQ == comtype){
+			PPXCOM_VERSION_REQ	pComContents = CVT_COMPTR_VERSION_REQ(pComPacket);
+			HTON_PPXCOM_VERSION_REQ(pComContents);
+
+		}else if(CHMPX_COM_VERSION_RES == comtype){
+			PPXCOM_VERSION_RES	pComContents = CVT_COMPTR_VERSION_RES(pComPacket);
+			HTON_PPXCOM_VERSION_RES(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_REQ == comtype){
+			PPXCOM_N2_STATUS_REQ	pComContents = CVT_COMPTR_N2_STATUS_REQ(pComPacket);
+			HTON_PPXCOM_N2_STATUS_REQ(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_RES == comtype){
+			PPXCOM_N2_STATUS_RES	pComContents = CVT_COMPTR_N2_STATUS_RES(pComPacket);
+			// hton each chmpxsvr
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+			HTON_PPXCOM_N2_STATUS_RES(pComContents);
+
+		}else if(CHMPX_COM_N2_CONINIT_REQ == comtype){
+			PPXCOM_N2_CONINIT_REQ	pComContents = CVT_COMPTR_N2_CONINIT_REQ(pComPacket);
+			HTON_PPXCOM_N2_CONINIT_REQ(pComContents);
+
+		}else if(CHMPX_COM_N2_CONINIT_RES == comtype){
+			PPXCOM_N2_CONINIT_RES	pComContents = CVT_COMPTR_N2_CONINIT_RES(pComPacket);
+			HTON_PPXCOM_N2_CONINIT_RES(pComContents);
+
+		}else if(CHMPX_COM_N2_JOIN_RING == comtype){
+			PPXCOM_N2_JOIN_RING	pComContents = CVT_COMPTR_N2_JOIN_RING(pComPacket);
+			HTON_PPXCOM_N2_JOIN_RING(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_UPDATE == comtype){
+			PPXCOM_N2_STATUS_UPDATE	pComContents = CVT_COMPTR_N2_STATUS_UPDATE(pComPacket);
+			// hton each chmpxsvr
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+			HTON_PPXCOM_N2_STATUS_UPDATE(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_CONFIRM == comtype){
+			PPXCOM_N2_STATUS_CONFIRM	pComContents = CVT_COMPTR_N2_STATUS_CONFIRM(pComPacket);
+			// hton each chmpxsvr
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				HTON_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+			HTON_PPXCOM_N2_STATUS_CONFIRM(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_CHANGE == comtype){
+			PPXCOM_N2_STATUS_CHANGE	pComContents = CVT_COMPTR_N2_STATUS_CHANGE(pComPacket);
+			HTON_PPXCOM_N2_STATUS_CHANGE(pComContents);
 		}else{
 			WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(comtype), comtype);
 		}
@@ -992,9 +1147,9 @@ bool ChmEventSock::ntoh(PCOMPKT pComPkt, bool is_except_compkt)
 			PPXCOM_STATUS_RES	pComContents = CVT_COMPTR_STATUS_RES(pComPacket);
 			NTOH_PPXCOM_STATUS_RES(pComContents);
 			// ntoh each chmpx
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+				NTOH_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 
 		}else if(CHMPX_COM_CONINIT_REQ == type){
@@ -1013,18 +1168,18 @@ bool ChmEventSock::ntoh(PCOMPKT pComPkt, bool is_except_compkt)
 			PPXCOM_STATUS_UPDATE	pComContents = CVT_COMPTR_STATUS_UPDATE(pComPacket);
 			NTOH_PPXCOM_STATUS_UPDATE(pComContents);
 			// ntoh each chmpx
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+				NTOH_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 
 		}else if(CHMPX_COM_STATUS_CONFIRM == type){
 			PPXCOM_STATUS_CONFIRM	pComContents = CVT_COMPTR_STATUS_CONFIRM(pComPacket);
 			NTOH_PPXCOM_STATUS_CONFIRM(pComContents);
 			// ntoh each chmpx
-			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			PCHMPXSVRV1	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVRV1);
 			for(long cnt = 0; cnt < pComContents->count; cnt++){
-				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+				NTOH_PCHMPXSVRV1(&pChmpxsvr[cnt]);
 			}
 
 		}else if(CHMPX_COM_STATUS_CHANGE == type){
@@ -1080,6 +1235,60 @@ bool ChmEventSock::ntoh(PCOMPKT pComPkt, bool is_except_compkt)
 			PPXCOM_MERGE_SUSPEND_RES	pComContents = CVT_COMPTR_MERGE_SUSPEND_RES(pComPacket);
 			NTOH_PPXCOM_MERGE_SUSPEND_RES(pComContents);
 
+		}else if(CHMPX_COM_VERSION_REQ == type){
+			PPXCOM_VERSION_REQ	pComContents = CVT_COMPTR_VERSION_REQ(pComPacket);
+			NTOH_PPXCOM_VERSION_REQ(pComContents);
+
+		}else if(CHMPX_COM_VERSION_RES == type){
+			PPXCOM_VERSION_RES	pComContents = CVT_COMPTR_VERSION_RES(pComPacket);
+			NTOH_PPXCOM_VERSION_RES(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_REQ == type){
+			PPXCOM_N2_STATUS_REQ	pComContents = CVT_COMPTR_N2_STATUS_REQ(pComPacket);
+			NTOH_PPXCOM_N2_STATUS_REQ(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_RES == type){
+			PPXCOM_N2_STATUS_RES	pComContents = CVT_COMPTR_N2_STATUS_RES(pComPacket);
+			NTOH_PPXCOM_N2_STATUS_RES(pComContents);
+			// ntoh each chmpx
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+
+		}else if(CHMPX_COM_N2_CONINIT_REQ == type){
+			PPXCOM_N2_CONINIT_REQ	pComContents = CVT_COMPTR_N2_CONINIT_REQ(pComPacket);
+			NTOH_PPXCOM_N2_CONINIT_REQ(pComContents);
+
+		}else if(CHMPX_COM_N2_CONINIT_RES == type){
+			PPXCOM_N2_CONINIT_RES	pComContents = CVT_COMPTR_N2_CONINIT_RES(pComPacket);
+			NTOH_PPXCOM_N2_CONINIT_RES(pComContents);
+
+		}else if(CHMPX_COM_N2_JOIN_RING == type){
+			PPXCOM_N2_JOIN_RING	pComContents = CVT_COMPTR_N2_JOIN_RING(pComPacket);
+			NTOH_PPXCOM_N2_JOIN_RING(pComContents);
+
+		}else if(CHMPX_COM_N2_STATUS_UPDATE == type){
+			PPXCOM_N2_STATUS_UPDATE	pComContents = CVT_COMPTR_N2_STATUS_UPDATE(pComPacket);
+			NTOH_PPXCOM_N2_STATUS_UPDATE(pComContents);
+			// ntoh each chmpx
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+
+		}else if(CHMPX_COM_N2_STATUS_CONFIRM == type){
+			PPXCOM_N2_STATUS_CONFIRM	pComContents = CVT_COMPTR_N2_STATUS_CONFIRM(pComPacket);
+			NTOH_PPXCOM_N2_STATUS_CONFIRM(pComContents);
+			// ntoh each chmpx
+			PCHMPXSVR	pChmpxsvr = CHM_OFFSET(pComContents, pComContents->pchmpxsvr_offset, PCHMPXSVR);
+			for(long cnt = 0; cnt < pComContents->count; cnt++){
+				NTOH_PCHMPXSVR(&pChmpxsvr[cnt]);
+			}
+
+		}else if(CHMPX_COM_N2_STATUS_CHANGE == type){
+			PPXCOM_N2_STATUS_CHANGE	pComContents = CVT_COMPTR_N2_STATUS_CHANGE(pComPacket);
+			NTOH_PPXCOM_N2_STATUS_CHANGE(pComContents);
 		}else{
 			WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(type), type);
 		}
@@ -1158,6 +1367,36 @@ PCOMPKT ChmEventSock::AllocatePxComPacket(pxcomtype_t type, ssize_t ext_length)
 
 	}else if(CHMPX_COM_MERGE_SUSPEND_RES == type){
 		length += sizeof(PXCOM_MERGE_SUSPEND_RES);
+
+	}else if(CHMPX_COM_VERSION_REQ == type){
+		length += sizeof(PXCOM_VERSION_REQ);
+
+	}else if(CHMPX_COM_VERSION_RES == type){
+		length += sizeof(PXCOM_VERSION_RES);
+
+	}else if(CHMPX_COM_N2_STATUS_REQ == type){
+		length += sizeof(PXCOM_N2_STATUS_REQ);
+
+	}else if(CHMPX_COM_N2_STATUS_RES == type){
+		length += sizeof(PXCOM_N2_STATUS_RES);
+
+	}else if(CHMPX_COM_N2_CONINIT_REQ == type){
+		length += sizeof(PXCOM_N2_CONINIT_REQ);
+
+	}else if(CHMPX_COM_N2_CONINIT_RES == type){
+		length += sizeof(PXCOM_N2_CONINIT_RES);
+
+	}else if(CHMPX_COM_N2_JOIN_RING == type){
+		length += sizeof(PXCOM_N2_JOIN_RING);
+
+	}else if(CHMPX_COM_N2_STATUS_UPDATE == type){
+		length += sizeof(PXCOM_N2_STATUS_UPDATE);
+
+	}else if(CHMPX_COM_N2_STATUS_CONFIRM == type){
+		length += sizeof(PXCOM_N2_STATUS_CONFIRM);
+
+	}else if(CHMPX_COM_N2_STATUS_CHANGE == type){
+		length += sizeof(PXCOM_N2_STATUS_CHANGE);
 
 	}else{
 		WAN_CHMPRN("ComPacket type is %s(%" PRIu64 ") which is unknown. so does not convert contents.", STRPXCOMTYPE(type), type);
@@ -1611,7 +1850,7 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 	mergeidmap_lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), is_server_mode(false), max_sock_pool(ChmEventSock::DEFAULT_MAX_SOCK_POOL),
 	sock_pool_timeout(ChmEventSock::DEFAULT_SOCK_POOL_TIMEOUT), sock_retry_count(ChmEventSock::DEFAULT_RETRYCNT),
 	con_retry_count(ChmEventSock::DEFAULT_RETRYCNT_CONNECT), sock_wait_time(ChmEventSock::DEFAULT_WAIT_SOCKET),
-	con_wait_time(ChmEventSock::DEFAULT_WAIT_CONNECT)
+	con_wait_time(ChmEventSock::DEFAULT_WAIT_CONNECT), comproto_ver(COM_VERSION_UNINIT), is_merge_done_processing(false)
 {
 	assert(pChmCntrl);
 
@@ -2734,78 +2973,131 @@ bool ChmEventSock::RawReceive(int fd, bool& is_closed)
 		//
 		// Accepting logic needs socket, so we processing here.
 		//
+		// There is a possibility of receiving N2_CONINIT_REQ(or CONINIT_REQ) or VERSION_REQ
+		// from sockets being accepted. The following branches.
+		//
 
 		// check COMPKT(length, type, offset)
-		if(COM_PX2PX != pComPkt->head.type || (sizeof(COMPKT) + sizeof(PXCOM_CONINIT_REQ)) != pComPkt->length || sizeof(COMPKT) != pComPkt->offset){
-			ERR_CHMPRN("ComPkt is wrong for accepting, type(%" PRIu64 ":%s), length(%zu), offset(%jd).", pComPkt->head.type, STRCOMTYPE(pComPkt->head.type), pComPkt->length, static_cast<intmax_t>(pComPkt->offset));
+		if(COM_PX2PX != pComPkt->head.type){
+			ERR_CHMPRN("ComPkt is wrong for accepting, type(%" PRIu64 ":%s).", pComPkt->head.type, STRCOMTYPE(pComPkt->head.type));
 			CHM_Free(pComPkt);
 			return false;
 		}
-		// check CONINIT_REQ
+
+		// check N2_CONINIT_REQ(or CONINIT_REQ) or VERSION_REQ
 		PPXCOM_ALL	pComAll = CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
-		if(CHMPX_COM_CONINIT_REQ != pComAll->val_head.type){
-			ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s), but allow only CHMPX_COM_CONINIT_REQ.", pComAll->val_head.type, STRPXCOMTYPE(pComAll->val_head.type));
-			CHM_Free(pComPkt);
-			return false;
-		}
+		if(CHMPX_COM_VERSION_REQ == pComAll->val_head.type){
+			// Receive CHMPX_COM_VERSION_REQ
 
-		// Parse
-		PCOMPKT		pResComPkt	= NULL;	// dummy
-		chmpxid_t	slvchmpxid	= CHM_INVALID_CHMPXID;
-		short		ctlport		= CHM_INVALID_PORT;
-		PCHMPXSSL	pssl		= NULL;
-		if(!PxComReceiveConinitReq(&(pComPkt->head), pComAll, &pResComPkt, slvchmpxid, ctlport)){
-			ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pComAll->val_head.type, STRPXCOMTYPE(pComAll->val_head.type));
-			CHM_Free(pComPkt);
-			return false;
-		}
-		CHM_Free(pComPkt);
-
-		// check ACL(with port)
-		if(!pImData->IsAllowHostname(achname.c_str(), &ctlport, &pssl)){
-			// Not allow accessing from slave.
-			ERR_CHMPRN("Denied %s(sock:%d):%d by not allowed.", achname.c_str(), fd, ctlport);
-			PxComSendConinitRes(fd, slvchmpxid, CHMPX_COM_RES_ERROR);
-
-			// close
-			if(!RawNotifyHup(fd)){
-				ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", achname.c_str());
+			// check COMPKT(length)
+			if((sizeof(COMPKT) + sizeof(PXCOM_VERSION_REQ)) != pComPkt->length){
+				ERR_CHMPRN("ComPkt is wrong for accepting: length(%zu)", pComPkt->length);
+				CHM_Free(pComPkt);
+				return false;
 			}
-			is_closed = true;
-			return false;
-		}
 
-		// Set nonblock
-		if(!ChmEventSock::SetNonblocking(fd)){
-			WAN_CHMPRN("Failed to nonblock socket(sock:%d), but continue...", fd);
-		}
-		// update slave list in CHMSHM
-		//
-		// [NOTICE]
-		// All server status which connects to this server is "SLAVE".
-		// If other server connects this server for chain of RING, then this server sets that server status as "SLAVE" in slaves list.
-		// See: comment in chmstructure.h
-		//
-		if(!pImData->SetSlaveAll(slvchmpxid, achname.c_str(), ctlport, pssl, fd, CHMPXSTS_SLAVE_UP_NORMAL)){
-			ERR_CHMPRN("Failed to add/update slave list, chmpid=0x%016" PRIx64 ", hostname=%s, ctlport=%d, sock=%d", slvchmpxid, achname.c_str(), ctlport, fd);
-			PxComSendConinitRes(fd, slvchmpxid, CHMPX_COM_RES_ERROR);
-
-			// close
-			if(!RawNotifyHup(fd)){
-				ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", achname.c_str());
+			// Parse and Respond
+			if(!PxComReceiveVersionReq(fd, &(pComPkt->head), pComAll)){
+				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s) and responed. Something error occured.", pComAll->val_head.type, STRPXCOMTYPE(pComAll->val_head.type));
+				CHM_Free(pComPkt);
+				return false;
 			}
-			is_closed = true;
-			return false;
-		}
+			CHM_Free(pComPkt);		// For stop dispatching
 
-		// add internal mapping
-		slavesockmap.set(fd, slvchmpxid);
-		// remove mapping
-		acceptingmap.erase(fd, NULL, NULL);		// do not call callback because this socket is used by slave map.
+		}else if(CHMPX_COM_CONINIT_REQ == pComAll->val_head.type || CHMPX_COM_N2_CONINIT_REQ == pComAll->val_head.type){
+			// Receive CHMPX_COM_N2_CONINIT_REQ(or CHMPX_COM_CONINIT_REQ)
 
-		// Send CHMPX_COM_CONINIT_RES(success)
-		if(!PxComSendConinitRes(fd, slvchmpxid, CHMPX_COM_RES_SUCCESS)){
-			ERR_CHMPRN("Failed to send CHMPX_COM_CONINIT_RES, but do(could) not recover for automatic closing.");
+			// check COMPKT(length, offset)
+			if(	((sizeof(COMPKT) + sizeof(PXCOM_N2_CONINIT_REQ)) != pComPkt->length && (sizeof(COMPKT) + sizeof(PXCOM_CONINIT_REQ)) != pComPkt->length) ||
+				sizeof(COMPKT) != pComPkt->offset )
+			{
+				ERR_CHMPRN("ComPkt is wrong for accepting: length(%zu), offset(%jd).", pComPkt->length, static_cast<intmax_t>(pComPkt->offset));
+				CHM_Free(pComPkt);
+				return false;
+			}
+
+			// Parse
+			PCOMPKT			pResComPkt	= NULL;	// dummy
+			comver_t		comver		= COM_VERSION_2;
+			string			rawslvname;
+			chmpxid_t		slvchmpxid	= CHM_INVALID_CHMPXID;
+			short			ctlport		= CHM_INVALID_PORT;
+			string			cuk;
+			string			custom_seed;
+			hostport_list_t	endpoints;
+			hostport_list_t	ctlendpoints;
+			hostport_list_t	forward_peers;
+			hostport_list_t	reverse_peers;
+
+			if(!PxComReceiveConinitReq(&(pComPkt->head), pComAll, &pResComPkt, comver, rawslvname, slvchmpxid, ctlport, cuk, custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers)){
+				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pComAll->val_head.type, STRPXCOMTYPE(pComAll->val_head.type));
+				CHM_Free(pComPkt);
+				return false;
+			}
+			CHM_Free(pComPkt);
+
+			// check ACL(with ctlport/cuk and get CHMPXSSL)
+			//
+			// [NOTE]
+			// The hostname(IP address) passed is the name recognized by the slave.
+			// Reverse lookup may not work if passed by FQDN. Also, for CONINIT_REQ
+			// instead of N2_CONINIT_REQ, this value is always empty.
+			// In these cases, use the accepted hostname(=slvname).
+			//
+			CHMPXSSL	ssl;
+			string		slvname;
+			if(!pImData->IsAllowHostStrictly(achname.c_str(), ctlport, cuk.c_str(), slvname, &ssl)){
+				// Not allow accessing from slave.
+				ERR_CHMPRN("Denied %s(sock:%d):%d by not allowed.", achname.c_str(), fd, ctlport);
+				PxComSendConinitRes(fd, slvchmpxid, comver, CHMPX_COM_RES_ERROR);
+
+				// close
+				if(!RawNotifyHup(fd)){
+					ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", achname.c_str());
+				}
+				is_closed = true;
+				return false;
+			}
+
+			// Set nonblock
+			if(!ChmEventSock::SetNonblocking(fd)){
+				WAN_CHMPRN("Failed to nonblock socket(sock:%d), but continue...", fd);
+			}
+
+			// update slave list in CHMSHM
+			//
+			// [NOTICE]
+			// All server status which connects to this server is "SLAVE".
+			// If other server connects this server for chain of RING, then this server sets that server status as "SLAVE" in slaves list.
+			// See: comment in chmstructure.h
+			//
+			if(!pImData->SetSlaveAll(slvchmpxid, slvname.c_str(), ctlport, cuk.c_str(), custom_seed.c_str(), &endpoints, &ctlendpoints, &forward_peers, &reverse_peers, &ssl, fd, CHMPXSTS_SLAVE_UP_NORMAL)){
+				ERR_CHMPRN("Failed to add/update slave list, chmpxid=0x%016" PRIx64 ", hostname=%s(%s), ctlport=%d, sock=%d", slvchmpxid, slvname.c_str(), achname.c_str(), ctlport, fd);
+				PxComSendConinitRes(fd, slvchmpxid, comver, CHMPX_COM_RES_ERROR);
+
+				// close
+				if(!RawNotifyHup(fd)){
+					ERR_CHMPRN("Failed to closing \"accepting socket\" for %s(%s), but continue...", slvname.c_str(), achname.c_str());
+				}
+				is_closed = true;
+				return false;
+			}
+
+			// add internal mapping
+			slavesockmap.set(fd, slvchmpxid);
+			// remove mapping
+			acceptingmap.erase(fd, NULL, NULL);		// do not call callback because this socket is used by slave map.
+
+			// Send CHMPX_COM_CONINIT_RES(success)
+			if(!PxComSendConinitRes(fd, slvchmpxid, comver, CHMPX_COM_RES_SUCCESS)){
+				ERR_CHMPRN("Failed to send CHMPX_COM_N2_CONINIT_RES(or CHMPX_COM_CONINIT_RES), but do(could) not recover for automatic closing.");
+				return false;
+			}
+
+		}else{
+			// Not allowed communication type
+			ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s), but allow only CHMPX_COM_N2_CONINIT_REQ(or CHMPX_COM_CONINIT_REQ) or CHMPX_COM_VERSION_REQ.", pComAll->val_head.type, STRPXCOMTYPE(pComAll->val_head.type));
+			CHM_Free(pComPkt);
 			return false;
 		}
 
@@ -3338,8 +3630,8 @@ bool ChmEventSock::ConnectServer(chmpxid_t chmpxid, int& sock, bool without_set_
 //
 // [NOTICE] This method blocks receiving data, means waits connecting.
 //
-// This method try to connect chmpxid server, and send CHMPX_COM_CONINIT_REQ request
-// after connecting the server and receive CHMPX_COM_CONINIT_RES. This is flow for
+// This method try to connect chmpxid server, and send CHMPX_COM_N2_CONINIT_REQ request
+// after connecting the server and receive CHMPX_COM_N2_CONINIT_RES. This is flow for
 // connecting server.
 // So that this method calls RawSend and RawReceive in PxComSendConinitReq().
 //
@@ -3348,24 +3640,49 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// get hostname/port
-	string	hostname;
-	short	port	= CHM_INVALID_PORT;
-	short	ctlport	= CHM_INVALID_PORT;
-	if(!pImData->GetServerBase(chmpxid, hostname, port, ctlport)){
-		ERR_CHMPRN("Could not get hostname/port/ctlport by chmpxid(0x%016" PRIx64 ").", chmpxid);
+	string			hostname;
+	short			port	= CHM_INVALID_PORT;
+	short			ctlport	= CHM_INVALID_PORT;
+	hostport_list_t	endpoints;
+	if(!pImData->GetServerBase(chmpxid, &hostname, &port, &ctlport, &endpoints, NULL)){
+		ERR_CHMPRN("Could not get hostname/port/ctlport/endpoints by chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
 
 	// try to connect
 	while(!fullock::flck_trylock_noshared_mutex(&sockfd_lockval));	// LOCK
-	if(CHM_INVALID_SOCK == (sock = ChmEventSock::Connect(hostname.c_str(), port, false, con_retry_count, con_wait_time))){
-		// could not connect
-		MSG_CHMPRN("Could not connect to %s:%d, set status to DOWN.", hostname.c_str(), port);
-		fullock::flck_unlock_noshared_mutex(&sockfd_lockval);		// UNLOCK
-		return false;
+
+	string	connected_host;
+	short	connected_port	= CHM_INVALID_PORT;
+	sock					= CHM_INVALID_SOCK;
+	if(!endpoints.empty()){
+		// If target has endpoints, try it
+		for(hostport_list_t::const_iterator iter = endpoints.begin(); endpoints.end() != iter; ++iter){
+			if(CHM_INVALID_SOCK != (sock = ChmEventSock::Connect(iter->host.c_str(), iter->port, false, con_retry_count, con_wait_time))){
+				// connected
+				MSG_CHMPRN("Connected to %s:%d for %s:%d endpoint, set sock(%d).", iter->host.c_str(), iter->port, hostname.c_str(), port, sock);
+				connected_host = iter->host;
+				connected_port = iter->port;
+				break;
+			}else{
+				// could not connect, try another
+				MSG_CHMPRN("Could not connect to %s:%d which is one of endpoints for %s:%d, try to connect another host/port.", iter->host.c_str(), iter->port, hostname.c_str(), port);
+			}
+		}
 	}
-	// connected
-	MSG_CHMPRN("Connected to %s:%d, set sock(%d).", hostname.c_str(), port, sock);
+	if(CHM_INVALID_SOCK == sock){
+		// If do not connect endpoints, try to main host/port
+		if(CHM_INVALID_SOCK == (sock = ChmEventSock::Connect(hostname.c_str(), port, false, con_retry_count, con_wait_time))){
+			// could not connect
+			MSG_CHMPRN("Could not connect to %s:%d, set status to DOWN.", hostname.c_str(), port);
+			fullock::flck_unlock_noshared_mutex(&sockfd_lockval);		// UNLOCK
+			return false;
+		}
+		// connected
+		MSG_CHMPRN("Connected to %s:%d, set sock(%d).", hostname.c_str(), port, sock);
+		connected_host = hostname;
+		connected_port = port;
+	}
 	fullock::flck_unlock_noshared_mutex(&sockfd_lockval);			// UNLOCK
 
 	// SSL
@@ -3403,9 +3720,18 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		sslmap.set(sock, ssl, true);		// over write whether exitsts or does not.
 	}
 
+	// Check/Get communication protocol version
+	if(COM_VERSION_UNINIT == comproto_ver){
+		if(!InitialComVersion(sock, chmpxid, comproto_ver)){
+			ERR_CHMPRN("Failed to send/receive PXCOM_VERSION_REQ.");
+			CloseSSL(sock);
+			return false;
+		}
+	}
+
 	// Send coninit_req
 	if(!PxComSendConinitReq(sock, chmpxid)){
-		ERR_CHMPRN("Failed to send PCCOM_CONINIT_REQ to sock(%d).", sock);
+		ERR_CHMPRN("Failed to send PCCOM_N2_CONINIT_REQ(or PCCOM_CONINIT_REQ) to sock(%d).", sock);
 		CloseSSL(sock);
 		return false;
 	}
@@ -3432,8 +3758,8 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		return false;
 	}
 	PPXCOM_ALL	pChmpxCom = CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
-	if(CHMPX_COM_CONINIT_RES != pChmpxCom->val_head.type){
-		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_CONINIT_RES type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
+	if(CHMPX_COM_CONINIT_RES != pChmpxCom->val_head.type && CHMPX_COM_N2_CONINIT_RES != pChmpxCom->val_head.type){
+		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_N2_CONINIT_RES(or CHMPX_COM_CONINIT_RES) type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
 		CloseSSL(sock);
 		CHM_Free(pComPkt);
 		return false;
@@ -3453,7 +3779,11 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 	CHM_Free(pResComPkt);
 
 	if(CHMPX_COM_RES_SUCCESS != coninit_result){
-		ERR_CHMPRN("Connected to %s:%d, but could not allow from this server.", hostname.c_str(), port);
+		if(connected_host == hostname && connected_port == port){
+			ERR_CHMPRN("Connected to %s:%d, but could not allow from this server.", hostname.c_str(), port);
+		}else{
+			ERR_CHMPRN("Connected to %s:%d(endpoint for %s:%d), but could not allow from this server.", connected_host.c_str(), connected_port, hostname.c_str(), port);
+		}
 		CloseSSL(sock);
 		return false;
 	}
@@ -3474,7 +3804,11 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		eqevent.data.fd	= sock;
 		eqevent.events	= EPOLLIN | EPOLLET | EPOLLRDHUP;	// EPOLLRDHUP is set, connecting to server socket is needed to know server side down.
 		if(-1 == epoll_ctl(eqfd, EPOLL_CTL_ADD, sock, &eqevent)){
-			ERR_CHMPRN("Failed to add sock(port %d: sock %d) into epoll event(%d), errno=%d", port, sock, eqfd, errno);
+			if(connected_host == hostname && connected_port == port){
+				ERR_CHMPRN("Failed to add sock(%s:%d - sock %d) into epoll event(%d), errno=%d", hostname.c_str(), port, sock, eqfd, errno);
+			}else{
+				ERR_CHMPRN("Failed to add sock(%s:%d for %s:%d - sock %d) into epoll event(%d), errno=%d", connected_host.c_str(), connected_port, hostname.c_str(), port, sock, eqfd, errno);
+			}
 			if(is_lock){
 				UnlockSendSock(sock);						// UNLOCK SOCKET
 			}
@@ -3484,7 +3818,11 @@ bool ChmEventSock::RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_s
 		}
 		// set sock in server list and update status
 		if(!pImData->SetServerSocks(chmpxid, sock, CHM_INVALID_SOCK, SOCKTG_SOCK)){
-			MSG_CHMPRN("Could not set sock(%d) to chmpxid(0x%016" PRIx64 ").", sock, chmpxid);
+			if(connected_host == hostname && connected_port == port){
+				MSG_CHMPRN("Could not set sock(%d - %s:%d) to chmpxid(0x%016" PRIx64 ").", sock, hostname.c_str(), port, chmpxid);
+			}else{
+				MSG_CHMPRN("Could not set sock(%d - %s:%d for %s:%d) to chmpxid(0x%016" PRIx64 ").", sock, connected_host.c_str(), connected_port, hostname.c_str(), port, chmpxid);
+			}
 			if(is_lock){
 				UnlockSendSock(sock);						// UNLOCK SOCKET
 			}
@@ -3519,11 +3857,9 @@ bool ChmEventSock::ConnectServers(void)
 	for(chmpxpos_t pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, CHM_INVALID_CHMPXLISTPOS, false, false); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, pos, false, false)){
 		// get base information
 		string		name;
-		short		port;
-		short		ctlport;
 		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport) || CHM_INVALID_CHMPXID == chmpxid){
-			ERR_CHMPRN("Could not get serer name/chmpxid/port/ctlport for pos(%" PRIu64 ").", pos);
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ").", pos);
 			continue;
 		}
 
@@ -3531,7 +3867,7 @@ bool ChmEventSock::ConnectServers(void)
 		chmpxsts_t	status		= pImData->GetServerStatus(chmpxid);
 		chmpxsts_t	old_status	= status;
 		if(!IS_CHMPXSTS_SERVER(status) || !IS_CHMPXSTS_UP(status)){
-			MSG_CHMPRN("chmpid(0x%016" PRIx64 ") which is pos(%" PRIu64 ") is status(0x%016" PRIx64 ":%s), not enough status to connecting.", chmpxid, pos, status, STR_CHMPXSTS_FULL(status).c_str());
+			WAN_CHMPRN("%s:chmpxid(0x%016" PRIx64 ")  which is pos(%" PRIu64 ") is status(0x%016" PRIx64 ":%s), not enough status to connecting.", name.c_str(), chmpxid, pos, status, STR_CHMPXSTS_FULL(status).c_str());
 			continue;
 		}
 
@@ -3539,15 +3875,15 @@ bool ChmEventSock::ConnectServers(void)
 		int	sock = CHM_INVALID_SOCK;
 		if(!ConnectServer(chmpxid, sock, false) || CHM_INVALID_SOCK == sock){		// connect & set epoll & chmshm
 			// could not connect
-			ERR_CHMPRN("Could not connect to %s:%d, set status to DOWN.", name.c_str(), port);
+			ERR_CHMPRN("Could not connect to %s:chmpxid(0x%016" PRIx64 ") which is pos(%" PRIu64 "), set status to DOWN.", name.c_str(), chmpxid, pos);
 
 			// [NOTICE]
 			// Other server status is updated, because DOWN status can not be sent by that server.
 			//
 			CHANGE_CHMPXSTS_TO_DOWN(status);
-			MSG_CHMPRN("chmpid(0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
+			MSG_CHMPRN("%s:chmpxid(0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s) is changed from old status(0x%016" PRIx64 ":%s).", name.c_str(), chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 			if(!pImData->SetServerStatus(chmpxid, status)){
-				MSG_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) by down to chmpid(%" PRIu64 ") which is pos(%" PRIu64 ").", status, STR_CHMPXSTS_FULL(status).c_str(), chmpxid, pos);
+				MSG_CHMPRN("Could not set status(0x%016" PRIx64 ":%s) by down to %s:chmpxid(%" PRIu64 ") which is pos(%" PRIu64 ").", status, STR_CHMPXSTS_FULL(status).c_str(), name.c_str(), chmpxid, pos);
 				continue;
 			}
 		}
@@ -3586,18 +3922,16 @@ bool ChmEventSock::ConnectRing(void)
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
 		// get server information
 		string		name;
-		short		port;
-		short		ctlport;
 		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport)){
-			ERR_CHMPRN("Could not get serer name/chmpxid/port/ctlport for pos(%" PRIu64 ").", pos);
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get serer name/chmpxid for pos(%" PRIu64 ").", pos);
 			continue;
 		}
 
 		// status check
 		chmpxsts_t	status = pImData->GetServerStatus(chmpxid);
 		if(!IS_CHMPXSTS_SERVER(status) || !IS_CHMPXSTS_UP(status)){
-			MSG_CHMPRN("chmpid(0x%016" PRIx64 "):%s which is pos(%" PRIu64 ") is status(0x%01lx:%s), not enough status to connecting.", chmpxid, name.c_str(), pos, status, STR_CHMPXSTS_FULL(status).c_str());
+			WAN_CHMPRN("%s:chmpxid(0x%016" PRIx64 ") which is pos(%" PRIu64 ") is status(0x%016" PRIx64 ":%s), not enough status to connecting.", name.c_str(), chmpxid, pos, status, STR_CHMPXSTS_FULL(status).c_str());
 			continue;
 		}
 
@@ -3605,7 +3939,7 @@ bool ChmEventSock::ConnectRing(void)
 		sock = CHM_INVALID_SOCK;
 		if(!ConnectServer(chmpxid, sock, false) || CHM_INVALID_SOCK == sock){	// connect & set epoll & chmshm
 			// could not connect
-			ERR_CHMPRN("Could not connect to %s:%d, set status to DOWN.", name.c_str(), port);
+			WAN_CHMPRN("Could not connect to %s:chmpxid(0x%016" PRIx64 ") which is pos(%" PRIu64 "), set status to DOWN.", name.c_str(), chmpxid, pos);
 		}else{
 			// Update self last status updating time
 			if(!pImData->UpdateSelfLastStatusTime()){
@@ -3620,7 +3954,7 @@ bool ChmEventSock::ConnectRing(void)
 			}
 			if(!PxComSendJoinRing(chmpxid, &selfchmpxsvr)){
 				// Failed to join.
-				ERR_CHMPRN("Failed to send CHMPX_COM_JOIN_RING to chmpxid(0x%016" PRIx64 ") on RING, so close connection to servers.", chmpxid);
+				ERR_CHMPRN("Failed to send CHMPX_COM_N2_JOIN_RING(or CHMPX_COM_JOIN_RING) to %s:chmpxid(0x%016" PRIx64 ") on RING, so close connection to servers.", name.c_str(), chmpxid);
 				if(!CloseToServersSocks()){
 					ERR_CHMPRN("Failed to close connection to other servers, but continue...");
 				}
@@ -3657,12 +3991,9 @@ bool ChmEventSock::CloseRechainRing(chmpxid_t nowchmpxid)
 	chmpxpos_t	pos = selfpos;	// Start at self pos
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
 		string		name;
-		socklist_t	socklist;
 		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
-		short		port	= CHM_INVALID_PORT;
-		short		ctlport	= CHM_INVALID_PORT;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport) || CHM_INVALID_CHMPXID == chmpxid){
-			ERR_CHMPRN("Could not get chmpxid by position(%" PRIu64 ") in server list, but continue...", pos);
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ") in server list, but continue...", pos);
 			continue;
 		}
 		if(nowchmpxid == chmpxid){
@@ -3672,9 +4003,10 @@ bool ChmEventSock::CloseRechainRing(chmpxid_t nowchmpxid)
 		// [NOTE]
 		// Close all sockets to servers except next server.
 		// 
+		socklist_t	socklist;
 		socklist.clear();
 		if(!pImData->GetServerSock(chmpxid, socklist) || socklist.empty()){
-			MSG_CHMPRN("Not have connection to chmpxid(0x%016" PRIx64 ").", chmpxid);
+			WAN_CHMPRN("Not have connection to %s:chmpxid(0x%016" PRIx64 ") which is pos(%" PRIu64 ").", name.c_str(), chmpxid, pos);
 			continue;
 		}
 		// close
@@ -3741,40 +4073,34 @@ bool ChmEventSock::CheckRechainRing(chmpxid_t newchmpxid, bool& is_rechain)
 	chmpxpos_t	pos = selfpos;	// Start at self pos
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
 		string		name;
-		chmpxid_t	chmpxid;
-		short		port;
-		short		ctlport;
-
-		chmpxid	= CHM_INVALID_CHMPXID;
-		port	= CHM_INVALID_PORT;
-		ctlport	= CHM_INVALID_PORT;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport) || CHM_INVALID_CHMPXID == chmpxid){
-			ERR_CHMPRN("Could not get chmpxid by position(%" PRIu64 ") in server list, but continue...", pos);
+		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ") in server list, but continue...", pos);
 			continue;
 		}
 		if(nowchmpxid == chmpxid){
 			socklist_t	nowsocklist;
 			if(pImData->GetServerSock(nowchmpxid, nowsocklist) && !nowsocklist.empty()){
-				MSG_CHMPRN("Found now next chmpxid(0x%016" PRIx64 ") before new chmpxid(0x%016" PRIx64 "), so do not need rechain RING.", nowchmpxid, newchmpxid);
+				MSG_CHMPRN("Found now next %s:chmpxid(0x%016" PRIx64 ") before new chmpxid(0x%016" PRIx64 "), so do not need rechain RING.", name.c_str(), nowchmpxid, newchmpxid);
 			}else{
 				// do rechain
 				if(!RechainRing(nowchmpxid)){
-					ERR_CHMPRN("Failed to rechain RING for chmpxid(0x%016" PRIx64 ").", nowchmpxid);
+					ERR_CHMPRN("Failed to rechain RING for %s:chmpxid(0x%016" PRIx64 ").", name.c_str(), nowchmpxid);
 				}else{
-					MSG_CHMPRN("Succeed to rechain RING for chmpxid(0x%016" PRIx64 ").", nowchmpxid);
+					MSG_CHMPRN("Succeed to rechain RING for %s:chmpxid(0x%016" PRIx64 ").", name.c_str(), nowchmpxid);
 					is_rechain = true;
 				}
 			}
 			return true;
 
 		}else if(newchmpxid == chmpxid){
-			MSG_CHMPRN("Found new chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so need rechain RING.", newchmpxid, nowchmpxid);
+			MSG_CHMPRN("Found new %s:chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so need rechain RING.", name.c_str(), newchmpxid, nowchmpxid);
 
 			// do rechain
 			if(!RechainRing(newchmpxid)){
-				ERR_CHMPRN("Failed to rechain RING for chmpxid(0x%016" PRIx64 ").", newchmpxid);
+				ERR_CHMPRN("Failed to rechain RING for %s:chmpxid(0x%016" PRIx64 ").", name.c_str(), newchmpxid);
 			}else{
-				MSG_CHMPRN("Succeed to rechain RING for chmpxid(0x%016" PRIx64 ").", newchmpxid);
+				MSG_CHMPRN("Succeed to rechain RING for %s:chmpxid(0x%016" PRIx64 ").", name.c_str(), newchmpxid);
 				is_rechain = true;
 			}
 			return true;
@@ -3782,6 +4108,7 @@ bool ChmEventSock::CheckRechainRing(chmpxid_t newchmpxid, bool& is_rechain)
 	}
 	// why...?
 	MSG_CHMPRN("There is no server UP on RING(= there is not the server of chmpxid(0x%016" PRIx64 ") in server list), so can not rechain RING.", newchmpxid);
+
 	return true;
 }
 
@@ -3812,15 +4139,9 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 	chmpxpos_t	pos = selfpos;	// Start at self pos
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
 		string	name;
-		short	port;
-		short	ctlport;
-
 		chmpxid	= CHM_INVALID_CHMPXID;
-		port	= CHM_INVALID_PORT;
-		ctlport	= CHM_INVALID_PORT;
-
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport) || CHM_INVALID_CHMPXID == chmpxid){
-			WAN_CHMPRN("Could not get chmpxid by position(%" PRIu64 ") in server list, but continue...", pos);
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ") in server list, but continue...", pos);
 			continue;
 		}
 		// status check
@@ -3829,14 +4150,15 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 			// try to connect server.
 			int	sock = CHM_INVALID_SOCK;
 			if(ConnectServer(chmpxid, sock, false) && CHM_INVALID_SOCK != sock){			// update chmshm
-				MSG_CHMPRN("Connect new server chmpxid(0x%016" PRIx64 ") to sock(%d), and recover RING.", chmpxid, sock);
+				MSG_CHMPRN("Connect new server %s:chmpxid(0x%016" PRIx64 ") to sock(%d), and recover RING.", name.c_str(), chmpxid, sock);
 				return chmpxid;
 			}else{
-				ERR_CHMPRN("Could not connect new server chmpxid(0x%016" PRIx64 "), so try to next server.", chmpxid);
+				ERR_CHMPRN("Could not connect new server %s:chmpxid(0x%016" PRIx64 "), so try to next server.", name.c_str(), chmpxid);
 			}
 		}
 	}
 	WAN_CHMPRN("There is no connect-able server in RING. probably there is no UP server in RING.");
+
 	return CHM_INVALID_CHMPXID;
 }
 
@@ -3868,28 +4190,23 @@ bool ChmEventSock::IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t ne
 	chmpxpos_t	pos = selfpos;	// Start at self pos
 	for(pos = pImData->GetNextServerPos(selfpos, pos, true, true); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(selfpos, pos, true, true)){
 		string		name;
-		chmpxid_t	chmpxid;
-		short		port;
-		short		ctlport;
-
-		chmpxid	= CHM_INVALID_CHMPXID;
-		port	= CHM_INVALID_PORT;
-		ctlport	= CHM_INVALID_PORT;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport) || CHM_INVALID_CHMPXID == chmpxid){
-			ERR_CHMPRN("Could not get chmpxid by position(%" PRIu64 ") in server list, but continue...", pos);
+		chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			ERR_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ") in server list, but continue...", pos);
 			continue;
 		}
 		if(next_chmpxid == chmpxid){
-			MSG_CHMPRN("Found next chmpxid(0x%016" PRIx64 ") before departure chmpxid(0x%016" PRIx64 "), so can send this pkt.", next_chmpxid, dept_chmpxid);
+			MSG_CHMPRN("Found next %s:chmpxid(0x%016" PRIx64 ") before departure chmpxid(0x%016" PRIx64 "), so can send this pkt.", name.c_str(), next_chmpxid, dept_chmpxid);
 			return true;
 		}
 		if(dept_chmpxid == chmpxid){
-			MSG_CHMPRN("Found departure chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so can not send this pkt.", dept_chmpxid, next_chmpxid);
+			MSG_CHMPRN("Found departure %s:chmpxid(0x%016" PRIx64 ") before next chmpxid(0x%016" PRIx64 "), so can not send this pkt.", name.c_str(), dept_chmpxid, next_chmpxid);
 			return false;
 		}
 	}
 	// why...?
 	MSG_CHMPRN("There is no server UP on RING(= there is not the server of chmpxid(0x%016" PRIx64 ") in server list), so can not send this pkt.", next_chmpxid);
+
 	return false;
 }
 
@@ -3943,7 +4260,11 @@ bool ChmEventSock::Accept(int sock)
 	acceptingmap.set(newsock, strhostname);
 
 	// check ACL
-	if(!pImData->IsAllowHostname(strhostname.c_str())){
+	//
+	// [NOTE]
+	// Check only hostname(IP address), then check strictly after accepting.
+	//
+	if(!pImData->IsAllowHost(strhostname.c_str())){
 		// Not allow accessing from slave.
 		ERR_CHMPRN("Denied %s(sock:%d) by not allowed.", strhostname.c_str(), newsock);
 		if(!NotifyHup(newsock)){
@@ -4010,7 +4331,7 @@ bool ChmEventSock::Accept(int sock)
 		return false;
 	}
 	//
-	// CONINIT_REQ will get in main event loop.
+	// N2_CONINIT_REQ(or CONINIT_REQ) will get in main event loop.
 	//
 	return true;
 }
@@ -4066,7 +4387,11 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 	}
 
 	// check ACL
-	if(!pImData->IsAllowHostname(strhostname.c_str())){
+	//
+	// [NOTE]
+	// Check only hostname(IP address), then check strictly after accepting.
+	//
+	if(!pImData->IsAllowHost(strhostname.c_str())){
 		// Not allow accessing from slave.
 		ERR_CHMPRN("Denied %s(ctlsock:%d) by not allowed.", strhostname.c_str(), newctlsock);
 		if(!NotifyHup(newctlsock)){
@@ -4096,10 +4421,75 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 	return true;
 }
 
+//
+// Check the version of the communication protocol that can be used for backward compatibility.
+//
+// [NOTE]
+// Due to changes in the CHMINFO structure, some communication protocols have been deprecated since v1.0.71.
+// However, for backward compatibility, v1.0.71 or later can communicate with previous versions of CHMPX.
+// Use CHMPX_COM_VERSION_REQ to check the compatibility of this CHMPX and communication protocol.
+//
+bool ChmEventSock::InitialComVersion(int sock, chmpxid_t chmpxid, comver_t& com_proto_version)
+{
+	if(CHM_INVALID_SOCK == sock || CHM_INVALID_CHMPXID == chmpxid){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+
+	// [NOTE]
+	// Prioritize environment variables over anything.
+	if(get_comproto_version_env(com_proto_version)){
+		MSG_CHMPRN("Found %s environment and force to use communication protocol (%" PRIu64 ").", CHMPX_COMPROTO_VERSION, com_proto_version);
+		return true;
+	}
+
+	// Send version request
+	if(!PxComSendVersionReq(sock, chmpxid, false)){	// do not close socket if error.
+		ERR_CHMPRN("Failed to send PXCOM_VERSION_REQ.");
+		return false;
+	}
+
+	// Receive response
+	bool	is_closed	= false;
+	PCOMPKT	pComPkt		= NULL;
+	if(!ChmEventSock::RawReceive(sock, GetSSL(sock), is_closed, &pComPkt, 0L, false, sock_retry_count, sock_wait_time) || !pComPkt){
+		ERR_CHMPRN("Failed to receive ComPkt from sock(%d), sock is %s.", sock, is_closed ? "closed" : "not closed");
+		CHM_Free(pComPkt);
+		return false;
+	}
+
+	// Check response type
+	if(COM_PX2PX != pComPkt->head.type){
+		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not COM_PX2PX type from sock(%d).", STRCOMTYPE(pComPkt->head.type), pComPkt->head.type, sock);
+		CHM_Free(pComPkt);
+		return false;
+	}
+	PPXCOM_ALL	pChmpxCom = CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
+	if(CHMPX_COM_VERSION_RES != pChmpxCom->val_head.type){
+		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_VERSION_RES type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
+		CHM_Free(pComPkt);
+		return false;
+	}
+
+	// Check response
+	PCOMPKT	pResComPkt	= NULL;						// tmp
+	com_proto_version	= COM_VERSION_UNINIT;
+	if(!PxComReceiveVersionRes(&(pComPkt->head), pChmpxCom, &pResComPkt, com_proto_version)){
+		ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
+		CHM_Free(pComPkt);
+		CHM_Free(pResComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
+	CHM_Free(pResComPkt);
+
+	return true;
+}
+
 // [NOTICE]
 // This function is updating all server status from a server on RING.
-// This method opens the port of one of servers, and sends CHMPX_COM_STATUS_REQ,
-// receives CHMPX_COM_STATUS_RES, updates all server status by result.
+// This method opens the port of one of servers, and sends CHMPX_COM_N2_STATUS_REQ,
+// receives CHMPX_COM_N2_STATUS_RES, updates all server status by result.
 // This method uses the socket for that port, the socket is connecting very short time.
 // After updating all server status from the result, this method closes that socket ASSAP.
 //
@@ -4112,21 +4502,20 @@ bool ChmEventSock::InitialAllServerStatus(void)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Connect to ONE of servers.
+	string		name;
 	int			sock	= CHM_INVALID_SOCK;
 	chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
 	for(chmpxpos_t pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, CHM_INVALID_CHMPXLISTPOS, true, false); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, pos, true, false), sock = CHM_INVALID_SOCK){
-		string	name;
-		short	port;
-		short	ctlport;
-		if(!pImData->GetServerBase(pos, name, chmpxid, port, ctlport)){
-			ERR_CHMPRN("Could not get serer name/chmpxid/port/ctlport for pos(%" PRIu64 ").", pos);
+		chmpxid	= CHM_INVALID_CHMPXID;
+		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
+			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ").", pos);
 			continue;
 		}
 		if(ConnectServer(chmpxid, sock, true)){		// connect & not set epoll & not chmshm
 			// connected.
 			break;
 		}
-		MSG_CHMPRN("Could not connect to %s:%d, try to connect next server.", name.c_str(), port);
+		WAN_CHMPRN("Could not connect to %s:chmpxid(0x%016" PRIx64 ") which is pos(%" PRIu64 "), try to connect next server.", name.c_str(), chmpxid, pos);
 	}
 	if(CHM_INVALID_SOCK == sock){
 		MSG_CHMPRN("There is no server to connect port, so it means any server ready up.");
@@ -4166,8 +4555,8 @@ bool ChmEventSock::InitialAllServerStatus(void)
 		return false;
 	}
 	PPXCOM_ALL	pChmpxCom = CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
-	if(CHMPX_COM_STATUS_RES != pChmpxCom->val_head.type){
-		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_STATUS_RES type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
+	if(CHMPX_COM_STATUS_RES != pChmpxCom->val_head.type && CHMPX_COM_N2_STATUS_RES != pChmpxCom->val_head.type){
+		ERR_CHMPRN("Received data is %s(%" PRIu64 ") type, which does not CHMPX_COM_N2_STATUS_RES(or CHMPX_COM_STATUS_RES) type from sock(%d).", STRPXCOMTYPE(pChmpxCom->val_head.type), pChmpxCom->val_head.type, sock);
 		CloseSSL(sock);
 		CHM_Free(pComPkt);
 		return false;
@@ -4253,7 +4642,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 		// following datas
 		PPXCOM_ALL	pChmpxCom	= CHM_OFFSET(pComPkt, pComPkt->offset, PPXCOM_ALL);
 
-		if(CHMPX_COM_STATUS_REQ == pChmpxCom->val_head.type){
+		if(CHMPX_COM_STATUS_REQ == pChmpxCom->val_head.type || CHMPX_COM_N2_STATUS_REQ == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusReq(&(pComPkt->head), pChmpxCom, &pResComPkt) || !pResComPkt){
 				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
@@ -4268,7 +4657,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			}
 			CHM_Free(pResComPkt);
 
-		}else if(CHMPX_COM_STATUS_RES == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_STATUS_RES == pChmpxCom->val_head.type || CHMPX_COM_N2_STATUS_RES == pChmpxCom->val_head.type){
 			// processing
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusRes(&(pComPkt->head), pChmpxCom, &pResComPkt, false) || pResComPkt){			// should be pResComPkt=NULL
@@ -4323,15 +4712,15 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			}
 			CHM_Free(pResComPkt);
 
-		}else if(CHMPX_COM_CONINIT_REQ == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_CONINIT_REQ == pChmpxCom->val_head.type || CHMPX_COM_N2_CONINIT_REQ == pChmpxCom->val_head.type){
 			ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured, so exit with no processing.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 			return false;
 
-		}else if(CHMPX_COM_CONINIT_RES == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_CONINIT_RES == pChmpxCom->val_head.type || CHMPX_COM_N2_CONINIT_RES == pChmpxCom->val_head.type){
 			ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured, so exit with no processing.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
 			return false;
 
-		}else if(CHMPX_COM_JOIN_RING == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_JOIN_RING == pChmpxCom->val_head.type || CHMPX_COM_N2_JOIN_RING == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveJoinRing(&(pComPkt->head), pChmpxCom, &pResComPkt)){
 				ERR_CHMPRN("Received CHMPXCOM type(%" PRIu64 ":%s). Something error occured.", pChmpxCom->val_head.type, STRPXCOMTYPE(pChmpxCom->val_head.type));
@@ -4368,7 +4757,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				MSG_CHMPRN("Succeed to join RING, next step which is updating status and server list runs automatically.");
 			}
 
-		}else if(CHMPX_COM_STATUS_UPDATE == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_STATUS_UPDATE == pChmpxCom->val_head.type || CHMPX_COM_N2_STATUS_UPDATE == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusUpdate(&(pComPkt->head), pChmpxCom, &pResComPkt)){
 				// Failed Status Update
@@ -4388,7 +4777,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				// Success Status Update, wait to receive merging...(Nothing to do here)
 			}
 
-		}else if(CHMPX_COM_STATUS_CONFIRM == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_STATUS_CONFIRM == pChmpxCom->val_head.type || CHMPX_COM_N2_STATUS_CONFIRM == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusConfirm(&(pComPkt->head), pChmpxCom, &pResComPkt)){
 				// Failed Status Confirm
@@ -4406,7 +4795,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				CHM_Free(pResComPkt);
 			}
 
-		}else if(CHMPX_COM_STATUS_CHANGE == pChmpxCom->val_head.type){
+		}else if(CHMPX_COM_STATUS_CHANGE == pChmpxCom->val_head.type || CHMPX_COM_N2_STATUS_CHANGE == pChmpxCom->val_head.type){
 			PCOMPKT	pResComPkt = NULL;
 			if(!PxComReceiveStatusChange(&(pComPkt->head), pChmpxCom, &pResComPkt)){
 				// Failed
@@ -4552,7 +4941,29 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				CHM_Free(pResComPkt);
 			}
 			if(!is_completed){
-				// Not finish merging by all servers in RING, then nothing to do.
+				// Not finish merging by all servers in RING, then retry to complete.
+				chmpxid_t	nextchmpxid = GetNextRingChmpxId();
+				if(CHM_INVALID_CHMPXID != nextchmpxid){
+					MSG_CHMPRN("retry merge complete processing for recover.");
+
+					// Update self last status updating time for updating self status
+					if(!pImData->UpdateSelfLastStatusTime()){
+						ERR_CHMPRN("Could not update own updating status time, but continue...");
+					}
+					CHMPXSVR	selfchmpxsvr;
+					if(!pImData->GetSelfChmpxSvr(&selfchmpxsvr)){
+						ERR_CHMPRN("Could not get self chmpx information for retry merge complete, then could not recover...");
+					}else{
+						if(!PxComSendStatusChange(nextchmpxid, &selfchmpxsvr)){
+							ERR_CHMPRN("Failed to send self status change for retry merge complete, then could not recover...");
+						}else{
+							// send complete_merge
+							if(!PxComSendMergeComplete(nextchmpxid)){
+								ERR_CHMPRN("Failed to send CHMPX_COM_MERGE_COMPLETE for retry merge complete, then could not recover...");
+							}
+						}
+					}
+				}
 				return true;
 			}
 
@@ -4933,8 +5344,8 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 	}else if(0 == strcasecmp(strCommand.c_str(), CTL_COMMAND_START_MERGE)){
 		// Start Merge
 		//
-		// The merging flow is sending CHMPX_COM_STATUS_CONFIRM, and sending CHMPX_COM_MERGE_START
-		// after returning CHMPX_COM_STATUS_CONFIRM result on RING. After getting CHMPX_COM_MERGE_START
+		// The merging flow is sending CHMPX_COM_N2_STATUS_CONFIRM, and sending CHMPX_COM_MERGE_START
+		// after returning CHMPX_COM_N2_STATUS_CONFIRM result on RING. After getting CHMPX_COM_MERGE_START
 		// start to merge for self.
 		//
 		if(!CtlComMergeStart(strResponse)){
@@ -4988,20 +5399,75 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 		// Service OUT(status is changed to delete pending)
 		//
 		if(cmdarray.empty()){
-			ERR_CHMPRN("%s command must have parameter for server name/port.", strCommand.c_str());
+			ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
 			strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
 		}else{
-			string		strTmp = cmdarray.front();
-			strlst_t	paramarray;
-			if(!str_paeser(strTmp.c_str(), paramarray, ":") || 2 != paramarray.size()){
-				ERR_CHMPRN("%s command parameter(%s) must be servername:port.", strCommand.c_str(), strTmp.c_str());
-				strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
-			}else{
-				// retrieving the server which is set SERVICE OUT on RING
-				string	strServer	= paramarray.front();	paramarray.pop_front();
-				string	strCtlPort	= paramarray.front();
-				short	ctlport		= static_cast<short>(atoi(strCtlPort.c_str()));
-				if(!CtlComServiceOut(strServer.c_str(), ctlport, pCommand, strResponse)){
+			CHMPXID_SEED_TYPE	type		= pImData->GetChmpxSeedType();
+			string				strTmp		= cmdarray.front();
+			strlst_t			paramarray;
+			string				strServer;
+			short				ctlport		= CHM_INVALID_PORT;
+			string				strCuk;
+			string				strCtleps;
+			string				strCustom;
+
+			if(CHMPXID_SEED_CUK == type){
+				if(!str_paeser(strTmp.c_str(), paramarray, ":") || 3 != paramarray.size()){
+					ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+					strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+				}else{
+					strServer			= paramarray.front();	paramarray.pop_front();
+					string	strCtlPort	= paramarray.front();	paramarray.pop_front();
+					ctlport				= static_cast<short>(atoi(strCtlPort.c_str()));
+					strCuk				= paramarray.front();
+				}
+
+			}else if(CHMPXID_SEED_CTLENDPOINTS == type){
+				string::size_type	pos;
+				if(string::npos == (pos = strTmp.find(':'))){
+					ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+					strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+				}else{
+					strServer			= strTmp.substr(0, pos);
+					strTmp				= strTmp.substr(pos + 1);
+					if(string::npos == (pos = strTmp.find(':'))){
+						ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+						strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+					}else{
+						string	strCtlPort	= strTmp.substr(0, pos);
+						ctlport				= static_cast<short>(atoi(strCtlPort.c_str()));
+						strCtleps			= strTmp.substr(pos + 1);
+						if(strCtleps.empty()){
+							ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+							strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+						}
+					}
+				}
+
+			}else if(CHMPXID_SEED_CUSTOM == type){
+				if(!str_paeser(strTmp.c_str(), paramarray, ":") || 3 != paramarray.size()){
+					ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+					strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+				}else{
+					strServer			= paramarray.front();	paramarray.pop_front();
+					string	strCtlPort	= paramarray.front();	paramarray.pop_front();
+					ctlport				= static_cast<short>(atoi(strCtlPort.c_str()));
+					strCustom			= paramarray.front();
+				}
+
+			}else{	// CHMPXID_SEED_NAME
+				if(!str_paeser(strTmp.c_str(), paramarray, ":") || paramarray.size() < 2 || 3 < paramarray.size()){
+					ERR_CHMPRN(CTLCOM_SERVICEOUT_ERRMSG, strCommand.c_str());
+					strResponse = CTL_RES_ERROR_SERVICE_OUT_PARAM;
+				}else{
+					strServer			= paramarray.front();	paramarray.pop_front();
+					string	strCtlPort	= paramarray.front();	paramarray.pop_front();
+					ctlport				= static_cast<short>(atoi(strCtlPort.c_str()));
+					strCuk				= paramarray.empty() ? "" : paramarray.front();
+				}
+			}
+			if(strResponse.empty()){
+				if(!CtlComServiceOut(strServer.c_str(), ctlport, strCuk.c_str(), strCtleps.c_str(), strCustom.c_str(), pCommand, strResponse)){
 					ERR_CHMPRN("CTL_COMMAND_SERVICE_OUT is failed.");
 				}else{
 					MSG_CHMPRN("CTL_COMMAND_SERVICE_OUT is succeed.");
@@ -5388,6 +5854,18 @@ bool ChmEventSock::MergeDone(void)
 
 			if(!PxComSendSlavesStatusChange(&selfchmpxsvr)){
 				WAN_CHMPRN("Failed to send self status change to slaves, but continue...");
+			}else{
+				// [NOTE]
+				// If there is no slave, special processing is performed.
+				//
+				chmpxidlist_t	chmpxidlist;
+				if(IsAutoMerge() && 0L == pImData->GetSlaveChmpxIds(chmpxidlist)){
+					MSG_CHMPRN("There is no server/slave node, then start to merge complete directly here.");
+					if(!RequestMergeComplete()){
+						ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, hope to recover automatic or DO COMPMERGE BY MANUAL!");
+						return false;
+					}
+				}
 			}
 		}else{
 			// push status changed
@@ -5397,11 +5875,9 @@ bool ChmEventSock::MergeDone(void)
 		}
 	}
 
-	// if the mode is automatically merging, do complete here.
+	// if the mode is automatically merging, set flag here.
 	if(IsAutoMerge()){
-		if(!RequestMergeComplete()){
-			ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, DO COMPMERGE BY MANUAL!");
-		}
+		is_merge_done_processing = true;
 	}
 	return true;
 }
@@ -5545,12 +6021,6 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 	}
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
-	// check operating(merging)
-	if(pImData->IsOperating()){
-		ERR_CHMPRN("Now operating(merging) now, then could not complete merging.");
-		return false;
-	}
-
 	// get all server status
 	PCHMPXSVR	pchmpxsvrs	= NULL;
 	long		count		= 0L;
@@ -5564,8 +6034,8 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 	for(long cnt = 0; cnt < count; ++cnt){
 		if(IS_CHMPXSTS_SRVIN(pchmpxsvrs[cnt].status)){
 			if(IS_CHMPXSTS_UP(pchmpxsvrs[cnt].status)){
-				if(!IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)){
-					MSG_CHMPRN("Found SERVICEIN / UP / NOACT or ADD or DELETE / !DONE server, then could not complete merging.");
+				if(IS_CHMPXSTS_DOING(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / UP / (NOACT or ADD or DELETE) / DOING server, then could not complete merging.");
 					result = false;
 					break;
 				}
@@ -5586,7 +6056,7 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 }
 
 //
-// This method sends only "STATUS_CONFIRM".
+// This method sends only "N2_STATUS_CONFIRM".
 // After that, this process receives "STATUS_CONFIRM" result, and sends "MERGE_START" automatically.
 //
 bool ChmEventSock::RequestMergeStart(string* pstring)
@@ -5651,7 +6121,7 @@ bool ChmEventSock::RequestMergeStart(string* pstring)
 
 	// send status_confirm
 	if(!PxComSendStatusConfirm(chmpxid, pchmpxsvrs, count)){
-		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CONFIRM.");
+		ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_CONFIRM.");
 		if(pstring){
 			*pstring = CTL_RES_ERROR_COMMUNICATION;
 		}
@@ -5879,7 +6349,7 @@ bool ChmEventSock::RequestMergeComplete(string* pstring)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// check status
-	if(CheckAllStatusForMergeComplete()){
+	if(!CheckAllStatusForMergeComplete()){
 		MSG_CHMPRN("Some server in RING have been merging yet, so could not change status.");
 		if(pstring){
 			*pstring = CTL_RES_ERROR_SOME_SERVER_STATUS;
@@ -5892,6 +6362,7 @@ bool ChmEventSock::RequestMergeComplete(string* pstring)
 	if(CHM_INVALID_CHMPXID == chmpxid){
 		// no server found, finish doing so pending hash updated self.
 		WAN_CHMPRN("Could not get to chmpxid, probably there is no server without self chmpx on RING. So stop sending status update.");
+		is_merge_done_processing = false;
 
 		// Complete to merge
 		//
@@ -6555,15 +7026,26 @@ bool ChmEventSock::SendCtlPort(chmpxid_t chmpxid, const unsigned char* pbydata, 
 		ERR_CHMPRN("Parameters are wrong.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	ChmIMData*		pImData = pChmCntrl->GetImDataObj();
 
-	string	hostname;
-	short	port	= CHM_INVALID_PORT;
-	short	ctlport	= CHM_INVALID_PORT;
-	if(!pImData->GetServerBase(chmpxid, hostname, port, ctlport)){
+	string			hostname;
+	short			ctlport	= CHM_INVALID_PORT;
+	hostport_list_t	ctlendpoints;
+	if(!pImData->GetServerBase(chmpxid, &hostname, NULL, &ctlport, NULL, &ctlendpoints)){
 		ERR_CHMPRN("Could not find server by chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
 	}
+	if(!ctlendpoints.empty()){
+		// If target has control endpoints, try it
+		for(hostport_list_t::const_iterator iter = ctlendpoints.begin(); ctlendpoints.end() != iter; ++iter){
+			if(ChmEventSock::RawSendCtlPort(iter->host.c_str(), iter->port, pbydata, length, strResult, sockfd_lockval, sock_retry_count, sock_wait_time, con_retry_count, con_wait_time)){
+				// Succeed
+				return true;
+			}
+			MSG_CHMPRN("Could not connect(send) to %s:%d which is one of control endpoints for %s:%d, try to connect another host/port.", iter->host.c_str(), iter->port, hostname.c_str(), ctlport);
+		}
+	}
+	// Last try main host/port
 	return ChmEventSock::RawSendCtlPort(hostname.c_str(), ctlport, pbydata, length, strResult, sockfd_lockval, sock_retry_count, sock_wait_time, con_retry_count, con_wait_time);
 }
 
@@ -6628,7 +7110,7 @@ bool ChmEventSock::CtlComServiceIn(string& strResponse)
 	return true;
 }
 
-bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const char* pOrgCommand, string& strResponse)
+bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed, const char* pOrgCommand, string& strResponse)
 {
 	if(CHMEMPTYSTR(hostname) || CHM_INVALID_PORT == ctlport || CHMEMPTYSTR(pOrgCommand)){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -6643,7 +7125,7 @@ bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const c
 
 	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 	chmpxid_t	chmpxid;
-	if(CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdByToServerName(hostname, ctlport))){
+	if(CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdByToServerName(hostname, ctlport, cuk, ctlendpoints, custom_seed))){
 		ERR_CHMPRN("Could not find a server as %s:%d.", hostname, ctlport);
 		strResponse = CTL_RES_ERROR_NOT_FOUND_SVR;
 		return false;
@@ -6735,6 +7217,12 @@ bool ChmEventSock::CtlComSelfStatus(string& strResponse)
 	ss << "Connection                = {"														<< endl;
 	ss << "    Port(socket)          = "	<< to_string(chmpxsvr.port)		<< "("				<< (CHM_INVALID_SOCK == sock ? "n/a" : to_string(sock))			<< ")" << endl;
 	ss << "    Control Port(socket)  = "	<< to_string(chmpxsvr.ctlport)	<< "("				<< (CHM_INVALID_SOCK == ctlsock ? "n/a" : to_string(ctlsock))	<< ")" << endl;
+	ss << "    CUK                   = "	<< chmpxsvr.cuk										<< endl;
+	ss << "    Custom ID Seed        = "	<< chmpxsvr.custom_seed								<< endl;
+	ss << "    Endpoints             = "	<< get_hostport_pairs_string(chmpxsvr.endpoints, EXTERNAL_EP_MAX)		<< endl;
+	ss << "    Control Endppoints    = "	<< get_hostport_pairs_string(chmpxsvr.ctlendpoints, EXTERNAL_EP_MAX)	<< endl;
+	ss << "    Forward Peers         = "	<< get_hostport_pairs_string(chmpxsvr.forward_peers, FORWARD_PEER_MAX)	<< endl;
+	ss << "    Reverse Peers         = "	<< get_hostport_pairs_string(chmpxsvr.reverse_peers, REVERSE_PEER_MAX)	<< endl;
 	ss << "    SSL Connection        = "	<< (chmpxsvr.ssl.is_ssl ? "yes" : "no")				<< endl;
 	if(chmpxsvr.ssl.is_ssl){
 		ss << "    SSL Parameters        = {"													<< endl;
@@ -6803,13 +7291,19 @@ bool ChmEventSock::CtlComAllServerStatus(string& strResponse)
 
 	// set output buffer
 	stringstream	ss;
-	ss << "RING Name              = "	<< group										<< endl;
+	ss << "RING Name              = "	<< group											<< endl;
 
 	for(long cnt = 0; cnt < count; cnt++){
 		ss << "No."							<< to_string(cnt + 1)							<< endl;
 		ss << "  Server Name          = "	<< pchmpxsvrs[cnt].name							<< endl;
 		ss << "    Port               = "	<< to_string(pchmpxsvrs[cnt].port)				<< endl;
 		ss << "    Control Port       = "	<< to_string(pchmpxsvrs[cnt].ctlport)			<< endl;
+		ss << "    CUK                = "	<< pchmpxsvrs[cnt].cuk							<< endl;
+		ss << "    Custom ID Seed     = "	<< pchmpxsvrs[cnt].custom_seed					<< endl;
+		ss << "    Endpoints          = "	<< get_hostport_pairs_string(pchmpxsvrs[cnt].endpoints, EXTERNAL_EP_MAX)		<< endl;
+		ss << "    Control Endppoints = "	<< get_hostport_pairs_string(pchmpxsvrs[cnt].ctlendpoints, EXTERNAL_EP_MAX)		<< endl;
+		ss << "    Forward Peers      = "	<< get_hostport_pairs_string(pchmpxsvrs[cnt].forward_peers, FORWARD_PEER_MAX)	<< endl;
+		ss << "    Reverse Peers      = "	<< get_hostport_pairs_string(pchmpxsvrs[cnt].reverse_peers, REVERSE_PEER_MAX)	<< endl;
 		ss << "    Use SSL            = "	<< (pchmpxsvrs[cnt].ssl.is_ssl ? "yes" : "no")	<< endl;
 		if(pchmpxsvrs[cnt].ssl.is_ssl){
 			ss << "    Verify Peer        = "	<< (pchmpxsvrs[cnt].ssl.verify_peer ? "yes" : "no")	<< endl;
@@ -6988,23 +7482,41 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_REQ))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_REQ))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_STATUS_REQ	pStatusReq	= CVT_COMPTR_N2_STATUS_REQ(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pStatusReq->head.type	= CHMPX_COM_N2_STATUS_REQ;
+		pStatusReq->head.result	= CHMPX_COM_RES_SUCCESS;
+		pStatusReq->head.length	= sizeof(PXCOM_N2_STATUS_REQ);
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_REQ))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_STATUS_REQ	pStatusReq	= CVT_COMPTR_STATUS_REQ(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_STATUS_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pStatusReq->head.type	= CHMPX_COM_STATUS_REQ;
+		pStatusReq->head.result	= CHMPX_COM_RES_SUCCESS;
+		pStatusReq->head.length	= sizeof(PXCOM_STATUS_REQ);
 	}
-
-	// compkt
-	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_STATUS_REQ	pStatusReq	= CVT_COMPTR_STATUS_REQ(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_STATUS_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
-
-	pStatusReq->head.type	= CHMPX_COM_STATUS_REQ;
-	pStatusReq->head.result	= CHMPX_COM_RES_SUCCESS;
-	pStatusReq->head.length	= sizeof(PXCOM_STATUS_REQ);
 
 	// Send request
 	//
@@ -7013,7 +7525,7 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 	//
 	bool	is_closed = false;
 	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pComPkt, is_closed, false, sock_retry_count, sock_wait_time)){		// as default nonblocking
-		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_REQ to sock(%d).", sock);
+		ERR_CHMPRN("Failed to send %s to sock(%d).", (IS_COM_CURRENT_VERSION(comproto_ver) ? "CHMPX_COM_N2_STATUS_REQ" : "CHMPX_COM_STATUS_REQ"), sock);
 
 		// [NOTE]
 		// When this method is called from InitialAllServerStatus(), the sock is not mapped.
@@ -7042,9 +7554,10 @@ bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
-	//PPXCOM_STATUS_REQ	pStatusReq	= CVT_COMPTR_STATUS_REQ(pComAll);	// unused now
-	*ppResComPkt					= NULL;
+	ChmIMData*				pImData		= pChmCntrl->GetImDataObj();
+	//PPXCOM_STATUS_REQ		pStatusReq	= CVT_COMPTR_STATUS_REQ(pComAll);		// unused now
+	//PPXCOM_N2_STATUS_REQ	pStatusReq	= CVT_COMPTR_N2_STATUS_REQ(pComAll);	// unused now
+	*ppResComPkt						= NULL;
 
 	// Update self last status updating time 
 	if(!pImData->UpdateSelfLastStatusTime()){
@@ -7064,28 +7577,55 @@ bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 
 	// make response data
 	PCOMPKT	pResComPkt;
-	if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_RES, sizeof(CHMPXSVR) * count))){
-		ERR_CHMPRN("Could not allocation memory.");
-		CHM_Free(pchmpxsvrs);
-		return false;
+	if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_RES, sizeof(CHMPXSVR) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			CHM_Free(pchmpxsvrs);
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+		PPXCOM_N2_STATUS_RES	pStatusRes	= CVT_COMPTR_N2_STATUS_RES(pResComAll);
+		SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, (sizeof(CHMPXSVR) * count));	// switch chmpxid
+
+		pStatusRes->head.type			= CHMPX_COM_N2_STATUS_RES;
+		pStatusRes->head.result			= result;
+		pStatusRes->head.length			= sizeof(PXCOM_N2_STATUS_RES) + (sizeof(CHMPXSVR) * count);
+		pStatusRes->count				= count;
+		pStatusRes->pchmpxsvr_offset	= sizeof(PXCOM_N2_STATUS_RES);
+
+		unsigned char*	pbyres			= CHM_OFFSET(pStatusRes, sizeof(PXCOM_N2_STATUS_RES), unsigned char*);
+		if(pchmpxsvrs && 0 < count){
+			memcpy(pbyres, pchmpxsvrs, sizeof(CHMPXSVR) * count);
+		}
+	}else{
+		// old version
+		if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_RES, sizeof(CHMPXSVRV1) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			CHM_Free(pchmpxsvrs);
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+		PPXCOM_STATUS_RES	pStatusRes	= CVT_COMPTR_STATUS_RES(pResComAll);
+		SET_PXCOMPKT(pResComPkt, COM_VERSION_1, CHMPX_COM_STATUS_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, (sizeof(CHMPXSVRV1) * count));	// switch chmpxid
+
+		pStatusRes->head.type			= CHMPX_COM_STATUS_RES;
+		pStatusRes->head.result			= result;
+		pStatusRes->head.length			= sizeof(PXCOM_STATUS_RES) + (sizeof(CHMPXSVRV1) * count);
+		pStatusRes->count				= count;
+		pStatusRes->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_RES);
+
+		PCHMPXSVRV1	pchmpxsvrsv1		= CHM_OFFSET(pStatusRes, sizeof(PXCOM_STATUS_RES), PCHMPXSVRV1);
+		if(pchmpxsvrs && pchmpxsvrsv1 && 0 < count){
+			for(long pos = 0; pos < count; ++pos){
+				CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&pchmpxsvrsv1[pos], &pchmpxsvrs[pos]);
+			}
+		}
 	}
-
-	// compkt
-	PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
-	PPXCOM_STATUS_RES	pStatusRes	= CVT_COMPTR_STATUS_RES(pResComAll);
-	SET_PXCOMPKT(pResComPkt, CHMPX_COM_STATUS_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, (sizeof(CHMPXSVR) * count));	// switch chmpxid
-
-	pStatusRes->head.type			= CHMPX_COM_STATUS_RES;
-	pStatusRes->head.result			= result;
-	pStatusRes->head.length			= sizeof(PXCOM_STATUS_RES) + (sizeof(CHMPXSVR) * count);
-	pStatusRes->count				= count;
-	pStatusRes->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_RES);
-
-	unsigned char*	pbyres			= CHM_OFFSET(pStatusRes, sizeof(PXCOM_STATUS_RES), unsigned char*);
-	if(pchmpxsvrs && 0 < count){
-		memcpy(pbyres, pchmpxsvrs, sizeof(CHMPXSVR) * count);
-	}
-
 	CHM_Free(pchmpxsvrs);
 	*ppResComPkt = pResComPkt;
 
@@ -7102,34 +7642,70 @@ bool ChmEventSock::PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
-	PPXCOM_STATUS_RES	pStatusRes	= CVT_COMPTR_STATUS_RES(pComAll);
-	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
-	*ppResComPkt					= NULL;
+	ChmIMData*		pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t		selfchmpxid	= pImData->GetSelfChmpxId();
+	*ppResComPkt				= NULL;
 
 	if(pComHead->term_ids.chmpxid == selfchmpxid){
 		// To me
-		if(CHMPX_COM_RES_SUCCESS != pStatusRes->head.result){
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
+
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
 			// Something error occured by status response
-			ERR_CHMPRN("PXCOM_STATUS_RES is failed.");
+			ERR_CHMPRN("PXCOM_N2_STATUS_RES(or PXCOM_STATUS_RES) is failed.");
 			return false;
 		}
 
 		// Succeed status response
-		PCHMPXSVR	pchmpxsvrs	= CHM_OFFSET(pStatusRes, pStatusRes->pchmpxsvr_offset, PCHMPXSVR);
-		if(!pchmpxsvrs){
-			ERR_CHMPRN("There is no CHMPXSVR data in received PXCOM_STATUS_RES.");
-			return false;
+		PCHMPXSVR	pchmpxsvrs;
+		PCHMPXSVR	pchmpxsvrs_tmp = NULL;
+		long		count;
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_STATUS_RES	pStatusRes	= CVT_COMPTR_N2_STATUS_RES(pComAll);
+			pchmpxsvrs							= CHM_OFFSET(pStatusRes, pStatusRes->pchmpxsvr_offset, PCHMPXSVR);
+			if(!pchmpxsvrs){
+				ERR_CHMPRN("There is no CHMPXSVR data in received PXCOM_N2_STATUS_RES.");
+				return false;
+			}
+			count = pStatusRes->count;
+		}else{
+			// old version
+			PPXCOM_STATUS_RES		pStatusRes	= CVT_COMPTR_STATUS_RES(pComAll);
+			PCHMPXSVRV1				pchmpxsvrsv1= CHM_OFFSET(pStatusRes, pStatusRes->pchmpxsvr_offset, PCHMPXSVRV1);
+			if(!pchmpxsvrsv1){
+				ERR_CHMPRN("There is no CHMPXSVRV1 data in received PXCOM_STATUS_RES.");
+				return false;
+			}
+			count = pStatusRes->count;
+
+			if(0 < count){
+				// allocation for CHMPXSVR(current)
+				if(NULL == (pchmpxsvrs_tmp = reinterpret_cast<PCHMPXSVR>(calloc(count, sizeof(CHMPXSVR))))){
+					ERR_CHMPRN("Could not allocation memory.");
+					return false;
+				}
+				// convert to CHMPXSVR(current)
+				for(long pos = 0; pos < count; ++pos){
+					CVT_PCHMPXSVRV1_TO_PCHMPXSVR(&pchmpxsvrs_tmp[pos], &pchmpxsvrsv1[pos]);
+				}
+				// set pointer
+				pchmpxsvrs = pchmpxsvrs_tmp;
+			}
 		}
 
 		// bup status
 		chmpxsts_t	bupstatus = pImData->GetSelfStatus();
 
 		// Merge all status
-		if(!pImData->MergeChmpxSvrs(pchmpxsvrs, pStatusRes->count, true, is_init_process, eqfd)){	// remove server chmpx data if there is not in list
-			ERR_CHMPRN("Failed to merge server CHMPXLIST from CHMPXSVR list.");
-			return false;
+		if(0 < count){
+			if(!pImData->MergeChmpxSvrs(pchmpxsvrs, count, true, is_init_process, eqfd)){	// remove server chmpx data if there is not in list
+				ERR_CHMPRN("Failed to merge server CHMPXLIST from CHMPXSVR list.");
+				CHM_Free(pchmpxsvrs_tmp);
+				return false;
+			}
 		}
+		CHM_Free(pchmpxsvrs_tmp);
 
 		// If server mode, update hash values
 		if(is_server_mode){
@@ -7145,7 +7721,7 @@ bool ChmEventSock::PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 		}
 	}else{
 		// To other chmpxid
-		ERR_CHMPRN("Received PXCOM_STATUS_RES packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
+		ERR_CHMPRN("Received PXCOM_N2_STATUS_RES(or PXCOM_STATUS_RES) packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
 		return false;
 	}
 	return true;
@@ -7170,30 +7746,68 @@ bool ChmEventSock::PxComSendConinitReq(int sock, chmpxid_t chmpxid)
 	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// datas
-	chmpxid_t	selfchmpxid = pImData->GetSelfChmpxId();
-	short		port		= CHM_INVALID_PORT;
-	short		ctlport		= CHM_INVALID_PORT;
-	if(!pImData->GetSelfPorts(port, ctlport)){
-		ERR_CHMPRN("Could not get self ctlport.");
+	chmpxid_t		selfchmpxid = pImData->GetSelfChmpxId();
+	string			name;
+	short			ctlport		= CHM_INVALID_PORT;
+	string			cuk;
+	string			custom_seed;
+	hostport_list_t	endpoints;
+	hostport_list_t	ctlendpoints;
+	hostport_list_t	forward_peers;
+	hostport_list_t	reverse_peers;
+	if(!pImData->GetSelfBase(&name, NULL, &ctlport, &cuk, &custom_seed, &endpoints, &ctlendpoints, &forward_peers, &reverse_peers)){
+		ERR_CHMPRN("Could not get self chmpx information.");
 		return false;
 	}
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_CONINIT_REQ))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_CONINIT_REQ))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_CONINIT_REQ	pConinitReq	= CVT_COMPTR_N2_CONINIT_REQ(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_CONINIT_REQ, selfchmpxid, chmpxid, true, 0L);
+
+		pConinitReq->head.type		= CHMPX_COM_N2_CONINIT_REQ;
+		pConinitReq->head.result	= CHMPX_COM_RES_SUCCESS;
+		pConinitReq->head.length	= sizeof(PXCOM_N2_CONINIT_REQ);
+		pConinitReq->chmpxid		= selfchmpxid;
+		pConinitReq->ctlport		= ctlport;
+
+		memset(pConinitReq->name,			0,					NI_MAXHOST);
+		strncpy(pConinitReq->name,			name.c_str(),		NI_MAXHOST - 1);
+		memset(pConinitReq->cuk,			0,					CUK_MAX);
+		strncpy(pConinitReq->cuk,			cuk.c_str(),		CUK_MAX - 1);
+		memset(pConinitReq->custom_seed,	0,					CUSTOM_ID_SEED_MAX);
+		strncpy(pConinitReq->custom_seed,	custom_seed.c_str(),CUSTOM_ID_SEED_MAX - 1);
+
+		cvt_hostport_pairs(pConinitReq->endpoints,		endpoints,		EXTERNAL_EP_MAX);
+		cvt_hostport_pairs(pConinitReq->ctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX);
+		cvt_hostport_pairs(pConinitReq->forward_peers,	forward_peers,	FORWARD_PEER_MAX);
+		cvt_hostport_pairs(pConinitReq->reverse_peers,	reverse_peers,	REVERSE_PEER_MAX);
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_CONINIT_REQ))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_CONINIT_REQ, selfchmpxid, chmpxid, true, 0L);
+
+		pConinitReq->head.type		= CHMPX_COM_CONINIT_REQ;
+		pConinitReq->head.result	= CHMPX_COM_RES_SUCCESS;
+		pConinitReq->head.length	= sizeof(PXCOM_CONINIT_REQ);
+		pConinitReq->chmpxid		= selfchmpxid;
+		pConinitReq->ctlport		= ctlport;
 	}
-
-	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_CONINIT_REQ, selfchmpxid, chmpxid, true, 0L);
-
-	pConinitReq->head.type		= CHMPX_COM_CONINIT_REQ;
-	pConinitReq->head.result	= CHMPX_COM_RES_SUCCESS;
-	pConinitReq->head.length	= sizeof(PXCOM_CONINIT_REQ);
-	pConinitReq->chmpxid		= selfchmpxid;
-	pConinitReq->ctlport		= ctlport;
 
 	// Send request
 	if(!ChmEventSock::LockedSend(sock, GetSSL(sock), pComPkt)){		// as default nonblocking
@@ -7206,8 +7820,10 @@ bool ChmEventSock::PxComSendConinitReq(int sock, chmpxid_t chmpxid)
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, chmpxid_t& from_chmpxid, short& ctlport)
+bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& comver, string& name, chmpxid_t& from_chmpxid, short& ctlport, string& cuk, string& custom_seed, hostport_list_t& endpoints, hostport_list_t& ctlendpoints, hostport_list_t& forward_peers, hostport_list_t& reverse_peers)
 {
+	comver = COM_VERSION_2;
+
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
 		return false;
@@ -7217,18 +7833,56 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		return false;
 	}
 	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
-	PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
 
 	if(pComHead->term_ids.chmpxid == selfchmpxid){
 		// To me
-		from_chmpxid= pConinitReq->chmpxid;
-		ctlport		= pConinitReq->ctlport;
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
 
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
+			// Something error occured by status response
+			ERR_CHMPRN("PPXCOM_N2_CONINIT_REQ(or PPXCOM_CONINIT_REQ) is failed.");
+			return false;
+		}
+
+		// Succeed response
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			comver = COM_VERSION_2;
+
+			PPXCOM_N2_CONINIT_REQ	pConinitReq	= CVT_COMPTR_N2_CONINIT_REQ(pComAll);
+
+			name		= pConinitReq->name;
+			from_chmpxid= pConinitReq->chmpxid;
+			ctlport		= pConinitReq->ctlport;
+			cuk			= pConinitReq->cuk;
+			custom_seed	= pConinitReq->custom_seed;
+
+			rev_hostport_pairs(endpoints,		pConinitReq->endpoints,		EXTERNAL_EP_MAX);
+			rev_hostport_pairs(ctlendpoints,	pConinitReq->ctlendpoints,	EXTERNAL_EP_MAX);
+			rev_hostport_pairs(forward_peers,	pConinitReq->forward_peers,	FORWARD_PEER_MAX);
+			rev_hostport_pairs(reverse_peers,	pConinitReq->reverse_peers,	REVERSE_PEER_MAX);
+
+		}else{
+			// old version
+			comver = pComHead->version;
+
+			PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
+
+			name.clear();
+			from_chmpxid= pConinitReq->chmpxid;
+			ctlport		= pConinitReq->ctlport;
+			cuk.clear();
+			custom_seed.clear();
+			endpoints.clear();
+			ctlendpoints.clear();
+			forward_peers.clear();
+			reverse_peers.clear();
+		}
 	}else{
 		// To other chmpxid
-		ERR_CHMPRN("Received PPXCOM_CONINIT_REQ packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
+		ERR_CHMPRN("Received PPXCOM_N2_CONINIT_REQ(or PPXCOM_CONINIT_REQ) packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
 		return false;
 	}
 	return true;
@@ -7240,7 +7894,7 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 // [NOTE]
 // PPXCOM_CONINIT_RES does not select socket.(Do not use GetLockedSendSock method).
 //
-bool ChmEventSock::PxComSendConinitRes(int sock, chmpxid_t chmpxid, pxcomres_t result)
+bool ChmEventSock::PxComSendConinitRes(int sock, chmpxid_t chmpxid, comver_t comver, pxcomres_t result)
 {
 	if(CHM_INVALID_SOCK == sock || CHM_INVALID_CHMPXID == chmpxid){
 		ERR_CHMPRN("Parameters are wrong.");
@@ -7254,23 +7908,42 @@ bool ChmEventSock::PxComSendConinitRes(int sock, chmpxid_t chmpxid, pxcomres_t r
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_CONINIT_RES))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
+	if(IS_COM_CURRENT_VERSION(comver)){							// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_CONINIT_RES))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_CONINIT_RES	pConinitRes	= CVT_COMPTR_N2_CONINIT_RES(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_CONINIT_RES, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pConinitRes->head.type		= CHMPX_COM_N2_CONINIT_RES;
+		pConinitRes->head.result	= result;
+		pConinitRes->head.length	= sizeof(PXCOM_N2_CONINIT_RES);
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_CONINIT_RES))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_CONINIT_RES	pConinitRes	= CVT_COMPTR_CONINIT_RES(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_CONINIT_RES, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pConinitRes->head.type		= CHMPX_COM_CONINIT_RES;
+		pConinitRes->head.result	= result;
+		pConinitRes->head.length	= sizeof(PXCOM_CONINIT_RES);
 	}
-
-	// compkt
-	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_CONINIT_RES	pConinitRes	= CVT_COMPTR_CONINIT_RES(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_CONINIT_RES, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
-
-	pConinitRes->head.type		= CHMPX_COM_CONINIT_RES;
-	pConinitRes->head.result	= result;
-	pConinitRes->head.length	= sizeof(PXCOM_CONINIT_RES);
 
 	// Send request
 	if(!ChmEventSock::LockedSend(sock, GetSSL(sock), pComPkt)){		// as default nonblocking
-		ERR_CHMPRN("Failed to send CHMPX_COM_CONINIT_RES to sock(%d).", sock);
+		ERR_CHMPRN("Failed to send CHMPX_COM_N2_CONINIT_RES(or CHMPX_COM_CONINIT_RES) to sock(%d).", sock);
 		CHM_Free(pComPkt);
 		return false;
 	}
@@ -7290,14 +7963,27 @@ bool ChmEventSock::PxComReceiveConinitRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		return false;
 	}
 	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
-	PPXCOM_CONINIT_RES	pConinitRes	= CVT_COMPTR_CONINIT_RES(pComAll);
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
 
 	if(pComHead->term_ids.chmpxid == selfchmpxid){
 		// To me
-		result = pConinitRes->head.result;
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
 
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
+			// Something error occured by status response
+			ERR_CHMPRN("PPXCOM_N2_CONINIT_RES(or PPXCOM_CONINIT_RES) is failed.");
+		}
+
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_CONINIT_RES	pConinitRes	= CVT_COMPTR_N2_CONINIT_RES(pComAll);
+			result = pConinitRes->head.result;
+		}else{
+			// old version
+			PPXCOM_CONINIT_RES	pConinitRes	= CVT_COMPTR_CONINIT_RES(pComAll);
+			result = pConinitRes->head.result;
+		}
 	}else{
 		// To other chmpxid
 		ERR_CHMPRN("Received PPXCOM_CONINIT_RES packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
@@ -7320,20 +8006,40 @@ bool ChmEventSock::PxComSendJoinRing(chmpxid_t chmpxid, PCHMPXSVR pserver)
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_JOIN_RING))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_JOIN_RING))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_JOIN_RING	pJoinRing	= CVT_COMPTR_N2_JOIN_RING(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_JOIN_RING, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pJoinRing->head.type	= CHMPX_COM_N2_JOIN_RING;
+		pJoinRing->head.result	= CHMPX_COM_RES_SUCCESS;
+		pJoinRing->head.length	= sizeof(PXCOM_N2_JOIN_RING);
+		COPY_PCHMPXSVR(&(pJoinRing->server), pserver);
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_JOIN_RING))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_JOIN_RING	pJoinRing	= CVT_COMPTR_JOIN_RING(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_JOIN_RING, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pJoinRing->head.type	= CHMPX_COM_JOIN_RING;
+		pJoinRing->head.result	= CHMPX_COM_RES_SUCCESS;
+		pJoinRing->head.length	= sizeof(PXCOM_JOIN_RING);
+		CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&(pJoinRing->server), pserver);
 	}
-
-	// compkt
-	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_JOIN_RING	pJoinRing	= CVT_COMPTR_JOIN_RING(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_JOIN_RING, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
-
-	pJoinRing->head.type	= CHMPX_COM_JOIN_RING;
-	pJoinRing->head.result	= CHMPX_COM_RES_SUCCESS;
-	pJoinRing->head.length	= sizeof(PXCOM_JOIN_RING);
-	COPY_PCHMPXSVR(&(pJoinRing->server), pserver);
 
 	// Send request
 	if(!Send(pComPkt, NULL, 0L)){
@@ -7356,56 +8062,86 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
-	PPXCOM_JOIN_RING	pJoinRing	= CVT_COMPTR_JOIN_RING(pComAll);
-	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
-	*ppResComPkt					= NULL;
+	ChmIMData*		pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t		selfchmpxid	= pImData->GetSelfChmpxId();
+	*ppResComPkt				= NULL;
 
 	if(pComHead->dept_ids.chmpxid == selfchmpxid){
 		// around -> next step: update pending hash value
 		//
-		if(CHMPX_COM_RES_SUCCESS == pJoinRing->head.result){
-			// Succeed adding this server on RING
-			//
-			// Next step is update all server status.
-			//
-			chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
-			if(CHM_INVALID_CHMPXID == nextchmpxid){
-				ERR_CHMPRN("Could not get next server chmpxid, maybe there is no server on RING...But WHY?");
-				return true;
-			}
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
 
-			int	nextsock = CHM_INVALID_SOCK;
-			if(!GetLockedSendSock(nextchmpxid, nextsock, false) || CHM_INVALID_SOCK == nextsock){		// LOCK SOCKET
-				ERR_CHMPRN("Could not get socket for chmpxid(0x%016" PRIx64 ").", nextchmpxid);
-				return false;
-			}
-
-			// Send request
-			if(!PxComSendStatusReq(nextsock, nextchmpxid, true)){	// if error, need to close sock in method.
-				ERR_CHMPRN("Failed to send PXCOM_STATUS_REQ.");
-				UnlockSendSock(nextsock);			// UNLOCK SOCKET
-				return false;
-			}
-			UnlockSendSock(nextsock);				// UNLOCK SOCKET
-			return true;
-
-		}else{
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
 			// Failed adding this server on RING
 			//
 			// This function returns false, so caller gets it and close all connection.
 			// So that, this function do nothing.
 			//
-			ERR_CHMPRN("PXCOM_JOIN_RING is failed, hope to recover automatically.");
+			ERR_CHMPRN("PXCOM_N2_JOIN_RING(or PXCOM_JOIN_RING) is failed, hope to recover automatically.");
+			return false;
+
+		}
+
+		// Succeed adding this server on RING
+		//
+		// Next step is update all server status.
+		//
+		// [NOTE]
+		// PPXCOM_N2_JOIN_RING and PPXCOM_JOIN_RING are the same process.
+		//
+		chmpxid_t	nextchmpxid	= GetNextRingChmpxId();
+		if(CHM_INVALID_CHMPXID == nextchmpxid){
+			ERR_CHMPRN("Could not get next server chmpxid, maybe there is no server on RING...But WHY?");
+			return true;
+		}
+
+		int	nextsock = CHM_INVALID_SOCK;
+		if(!GetLockedSendSock(nextchmpxid, nextsock, false) || CHM_INVALID_SOCK == nextsock){		// LOCK SOCKET
+			ERR_CHMPRN("Could not get socket for chmpxid(0x%016" PRIx64 ").", nextchmpxid);
 			return false;
 		}
+
+		// Send request
+		if(!PxComSendStatusReq(nextsock, nextchmpxid, true)){	// if error, need to close sock in method.
+			ERR_CHMPRN("Failed to send PXCOM_STATUS_REQ.");
+			UnlockSendSock(nextsock);			// UNLOCK SOCKET
+			return false;
+		}
+		UnlockSendSock(nextsock);				// UNLOCK SOCKET
+
 	}else{
 		// update own chmshm & transfer packet.
 		//
 
+		CHMPXSVR	chmpxsvr_tmp;
+		PCHMPXSVR	pchmpxsvr;
+		pxcomres_t	ReceiveResultCode = CHMPX_COM_RES_SUCCESS;
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_JOIN_RING	pJoinRing	= CVT_COMPTR_N2_JOIN_RING(pComAll);
+			pchmpxsvr						= &(pJoinRing->server);
+
+			if(CHMPX_COM_RES_SUCCESS != pJoinRing->head.result){
+				MSG_CHMPRN("Already error occured before this server.");
+				ReceiveResultCode = CHMPX_COM_RES_ERROR;
+			}
+		}else{
+			// old version
+			PPXCOM_JOIN_RING	pJoinRing	= CVT_COMPTR_JOIN_RING(pComAll);
+			pchmpxsvr						= &chmpxsvr_tmp;
+
+			// convert CHMPXSVRV1 to CHMPXSVR
+			CVT_PCHMPXSVRV1_TO_PCHMPXSVR(pchmpxsvr, &(pJoinRing->server));
+
+			if(CHMPX_COM_RES_SUCCESS != pJoinRing->head.result){
+				MSG_CHMPRN("Already error occured before this server.");
+				ReceiveResultCode = CHMPX_COM_RES_ERROR;
+			}
+		}
+
 		// update chmshm
 		pxcomres_t	ResultCode;
-		if(!pImData->MergeChmpxSvrs(&(pJoinRing->server), 1, false, false, eqfd)){	// not remove other
+		if(!pImData->MergeChmpxSvrs(pchmpxsvr, 1, false, false, eqfd)){				// not remove other
 			// error occured, so transfer packet.
 			ERR_CHMPRN("Could not update server chmpx information.");
 			ResultCode = CHMPX_COM_RES_ERROR;
@@ -7413,21 +8149,21 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 			// succeed.
 			ResultCode = CHMPX_COM_RES_SUCCESS;
 		}
-		if(CHMPX_COM_RES_SUCCESS != pJoinRing->head.result){
+		if(CHMPX_COM_RES_SUCCESS != ReceiveResultCode){
 			MSG_CHMPRN("Already error occured before this server.");
 			ResultCode = CHMPX_COM_RES_ERROR;
 		}
 
 		// check & rechain
 		bool	is_rechain = false;
-		if(!CheckRechainRing(pJoinRing->server.chmpxid, is_rechain)){
+		if(!CheckRechainRing(pchmpxsvr->chmpxid, is_rechain)){
 			ERR_CHMPRN("Something error occured in rechaining RING, but continue...");
 			ResultCode = CHMPX_COM_RES_ERROR;
 		}else{
 			if(is_rechain){
-				MSG_CHMPRN("Rechained RING after joining chmpxid(0x%016" PRIx64 ").", pJoinRing->server.chmpxid);
+				MSG_CHMPRN("Rechained RING after joining chmpxid(0x%016" PRIx64 ").", pchmpxsvr->chmpxid);
 			}else{
-				MSG_CHMPRN("Not rechained RING after joining chmpxid(0x%016" PRIx64 ").", pJoinRing->server.chmpxid);
+				MSG_CHMPRN("Not rechained RING after joining chmpxid(0x%016" PRIx64 ").", pchmpxsvr->chmpxid);
 			}
 		}
 
@@ -7437,7 +8173,7 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 			// After rechaining, new server does not in server list.
 			// So get old next server by GetNextRingChmpxId(), force set new server chmpxid.
 			//
-			nextchmpxid = pJoinRing->server.chmpxid;
+			nextchmpxid = pchmpxsvr->chmpxid;
 		}else{
 			nextchmpxid	= GetNextRingChmpxId();
 		}
@@ -7460,24 +8196,46 @@ bool ChmEventSock::PxComReceiveJoinRing(PCOMHEAD pComHead, PPXCOM_ALL pComAll, P
 		}else{
 			// make response data buffer
 			PCOMPKT	pResComPkt;
-			if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_JOIN_RING))){
-				ERR_CHMPRN("Could not allocation memory.");
-				return false;
+			if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+				// current version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_JOIN_RING))){
+					ERR_CHMPRN("Could not allocation memory.");
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_N2_JOIN_RING	pResJoinRing= CVT_COMPTR_N2_JOIN_RING(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_N2_JOIN_RING, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// join_ring(copy)
+				pResJoinRing->head.type				= CHMPX_COM_N2_JOIN_RING;
+				pResJoinRing->head.result			= ResultCode;
+				pResJoinRing->head.length			= sizeof(PXCOM_N2_JOIN_RING);
+				COPY_PCHMPXSVR(&(pResJoinRing->server), pchmpxsvr);
+
+			}else{
+				// old version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_JOIN_RING))){
+					ERR_CHMPRN("Could not allocation memory.");
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_JOIN_RING	pResJoinRing= CVT_COMPTR_JOIN_RING(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_1, CHMPX_COM_JOIN_RING, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// join_ring(copy)
+				pResJoinRing->head.type				= CHMPX_COM_JOIN_RING;
+				pResJoinRing->head.result			= ResultCode;
+				pResJoinRing->head.length			= sizeof(PXCOM_JOIN_RING);
+				CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&(pResJoinRing->server), pchmpxsvr);
 			}
-
-			// compkt
-			PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
-			PPXCOM_JOIN_RING	pResJoinRing= CVT_COMPTR_JOIN_RING(pResComAll);
-
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_JOIN_RING, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
-			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
-
-			// join_ring(copy)
-			pResJoinRing->head.type				= pJoinRing->head.type;
-			pResJoinRing->head.result			= ResultCode;
-			pResJoinRing->head.length			= pJoinRing->head.length;
-			COPY_PCHMPXSVR(&(pResJoinRing->server), &(pJoinRing->server));
-
 			*ppResComPkt = pResComPkt;
 		}
 	}
@@ -7503,32 +8261,60 @@ bool ChmEventSock::PxComSendStatusUpdate(chmpxid_t chmpxid, PCHMPXSVR pchmpxsvrs
 
 	// make data
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_UPDATE, sizeof(CHMPXSVR) * count))){
-		ERR_CHMPRN("Could not allocation memory.");
-		return false;
-	}
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_UPDATE, sizeof(CHMPXSVR) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			return false;
+		}
 
-	// compkt
-	PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_STATUS_UPDATE	pStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_STATUS_UPDATE, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVR) * count));
+		// compkt
+		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_STATUS_UPDATE	pStsUpdate	= CVT_COMPTR_N2_STATUS_UPDATE(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_UPDATE, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVR) * count));
 
-	// status_update
-	pStsUpdate->head.type			= CHMPX_COM_STATUS_UPDATE;
-	pStsUpdate->head.result			= CHMPX_COM_RES_SUCCESS;
-	pStsUpdate->head.length			= sizeof(PXCOM_STATUS_UPDATE) + (sizeof(CHMPXSVR) * count);
-	pStsUpdate->count				= count;
-	pStsUpdate->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_UPDATE);
+		// status_update
+		pStsUpdate->head.type			= CHMPX_COM_N2_STATUS_UPDATE;
+		pStsUpdate->head.result			= CHMPX_COM_RES_SUCCESS;
+		pStsUpdate->head.length			= sizeof(PXCOM_N2_STATUS_UPDATE) + (sizeof(CHMPXSVR) * count);
+		pStsUpdate->count				= count;
+		pStsUpdate->pchmpxsvr_offset	= sizeof(PXCOM_N2_STATUS_UPDATE);
 
-	// extra area
-	PCHMPXSVR	pStsUpChmsvr = CHM_OFFSET(pStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVR);
-	for(long cnt = 0; cnt < count; cnt++){
-		COPY_PCHMPXSVR(&pStsUpChmsvr[cnt], &pchmpxsvrs[cnt]);
+		// extra area
+		PCHMPXSVR	pStsUpChmsvr = CHM_OFFSET(pStsUpdate, sizeof(PXCOM_N2_STATUS_UPDATE), PCHMPXSVR);
+		for(long cnt = 0; cnt < count; cnt++){
+			COPY_PCHMPXSVR(&pStsUpChmsvr[cnt], &pchmpxsvrs[cnt]);
+		}
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_UPDATE, sizeof(CHMPXSVRV1) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_STATUS_UPDATE	pStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_STATUS_UPDATE, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVRV1) * count));
+
+		// status_update
+		pStsUpdate->head.type			= CHMPX_COM_STATUS_UPDATE;
+		pStsUpdate->head.result			= CHMPX_COM_RES_SUCCESS;
+		pStsUpdate->head.length			= sizeof(PXCOM_STATUS_UPDATE) + (sizeof(CHMPXSVRV1) * count);
+		pStsUpdate->count				= count;
+		pStsUpdate->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_UPDATE);
+
+		// extra area
+		PCHMPXSVRV1	pStsUpChmsvr = CHM_OFFSET(pStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVRV1);
+		for(long cnt = 0; cnt < count; cnt++){
+			CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&pStsUpChmsvr[cnt], &pchmpxsvrs[cnt]);
+		}
 	}
 
 	// Send request
 	if(!Send(pComPkt, NULL, 0L)){
-		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_UPDATE to chmpxid(0x%016" PRIx64 ").", chmpxid);
+		ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_UPDATE(or CHMPX_COM_STATUS_UPDATE) to chmpxid(0x%016" PRIx64 ").", chmpxid);
 		CHM_Free(pComPkt);
 		return false;
 	}
@@ -7547,23 +8333,26 @@ bool ChmEventSock::PxComReceiveStatusUpdate(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
-	PPXCOM_STATUS_UPDATE	pReqStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pComAll);
-	PCHMPXSVR				pReqChmsvrs		= CHM_OFFSET(pReqStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVR);
-	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
-	*ppResComPkt							= NULL;
+	ChmIMData*		pImData			= pChmCntrl->GetImDataObj();
+	chmpxid_t		selfchmpxid		= pImData->GetSelfChmpxId();
+	*ppResComPkt					= NULL;
 
 	if(pComHead->dept_ids.chmpxid == selfchmpxid){
 		// around
 		//
-		if(CHMPX_COM_RES_SUCCESS == pReqStsUpdate->head.result){
-			// Succeed updating status
-			return true;
-		}else{
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
+
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
 			// Failed updating status, for recovering...
-			ERR_CHMPRN("PXCOM_STATUS_UPDATE is failed, NEED to check all servers and recover MANUALLY.");
+			ERR_CHMPRN("PXCOM_N2_STATUS_UPDATE(or PXCOM_STATUS_UPDATE) is failed, NEED to check all servers and recover MANUALLY.");
 			return false;
 		}
+
+		// Succeed updating status
+		//
+		// [NOTE]
+		// PXCOM_N2_STATUS_UPDATE and PXCOM_STATUS_UPDATE are the same process.
+		//
 
 	}else{
 		// update own chmshm & transfer packet.
@@ -7574,9 +8363,38 @@ bool ChmEventSock::PxComReceiveStatusUpdate(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			return false;
 		}
 
-		pxcomres_t	ResultCode		= pReqStsUpdate->head.result;
-		long		ResultCount		= pReqStsUpdate->count;
-		PCHMPXSVR	pResultChmsvrs	= pReqChmsvrs;
+		PCHMPXSVR	pResultChmsvrs		= NULL;
+		PCHMPXSVR	pResultChmsvrs_tmp	= NULL;						// [NOTICE] need to free
+		pxcomres_t	ResultCode;
+		long		ResultCount;
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_STATUS_UPDATE	pReqStsUpdate	= CVT_COMPTR_N2_STATUS_UPDATE(pComAll);
+			pResultChmsvrs							= CHM_OFFSET(pReqStsUpdate, sizeof(PXCOM_N2_STATUS_UPDATE), PCHMPXSVR);
+			ResultCode								= pReqStsUpdate->head.result;
+			ResultCount								= pReqStsUpdate->count;
+
+		}else{
+			// old version
+			PPXCOM_STATUS_UPDATE	pReqStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pComAll);
+			PCHMPXSVRV1				pReqChmsvrsv1	= CHM_OFFSET(pReqStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVRV1);
+			ResultCode								= pReqStsUpdate->head.result;
+			ResultCount								= pReqStsUpdate->count;
+
+			if(0 < ResultCount){
+				// allocation for CHMPXSVR(current)
+				if(NULL == (pResultChmsvrs_tmp = reinterpret_cast<PCHMPXSVR>(calloc(ResultCount, sizeof(CHMPXSVR))))){
+					ERR_CHMPRN("Could not allocation memory.");
+					return false;
+				}
+				// convert to CHMPXSVR(current)
+				for(long pos = 0; pos < ResultCount; ++pos){
+					CVT_PCHMPXSVRV1_TO_PCHMPXSVR(&pResultChmsvrs_tmp[pos], &pReqChmsvrsv1[pos]);
+				}
+				// set pointer
+				pResultChmsvrs = pResultChmsvrs_tmp;
+			}
+		}
 
 		// Already error occured, skip merging
 		if(CHMPX_COM_RES_SUCCESS != ResultCode){
@@ -7608,31 +8426,66 @@ bool ChmEventSock::PxComReceiveStatusUpdate(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 
 		}else{
 			// make response data buffer
-			if(NULL == ((*ppResComPkt) = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_UPDATE, sizeof(CHMPXSVR) * ResultCount))){
-				ERR_CHMPRN("Could not allocation memory.");
-				return false;
+			PCOMPKT	pResComPkt;
+			if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+				// current version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_UPDATE, sizeof(CHMPXSVR) * ResultCount))){
+					ERR_CHMPRN("Could not allocation memory.");
+					CHM_Free(pResultChmsvrs_tmp);
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_N2_STATUS_UPDATE	pResStsUpdate	= CVT_COMPTR_N2_STATUS_UPDATE(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_UPDATE, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVR) * ResultCount));	// dept chmpxid is not changed.
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// status_update(copy)
+				pResStsUpdate->head.type				= CHMPX_COM_N2_STATUS_UPDATE;
+				pResStsUpdate->head.result				= ResultCode;
+				pResStsUpdate->head.length				= sizeof(PXCOM_N2_STATUS_UPDATE) + (sizeof(CHMPXSVR) * ResultCount);
+				pResStsUpdate->count					= ResultCount;
+				pResStsUpdate->pchmpxsvr_offset			= sizeof(PXCOM_N2_STATUS_UPDATE);
+
+				// extra area
+				PCHMPXSVR	pResChmsvrs = CHM_OFFSET(pResStsUpdate, sizeof(PXCOM_N2_STATUS_UPDATE), PCHMPXSVR);
+				for(long cnt = 0; cnt < ResultCount; cnt++){
+					COPY_PCHMPXSVR(&pResChmsvrs[cnt], &pResultChmsvrs[cnt]);
+				}
+
+			}else{
+				// old version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_UPDATE, sizeof(CHMPXSVRV1) * ResultCount))){
+					ERR_CHMPRN("Could not allocation memory.");
+					CHM_Free(pResultChmsvrs_tmp);
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_STATUS_UPDATE	pResStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_1, CHMPX_COM_STATUS_UPDATE, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVRV1) * ResultCount));	// dept chmpxid is not changed.
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// status_update(copy)
+				pResStsUpdate->head.type				= CHMPX_COM_STATUS_UPDATE;
+				pResStsUpdate->head.result				= ResultCode;
+				pResStsUpdate->head.length				= sizeof(PXCOM_N2_STATUS_UPDATE) + (sizeof(CHMPXSVRV1) * ResultCount);
+				pResStsUpdate->count					= ResultCount;
+				pResStsUpdate->pchmpxsvr_offset			= sizeof(PXCOM_STATUS_UPDATE);
+
+				// extra area
+				PCHMPXSVRV1	pResChmsvrsv1 = CHM_OFFSET(pResStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVRV1);
+				for(long cnt = 0; cnt < ResultCount; cnt++){
+					CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&pResChmsvrsv1[cnt], &pResultChmsvrs[cnt]);
+				}
 			}
-
-			// compkt
-			PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(*ppResComPkt);
-			PPXCOM_STATUS_UPDATE	pResStsUpdate	= CVT_COMPTR_STATUS_UPDATE(pResComAll);
-
-			SET_PXCOMPKT((*ppResComPkt), CHMPX_COM_STATUS_UPDATE, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVR) * ResultCount));	// dept chmpxid is not changed.
-			COPY_TIMESPEC(&((*ppResComPkt)->head.reqtime), &(pComHead->reqtime));	// not change
-
-			// status_update(copy)
-			pResStsUpdate->head.type				= pReqStsUpdate->head.type;
-			pResStsUpdate->head.result				= ResultCode;
-			pResStsUpdate->head.length				= pReqStsUpdate->head.length;
-			pResStsUpdate->count					= ResultCount;
-			pResStsUpdate->pchmpxsvr_offset			= sizeof(PXCOM_STATUS_UPDATE);
-
-			// extra area
-			PCHMPXSVR	pResChmsvrs = CHM_OFFSET(pResStsUpdate, sizeof(PXCOM_STATUS_UPDATE), PCHMPXSVR);
-			for(long cnt = 0; cnt < ResultCount; cnt++){
-				COPY_PCHMPXSVR(&pResChmsvrs[cnt], &pResultChmsvrs[cnt]);
-			}
+			*ppResComPkt = pResComPkt;
 		}
+		CHM_Free(pResultChmsvrs_tmp);
 	}
 	return true;
 }
@@ -7651,32 +8504,60 @@ bool ChmEventSock::PxComSendStatusConfirm(chmpxid_t chmpxid, PCHMPXSVR pchmpxsvr
 
 	// make data
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CONFIRM, sizeof(CHMPXSVR) * count))){
-		ERR_CHMPRN("Could not allocation memory.");
-		return false;
-	}
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_CONFIRM, sizeof(CHMPXSVR) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			return false;
+		}
 
-	// compkt
-	PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_STATUS_CONFIRM	pStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_STATUS_CONFIRM, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVR) * count));
+		// compkt
+		PPXCOM_ALL					pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_STATUS_CONFIRM	pStsConfirm	= CVT_COMPTR_N2_STATUS_CONFIRM(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_CONFIRM, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVR) * count));
 
-	// status_update
-	pStsConfirm->head.type			= CHMPX_COM_STATUS_CONFIRM;
-	pStsConfirm->head.result		= CHMPX_COM_RES_SUCCESS;
-	pStsConfirm->head.length		= sizeof(PXCOM_STATUS_CONFIRM) + (sizeof(CHMPXSVR) * count);
-	pStsConfirm->count				= count;
-	pStsConfirm->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_CONFIRM);
+		// status_update
+		pStsConfirm->head.type			= CHMPX_COM_N2_STATUS_CONFIRM;
+		pStsConfirm->head.result		= CHMPX_COM_RES_SUCCESS;
+		pStsConfirm->head.length		= sizeof(PXCOM_N2_STATUS_CONFIRM) + (sizeof(CHMPXSVR) * count);
+		pStsConfirm->count				= count;
+		pStsConfirm->pchmpxsvr_offset	= sizeof(PXCOM_N2_STATUS_CONFIRM);
 
-	// extra area
-	PCHMPXSVR	pStsChmsvr = CHM_OFFSET(pStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVR);
-	for(long cnt = 0; cnt < count; cnt++){
-		COPY_PCHMPXSVR(&pStsChmsvr[cnt], &pchmpxsvrs[cnt]);
+		// extra area
+		PCHMPXSVR	pStsChmsvr = CHM_OFFSET(pStsConfirm, sizeof(PXCOM_N2_STATUS_CONFIRM), PCHMPXSVR);
+		for(long cnt = 0; cnt < count; cnt++){
+			COPY_PCHMPXSVR(&pStsChmsvr[cnt], &pchmpxsvrs[cnt]);
+		}
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CONFIRM, sizeof(CHMPXSVRV1) * count))){
+			ERR_CHMPRN("Could not allocation memory.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_STATUS_CONFIRM	pStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_STATUS_CONFIRM, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(CHMPXSVRV1) * count));
+
+		// status_update
+		pStsConfirm->head.type			= CHMPX_COM_STATUS_CONFIRM;
+		pStsConfirm->head.result		= CHMPX_COM_RES_SUCCESS;
+		pStsConfirm->head.length		= sizeof(PXCOM_STATUS_CONFIRM) + (sizeof(CHMPXSVRV1) * count);
+		pStsConfirm->count				= count;
+		pStsConfirm->pchmpxsvr_offset	= sizeof(PXCOM_STATUS_CONFIRM);
+
+		// extra area
+		PCHMPXSVRV1	pStsChmsvrv1 = CHM_OFFSET(pStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVRV1);
+		for(long cnt = 0; cnt < count; cnt++){
+			CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&pStsChmsvrv1[cnt], &pchmpxsvrs[cnt]);
+		}
 	}
 
 	// Send request
 	if(!Send(pComPkt, NULL, 0L)){
-		ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CONFIRM to chmpxid(0x%016" PRIx64 ").", chmpxid);
+		ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_CONFIRM(or CHMPX_COM_STATUS_CONFIRM) to chmpxid(0x%016" PRIx64 ").", chmpxid);
 		CHM_Free(pComPkt);
 		return false;
 	}
@@ -7695,11 +8576,9 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
-	PPXCOM_STATUS_CONFIRM	pReqStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pComAll);
-	PCHMPXSVR				pReqChmsvrs		= CHM_OFFSET(pReqStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVR);
-	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
-	*ppResComPkt							= NULL;
+	ChmIMData*		pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t		selfchmpxid	= pImData->GetSelfChmpxId();
+	*ppResComPkt				= NULL;
 
 	if(pComHead->dept_ids.chmpxid == selfchmpxid){
 		// around
@@ -7709,7 +8588,10 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			ERR_CHMPRN("Could not get next server chmpxid.");
 			return false;
 		}
-		if(CHMPX_COM_RES_SUCCESS == pReqStsConfirm->head.result){
+
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
+
+		if(CHMPX_COM_RES_SUCCESS == pPxComHead->result){
 			// Succeed status confirm, do next step
 			//
 
@@ -7727,12 +8609,13 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 
 		}else{
 			// Failed status confirm, Thus retry to send status confirm
-			ERR_CHMPRN("PXCOM_STATUS_CONFIRM is failed, thus update self status and retry send status confirm.");
+			WAN_CHMPRN("PXCOM_N2_STATUS_CONFIRM(or PXCOM_STATUS_CONFIRM) is failed, thus update self status and retry send status confirm.");
 
 			// Update self last status updating time for retrying
 			if(!pImData->UpdateSelfLastStatusTime()){
 				ERR_CHMPRN("Could not update own updating status time, but continue...");
 			}
+
 			CHMPXSVR	chmpxsvr;
 			if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
 				ERR_CHMPRN("Could not get self chmpx information.");
@@ -7758,7 +8641,6 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			CHM_Free(pchmpxsvrs);
 
 			// Not start to merge, but retry to get confirm
-			return true;
 		}
 
 	}else{
@@ -7770,7 +8652,38 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			return false;
 		}
 
-		pxcomres_t	ResultCode = pReqStsConfirm->head.result;
+		PCHMPXSVR	pReqChmsvrs		= NULL;
+		PCHMPXSVR	pReqChmsvrs_tmp	= NULL;							// [NOTICE] need to free
+		pxcomres_t	ResultCode;
+		long		ResultCount;
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_STATUS_CONFIRM	pReqStsConfirm	= CVT_COMPTR_N2_STATUS_CONFIRM(pComAll);
+			pReqChmsvrs									= CHM_OFFSET(pReqStsConfirm, sizeof(PXCOM_N2_STATUS_CONFIRM), PCHMPXSVR);
+			ResultCode									= pReqStsConfirm->head.result;
+			ResultCount									= pReqStsConfirm->count;
+
+		}else{
+			// old version
+			PPXCOM_STATUS_CONFIRM	pReqStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pComAll);
+			PCHMPXSVRV1				pReqChmsvrsv1	= CHM_OFFSET(pReqStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVRV1);
+			ResultCode								= pReqStsConfirm->head.result;
+			ResultCount								= pReqStsConfirm->count;
+
+			if(0 < ResultCount){
+				// allocation for CHMPXSVR(current)
+				if(NULL == (pReqChmsvrs_tmp = reinterpret_cast<PCHMPXSVR>(calloc(ResultCount, sizeof(CHMPXSVR))))){
+					ERR_CHMPRN("Could not allocation memory.");
+					return false;
+				}
+				// convert to CHMPXSVR(current)
+				for(long pos = 0; pos < ResultCount; ++pos){
+					CVT_PCHMPXSVRV1_TO_PCHMPXSVR(&pReqChmsvrs_tmp[pos], &pReqChmsvrsv1[pos]);
+				}
+				// set pointer
+				pReqChmsvrs = pReqChmsvrs_tmp;
+			}
+		}
 
 		// Already error occured, skip merging
 		if(CHMPX_COM_RES_SUCCESS != ResultCode){
@@ -7778,8 +8691,8 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			ResultCode = CHMPX_COM_RES_ERROR;
 		}else{
 			// Compare
-			if(!pImData->CompareChmpxSvrs(pReqChmsvrs, pReqStsConfirm->count)){
-				MSG_CHMPRN("Status(%ld count status) could not confirm.", pReqStsConfirm->count);
+			if(!pImData->CompareChmpxSvrs(pReqChmsvrs, ResultCount)){
+				MSG_CHMPRN("Status(%ld count status) could not confirm.", ResultCount);
 				ResultCode = CHMPX_COM_RES_ERROR;
 			}else{
 				ResultCode = CHMPX_COM_RES_SUCCESS;
@@ -7799,31 +8712,66 @@ bool ChmEventSock::PxComReceiveStatusConfirm(PCOMHEAD pComHead, PPXCOM_ALL pComA
 
 		}else{
 			// make response data buffer
-			if(NULL == ((*ppResComPkt) = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CONFIRM, sizeof(CHMPXSVR) * pReqStsConfirm->count))){
-				ERR_CHMPRN("Could not allocation memory.");
-				return false;
+			PCOMPKT	pResComPkt;
+			if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+				// current version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_CONFIRM, sizeof(CHMPXSVR) * ResultCount))){
+					ERR_CHMPRN("Could not allocation memory.");
+					CHM_Free(pReqChmsvrs_tmp);
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL					pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_N2_STATUS_CONFIRM	pResStsConfirm	= CVT_COMPTR_N2_STATUS_CONFIRM(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_CONFIRM, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVR) * ResultCount));	// dept chmpxid is not changed.
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// status_confirm(copy)
+				pResStsConfirm->head.type				= CHMPX_COM_N2_STATUS_CONFIRM;
+				pResStsConfirm->head.result				= ResultCode;
+				pResStsConfirm->head.length				= sizeof(PXCOM_N2_STATUS_CONFIRM) + (sizeof(CHMPXSVR) * ResultCount);
+				pResStsConfirm->count					= ResultCount;
+				pResStsConfirm->pchmpxsvr_offset		= sizeof(PXCOM_N2_STATUS_CONFIRM);
+
+				// extra area
+				PCHMPXSVR	pResChmsvrs = CHM_OFFSET(pResStsConfirm, sizeof(PXCOM_N2_STATUS_CONFIRM), PCHMPXSVR);
+				for(long cnt = 0; cnt < ResultCount; cnt++){
+					COPY_PCHMPXSVR(&pResChmsvrs[cnt], &pReqChmsvrs[cnt]);
+				}
+
+			}else{
+				// old version
+				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CONFIRM, sizeof(CHMPXSVRV1) * ResultCount))){
+					ERR_CHMPRN("Could not allocation memory.");
+					CHM_Free(pReqChmsvrs_tmp);
+					return false;
+				}
+
+				// compkt
+				PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_STATUS_CONFIRM	pResStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pResComAll);
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_1, CHMPX_COM_STATUS_CONFIRM, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVRV1) * ResultCount));	// dept chmpxid is not changed.
+				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+				// status_confirm(copy)
+				pResStsConfirm->head.type				= CHMPX_COM_STATUS_CONFIRM;
+				pResStsConfirm->head.result				= ResultCode;
+				pResStsConfirm->head.length				= sizeof(PXCOM_N2_STATUS_CONFIRM) + (sizeof(CHMPXSVRV1) * ResultCount);
+				pResStsConfirm->count					= ResultCount;
+				pResStsConfirm->pchmpxsvr_offset		= sizeof(PXCOM_STATUS_CONFIRM);
+
+				// extra area
+				PCHMPXSVRV1	pResChmsvrsv1 = CHM_OFFSET(pResStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVRV1);
+				for(long cnt = 0; cnt < ResultCount; cnt++){
+					CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&pResChmsvrsv1[cnt], &pReqChmsvrs[cnt]);
+				}
 			}
-
-			// compkt
-			PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(*ppResComPkt);
-			PPXCOM_STATUS_CONFIRM	pResStsConfirm	= CVT_COMPTR_STATUS_CONFIRM(pResComAll);
-
-			SET_PXCOMPKT((*ppResComPkt), CHMPX_COM_STATUS_CONFIRM, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(CHMPXSVR) * pReqStsConfirm->count));	// dept chmpxid is not changed.
-			COPY_TIMESPEC(&((*ppResComPkt)->head.reqtime), &(pComHead->reqtime));	// not change
-
-			// status_update(copy)
-			pResStsConfirm->head.type				= pReqStsConfirm->head.type;
-			pResStsConfirm->head.result				= ResultCode;
-			pResStsConfirm->head.length				= pReqStsConfirm->head.length;
-			pResStsConfirm->count					= pReqStsConfirm->count;
-			pResStsConfirm->pchmpxsvr_offset		= sizeof(PXCOM_STATUS_CONFIRM);
-
-			// extra area
-			PCHMPXSVR	pResChmsvrs = CHM_OFFSET(pResStsConfirm, sizeof(PXCOM_STATUS_CONFIRM), PCHMPXSVR);
-			for(long cnt = 0; cnt < pReqStsConfirm->count; cnt++){
-				COPY_PCHMPXSVR(&pResChmsvrs[cnt], &pReqChmsvrs[cnt]);
-			}
+			*ppResComPkt = pResComPkt;
 		}
+		CHM_Free(pReqChmsvrs_tmp);
 	}
 	return true;
 }
@@ -7845,20 +8793,40 @@ bool ChmEventSock::PxComSendStatusChange(chmpxid_t chmpxid, PCHMPXSVR pserver, b
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_CHANGE))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_N2_STATUS_CHANGE(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_CHANGE, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pStatusChange->head.type	= CHMPX_COM_N2_STATUS_CHANGE;
+		pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
+		pStatusChange->head.length	= sizeof(PXCOM_N2_STATUS_CHANGE);
+		COPY_PCHMPXSVR(&(pStatusChange->server), pserver);
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
+		SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_STATUS_CHANGE, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+		pStatusChange->head.type	= CHMPX_COM_STATUS_CHANGE;
+		pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
+		pStatusChange->head.length	= sizeof(PXCOM_STATUS_CHANGE);
+		CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&(pStatusChange->server), pserver);
 	}
-
-	// compkt
-	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_STATUS_CHANGE, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
-
-	pStatusChange->head.type	= CHMPX_COM_STATUS_CHANGE;
-	pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
-	pStatusChange->head.length	= sizeof(PXCOM_STATUS_CHANGE);
-	COPY_PCHMPXSVR(&(pStatusChange->server), pserver);
 
 	// Send request
 	if(!Send(pComPkt, NULL, 0L)){
@@ -7870,7 +8838,7 @@ bool ChmEventSock::PxComSendStatusChange(chmpxid_t chmpxid, PCHMPXSVR pserver, b
 	// send to slaves
 	if(is_send_slaves){
 		if(!PxComSendSlavesStatusChange(pserver)){
-			ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CHANGE to slaves.");
+			ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_CHANGE(or CHMPX_COM_STATUS_CHANGE) to slaves.");
 		}
 	}
 	CHM_Free(pComPkt);
@@ -7903,36 +8871,74 @@ bool ChmEventSock::PxComSendSlavesStatusChange(PCHMPXSVR pserver)
 
 	// Make packet
 	PCOMPKT	pComPkt;
-	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
-		ERR_CHMPRN("Could not allocate memory for COMPKT.");
-		return false;
-	}
-
-	// compkt
-	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
-	PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
-
-	// loop: send to slaves
-	for(chmpxidlist_t::const_iterator iter = chmpxidlist.begin(); iter != chmpxidlist.end(); ++iter){
-		// Slave chmpxid list has server mode chmpxid.
-		// Because the server connects other server for RING as SLAVE.
-		// Then if server chmpxid, skip it.
-		//
-		if(pImData->IsServerChmpxId(*iter)){
-			continue;
+	if(IS_COM_CURRENT_VERSION(comproto_ver)){					// check communication protocol version(backward compatibility)
+		// current version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_CHANGE))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
 		}
 
-		// set status change struct data
-		SET_PXCOMPKT(pComPkt, CHMPX_COM_STATUS_CHANGE, selfchmpxid, (*iter), true, 0L);
+		// compkt
+		PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_N2_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_N2_STATUS_CHANGE(pComAll);
 
-		pStatusChange->head.type	= CHMPX_COM_STATUS_CHANGE;
-		pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
-		pStatusChange->head.length	= sizeof(PXCOM_STATUS_CHANGE);
-		COPY_PCHMPXSVR(&(pStatusChange->server), pserver);
+		// loop: send to slaves
+		for(chmpxidlist_t::const_iterator iter = chmpxidlist.begin(); iter != chmpxidlist.end(); ++iter){
+			// Slave chmpxid list has server mode chmpxid.
+			// Because the server connects other server for RING as SLAVE.
+			// Then if server chmpxid, skip it.
+			//
+			if(pImData->IsServerChmpxId(*iter)){
+				continue;
+			}
 
-		// send
-		if(!Send(pComPkt, NULL, 0L)){
-			ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CHANGE to slave chmpxid(0x%016" PRIx64 "), but continue...", *iter);
+			// set status change struct data
+			SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_CHANGE, selfchmpxid, (*iter), true, 0L);
+
+			pStatusChange->head.type	= CHMPX_COM_N2_STATUS_CHANGE;
+			pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
+			pStatusChange->head.length	= sizeof(PXCOM_N2_STATUS_CHANGE);
+			COPY_PCHMPXSVR(&(pStatusChange->server), pserver);
+
+			// send
+			if(!Send(pComPkt, NULL, 0L)){
+				ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_CHANGE to slave chmpxid(0x%016" PRIx64 "), but continue...", *iter);
+			}
+		}
+
+	}else{
+		// old version
+		if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
+			ERR_CHMPRN("Could not allocate memory for COMPKT.");
+			return false;
+		}
+
+		// compkt
+		PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+		PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
+
+		// loop: send to slaves
+		for(chmpxidlist_t::const_iterator iter = chmpxidlist.begin(); iter != chmpxidlist.end(); ++iter){
+			// Slave chmpxid list has server mode chmpxid.
+			// Because the server connects other server for RING as SLAVE.
+			// Then if server chmpxid, skip it.
+			//
+			if(pImData->IsServerChmpxId(*iter)){
+				continue;
+			}
+
+			// set status change struct data
+			SET_PXCOMPKT(pComPkt, COM_VERSION_1, CHMPX_COM_STATUS_CHANGE, selfchmpxid, (*iter), true, 0L);
+
+			pStatusChange->head.type	= CHMPX_COM_STATUS_CHANGE;
+			pStatusChange->head.result	= CHMPX_COM_RES_SUCCESS;
+			pStatusChange->head.length	= sizeof(PXCOM_STATUS_CHANGE);
+			CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&(pStatusChange->server), pserver);
+
+			// send
+			if(!Send(pComPkt, NULL, 0L)){
+				ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CHANGE to slave chmpxid(0x%016" PRIx64 "), but continue...", *iter);
+			}
 		}
 	}
 	CHM_Free(pComPkt);
@@ -7950,29 +8956,122 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
-	PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
-	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
-	*ppResComPkt							= NULL;
+	ChmIMData*		pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t		selfchmpxid	= pImData->GetSelfChmpxId();
+	*ppResComPkt				= NULL;
 
 	if(pComHead->dept_ids.chmpxid == selfchmpxid){
 		// around
 		//
-		if(CHMPX_COM_RES_SUCCESS == pStatusChange->head.result){
-			// Succeed change status
-			MSG_CHMPRN("PXCOM_STATUS_CHANGE is around the RING with success.");
-		}else{
+		PPXCOM_HEAD	pPxComHead = CVT_COMPTR_HEAD(pComAll);
+
+		bool	result	= true;
+		bool	is_retry= false;
+		if(CHMPX_COM_RES_SUCCESS != pPxComHead->result){
 			// Failed change status
-			ERR_CHMPRN("PXCOM_STATUS_CHANGE is failed, hope to recover automatic");
+			WAN_CHMPRN("PXCOM_N2_STATUS_CHANGE(or PXCOM_STATUS_CHANGE) is failed, try to recover status");
+			result	= false;
+			is_retry= true;
+		}else{
+			// Succeed change status
+			MSG_CHMPRN("PXCOM_N2_STATUS_CHANGE(or PXCOM_STATUS_CHANGE) is around the RING with success.");
+
+			// get chmpx data in packet
+			CHMPXSVR	tgchmpxsvr_tmp;
+			PCHMPXSVR	ptgchmpxsvr;
+			if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+				// current version
+				PPXCOM_N2_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_N2_STATUS_CHANGE(pComAll);
+				ptgchmpxsvr								= &(pStatusChange->server);
+			}else{
+				// old version
+				PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
+				ptgchmpxsvr								= &tgchmpxsvr_tmp;
+
+				// convert CHMPXSVRV1 to CHMPXSVR
+				CVT_PCHMPXSVRV1_TO_PCHMPXSVR(ptgchmpxsvr, &(pStatusChange->server));
+			}
+
+			// check chmpxid in packet is own
+			if(selfchmpxid == ptgchmpxsvr->chmpxid){
+				// check for processing to auto merge "done"
+				if(	IS_CHMPXSTS_SRVIN(ptgchmpxsvr->status)	&&
+					IS_CHMPXSTS_UP(ptgchmpxsvr->status)		&&
+					IS_CHMPXSTS_DONE(ptgchmpxsvr->status)	&&
+					IS_CHMPXSTS_NOSUP(ptgchmpxsvr->status)	&&
+					IsAutoMerge()							&&
+					is_merge_done_processing				)		// set in ChmEventSock::MergeDone()
+				{
+					MSG_CHMPRN("Start to merge complete automatically.");
+
+					if(!RequestMergeComplete()){
+						ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, hope to recover automatic or DO COMPMERGE BY MANUAL!");
+						if(is_merge_done_processing){
+							is_retry = true;
+						}
+					}
+				}
+			}
+		}
+
+		if(is_retry){
+			// Update self last status updating time
+			if(!pImData->UpdateSelfLastStatusTime()){
+				ERR_CHMPRN("Could not update own updating status time, but continue...");
+			}
+			chmpxid_t	nextchmpxid = GetNextRingChmpxId();
+			CHMPXSVR	selfchmpxsvr;
+			if(!pImData->GetSelfChmpxSvr(&selfchmpxsvr)){
+				ERR_CHMPRN("Could not get self chmpx information for retry updating status, then could not recover...");
+			}else{
+				if(CHM_INVALID_CHMPXID == nextchmpxid){
+					// no server found, finish doing so pending hash updated self.
+					if(!PxComSendSlavesStatusChange(&selfchmpxsvr)){
+						ERR_CHMPRN("Failed to send self status change to slaves, then could not recover...");
+					}
+				}else{
+					if(!PxComSendStatusChange(nextchmpxid, &selfchmpxsvr)){
+						ERR_CHMPRN("Failed to send self status change, then could not recover...");
+					}
+				}
+			}
+		}
+		if(!result){
 			return false;
 		}
+
 	}else{
 		// update own chmshm & transfer packet.
 		//
+		CHMPXSVR	chmpxsvr_tmp;
+		PCHMPXSVR	pchmpxsvr;
+		pxcomres_t	ReceiveResultCode = CHMPX_COM_RES_SUCCESS;
+		if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+			// current version
+			PPXCOM_N2_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_N2_STATUS_CHANGE(pComAll);
+			pchmpxsvr								= &(pStatusChange->server);
+
+			if(CHMPX_COM_RES_SUCCESS != pStatusChange->head.result){
+				MSG_CHMPRN("Already error occured before this server.");
+				ReceiveResultCode = CHMPX_COM_RES_ERROR;
+			}
+		}else{
+			// old version
+			PPXCOM_STATUS_CHANGE	pStatusChange	= CVT_COMPTR_STATUS_CHANGE(pComAll);
+			pchmpxsvr								= &chmpxsvr_tmp;
+
+			// convert CHMPXSVRV1 to CHMPXSVR
+			CVT_PCHMPXSVRV1_TO_PCHMPXSVR(pchmpxsvr, &(pStatusChange->server));
+
+			if(CHMPX_COM_RES_SUCCESS != pStatusChange->head.result){
+				MSG_CHMPRN("Already error occured before this server.");
+				ReceiveResultCode = CHMPX_COM_RES_ERROR;
+			}
+		}
 
 		// update chmshm
 		pxcomres_t	ResultCode;
-		if(!pImData->MergeChmpxSvrs(&(pStatusChange->server), 1, false, false, eqfd)){	// not remove other
+		if(!pImData->MergeChmpxSvrs(pchmpxsvr, 1, false, false, eqfd)){	// not remove other
 			// error occured, so transfer packet.
 			ERR_CHMPRN("Could not update server chmpx information.");
 			ResultCode = CHMPX_COM_RES_ERROR;
@@ -7980,33 +9079,33 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			// succeed.
 			ResultCode = CHMPX_COM_RES_SUCCESS;
 		}
-		if(CHMPX_COM_RES_SUCCESS != pStatusChange->head.result){
+		if(CHMPX_COM_RES_SUCCESS != ReceiveResultCode){
 			MSG_CHMPRN("Already error occured before this server.");
 			ResultCode = CHMPX_COM_RES_ERROR;
 		}
 
 		// [NOTICE]
-		// This STATUS_CHANGE is only received by Slave and Server.
+		// This N2_STATUS_CHANGE(or STATUS_CHANGE) is only received by Slave and Server.
 		// If server mode, transfer packet to RING, if slave mode, do not transfer it.
 		//
 		if(is_server_mode){
 			// always, new updated status to send to slaves
 			//
-			if(!PxComSendSlavesStatusChange(&(pStatusChange->server))){
-				ERR_CHMPRN("Failed to send CHMPX_COM_STATUS_CHANGE to slaves, but continue...");
+			if(!PxComSendSlavesStatusChange(pchmpxsvr)){
+				ERR_CHMPRN("Failed to send CHMPX_COM_N2_STATUS_CHANGE(or CHMPX_COM_STATUS_CHANGE) to slaves, but continue...");
 			}
 
 			// check & rechain
 			//
 			bool	is_rechain = false;
-			if(!CheckRechainRing(pStatusChange->server.chmpxid, is_rechain)){
+			if(!CheckRechainRing(pchmpxsvr->chmpxid, is_rechain)){
 				ERR_CHMPRN("Something error occured in rechaining RING, but continue...");
 				ResultCode = CHMPX_COM_RES_ERROR;
 			}else{
 				if(is_rechain){
-					MSG_CHMPRN("Rechained RING after joining chmpxid(0x%016" PRIx64 ").", pStatusChange->server.chmpxid);
+					MSG_CHMPRN("Rechained RING after joining chmpxid(0x%016" PRIx64 ").", pchmpxsvr->chmpxid);
 				}else{
-					MSG_CHMPRN("Not rechained RING after joining chmpxid(0x%016" PRIx64 ").", pStatusChange->server.chmpxid);
+					MSG_CHMPRN("Not rechained RING after joining chmpxid(0x%016" PRIx64 ").", pchmpxsvr->chmpxid);
 				}
 			}
 
@@ -8031,24 +9130,46 @@ bool ChmEventSock::PxComReceiveStatusChange(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			}else{
 				// make response data buffer
 				PCOMPKT	pResComPkt;
-				if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
-					ERR_CHMPRN("Could not allocation memory.");
-					return false;
+				if(IS_COM_CURRENT_VERSION(pComHead->version)){				// check communication protocol version(backward compatibility)
+					// current version
+					if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_N2_STATUS_CHANGE))){
+						ERR_CHMPRN("Could not allocation memory.");
+						return false;
+					}
+
+					// compkt
+					PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+					PPXCOM_N2_STATUS_CHANGE	pResStatusChange= CVT_COMPTR_N2_STATUS_CHANGE(pResComAll);
+
+					SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_CHANGE, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
+					COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+					// change_status(copy)
+					pResStatusChange->head.type			= CHMPX_COM_N2_STATUS_CHANGE;
+					pResStatusChange->head.result		= ResultCode;
+					pResStatusChange->head.length		= sizeof(PXCOM_N2_STATUS_CHANGE);
+					COPY_PCHMPXSVR(&(pResStatusChange->server), pchmpxsvr);
+
+				}else{
+					// old version
+					if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_STATUS_CHANGE))){
+						ERR_CHMPRN("Could not allocation memory.");
+						return false;
+					}
+
+					// compkt
+					PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+					PPXCOM_STATUS_CHANGE	pResStatusChange= CVT_COMPTR_STATUS_CHANGE(pResComAll);
+
+					SET_PXCOMPKT(pResComPkt, COM_VERSION_1, CHMPX_COM_STATUS_CHANGE, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
+					COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
+
+					// change_status(copy)
+					pResStatusChange->head.type			= CHMPX_COM_STATUS_CHANGE;
+					pResStatusChange->head.result		= ResultCode;
+					pResStatusChange->head.length		= sizeof(PXCOM_STATUS_CHANGE);
+					CVT_PCHMPXSVR_TO_PCHMPXSVRV1(&(pResStatusChange->server), pchmpxsvr);
 				}
-
-				// compkt
-				PPXCOM_ALL				pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
-				PPXCOM_STATUS_CHANGE	pResStatusChange= CVT_COMPTR_STATUS_CHANGE(pResComAll);
-
-				SET_PXCOMPKT(pResComPkt, CHMPX_COM_STATUS_CHANGE, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed
-				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
-
-				// change_status(copy)
-				pResStatusChange->head.type			= pStatusChange->head.type;
-				pResStatusChange->head.result		= ResultCode;
-				pResStatusChange->head.length		= pStatusChange->head.length;
-				COPY_PCHMPXSVR(&(pResStatusChange->server), &(pStatusChange->server));
-
 				*ppResComPkt = pResComPkt;
 			}
 		}
@@ -8078,7 +9199,7 @@ bool ChmEventSock::PxComSendMergeStart(chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_START	pMergeStart	= CVT_COMPTR_MERGE_START(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_START, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_START, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeStart->head.type		= CHMPX_COM_MERGE_START;
 	pMergeStart->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8184,7 +9305,7 @@ bool ChmEventSock::PxComReceiveMergeStart(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 			PPXCOM_ALL			pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 			PPXCOM_MERGE_START	pResMergeStart	= CVT_COMPTR_MERGE_START(pResComAll);
 
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_START, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_START, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 			// merge_start(copy)
@@ -8224,7 +9345,7 @@ bool ChmEventSock::PxComSendMergeAbort(chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_ABORT	pMergeAbort	= CVT_COMPTR_MERGE_ABORT(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_ABORT, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_ABORT, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeAbort->head.type		= CHMPX_COM_MERGE_ABORT;
 	pMergeAbort->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8261,7 +9382,7 @@ bool ChmEventSock::PxComReceiveMergeAbort(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		//
 		if(CHMPX_COM_RES_SUCCESS == pMergeAbort->head.result){
 			// Succeed
-			MSG_CHMPRN("PXCOM_MERGE_ABORT is succeed, All server start to merge.");
+			MSG_CHMPRN("PXCOM_MERGE_ABORT is succeed, All server abort to merge.");
 		}else{
 			// Something error occured on RING.
 			ERR_CHMPRN("PXCOM_MERGE_ABORT is failed, could not recover, but returns true.");
@@ -8299,7 +9420,7 @@ bool ChmEventSock::PxComReceiveMergeAbort(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 			PPXCOM_ALL			pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 			PPXCOM_MERGE_ABORT	pResMergeAbort	= CVT_COMPTR_MERGE_ABORT(pResComAll);
 
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_ABORT, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_ABORT, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 			// merge_start(copy)
@@ -8339,7 +9460,7 @@ bool ChmEventSock::PxComSendMergeComplete(chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_COMPLETE	pMergeComplete	= CVT_COMPTR_MERGE_COMPLETE(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_COMPLETE, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_COMPLETE, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeComplete->head.type	= CHMPX_COM_MERGE_COMPLETE;
 	pMergeComplete->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8413,7 +9534,7 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			}
 		}else{
 			// Something error occured on RING.
-			WAN_CHMPRN("PXCOM_MERGE_COMPLETE is failed, maybe other servers are merging now, thus returns true.");
+			WAN_CHMPRN("PXCOM_MERGE_COMPLETE is failed, maybe other servers are merging now, thus returns true for retry.");
 			return true;
 		}
 	}else{
@@ -8448,7 +9569,7 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			PPXCOM_ALL				pResComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 			PPXCOM_MERGE_COMPLETE	pResMergeComplete	= CVT_COMPTR_MERGE_COMPLETE(pResComAll);
 
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_COMPLETE, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_COMPLETE, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 			// merge_start(copy)
@@ -8535,7 +9656,7 @@ bool ChmEventSock::PxComSendMergeSuspend(chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_SUSPEND	pMergeSuspend	= CVT_COMPTR_MERGE_SUSPEND(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_SUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_SUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeSuspend->head.type	= CHMPX_COM_MERGE_SUSPEND;
 	pMergeSuspend->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8610,7 +9731,7 @@ bool ChmEventSock::PxComReceiveMergeSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 			PPXCOM_ALL				pResComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 			PPXCOM_MERGE_SUSPEND	pResMergeSuspend	= CVT_COMPTR_MERGE_SUSPEND(pResComAll);
 
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_SUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_SUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 			// merge_start(copy)
@@ -8659,7 +9780,7 @@ bool ChmEventSock::PxComSendMergeNoSuspend(chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_NOSUSPEND	pMergeNoSuspend	= CVT_COMPTR_MERGE_NOSUSPEND(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_NOSUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_NOSUSPEND, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeNoSuspend->head.type		= CHMPX_COM_MERGE_NOSUSPEND;
 	pMergeNoSuspend->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8734,7 +9855,7 @@ bool ChmEventSock::PxComReceiveMergeNoSuspend(PCOMHEAD pComHead, PPXCOM_ALL pCom
 			PPXCOM_ALL				pResComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 			PPXCOM_MERGE_NOSUSPEND	pResMergeNoSuspend	= CVT_COMPTR_MERGE_NOSUSPEND(pResComAll);
 
-			SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_NOSUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+			SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_NOSUSPEND, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 			COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 			// merge_start(copy)
@@ -8781,7 +9902,7 @@ bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
 	// compkt
 	PPXCOM_ALL					pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_MERGE_SUSPEND_GET	pMergeSuspendGet= CVT_COMPTR_MERGE_SUSPEND_GET(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_MERGE_SUSPEND_GET, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_MERGE_SUSPEND_GET, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pMergeSuspendGet->head.type		= CHMPX_COM_MERGE_SUSPEND_GET;
 	pMergeSuspendGet->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8828,7 +9949,7 @@ bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, PPXCOM_ALL pCo
 	// compkt
 	PPXCOM_ALL					pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 	PPXCOM_MERGE_SUSPEND_RES	pMergeSuspendRes= CVT_COMPTR_MERGE_SUSPEND_RES(pResComAll);
-	SET_PXCOMPKT(pResComPkt, CHMPX_COM_MERGE_SUSPEND_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, 0);		// switch chmpxid
+	SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_MERGE_SUSPEND_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, 0);	// switch chmpxid
 
 	pMergeSuspendRes->head.type		= CHMPX_COM_MERGE_SUSPEND_RES;
 	pMergeSuspendRes->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -8900,7 +10021,7 @@ bool ChmEventSock::PxComSendServerDown(chmpxid_t chmpxid, chmpxid_t downchmpxid)
 	// compkt
 	PPXCOM_ALL			pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_SERVER_DOWN	pServerDown	= CVT_COMPTR_SERVER_DOWN(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_SERVER_DOWN, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_SERVER_DOWN, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 	pServerDown->head.type		= CHMPX_COM_SERVER_DOWN;
 	pServerDown->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -9021,7 +10142,7 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 				PPXCOM_ALL			pResComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 				PPXCOM_SERVER_DOWN	pResServerDown	= CVT_COMPTR_SERVER_DOWN(pResComAll);
 
-				SET_PXCOMPKT(pResComPkt, CHMPX_COM_SERVER_DOWN, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_SERVER_DOWN, pComHead->dept_ids.chmpxid, nextchmpxid, false, 0L);	// dept chmpxid is not changed.
 				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 				// server_down(copy)
@@ -9149,8 +10270,7 @@ bool ChmEventSock::PxComSendReqUpdateData(chmpxid_t chmpxid, const PPXCOMMON_MER
 	// compkt
 	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_REQ_UPDATEDATA	pReqUpdateData	= CVT_COMPTR_REQ_UPDATEDATA(pComAll);
-
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_REQ_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(PXCOM_REQ_IDMAP) * mergeidmap.size()));
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_REQ_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, (sizeof(PXCOM_REQ_IDMAP) * mergeidmap.size()));
 
 	pReqUpdateData->head.type			= CHMPX_COM_REQ_UPDATEDATA;
 	pReqUpdateData->head.result			= CHMPX_COM_RES_SUCCESS;
@@ -9254,7 +10374,8 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 				// compkt(copy)
 				PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
 				PPXCOM_REQ_UPDATEDATA	pResUpdateData	= CVT_COMPTR_REQ_UPDATEDATA(pComAll);
-				SET_PXCOMPKT(pResComPkt, CHMPX_COM_REQ_UPDATEDATA, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(PXCOM_REQ_IDMAP) * pReqUpdateData->count));	// dept chmpxid is not changed.
+
+				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_REQ_UPDATEDATA, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(PXCOM_REQ_IDMAP) * pReqUpdateData->count));	// dept chmpxid is not changed.
 				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change
 
 				pResUpdateData->head.type			= CHMPX_COM_REQ_UPDATEDATA;
@@ -9341,8 +10462,7 @@ bool ChmEventSock::PxComSendResUpdateData(chmpxid_t chmpxid, size_t length, cons
 	// compkt
 	PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_RES_UPDATEDATA	pResUpdateData	= CVT_COMPTR_RES_UPDATEDATA(pComAll);
-
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_RES_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, length);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_RES_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, length);
 
 	pResUpdateData->head.type		= CHMPX_COM_RES_UPDATEDATA;
 	pResUpdateData->head.result		= CHMPX_COM_RES_SUCCESS;
@@ -9412,7 +10532,7 @@ bool ChmEventSock::PxComSendResultUpdateData(chmpxid_t chmpxid, reqidmapflag_t r
 	// compkt
 	PPXCOM_ALL					pComAll				= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 	PPXCOM_RESULT_UPDATEDATA	pResultUpdateData	= CVT_COMPTR_RESULT_UPDATEDATA(pComAll);
-	SET_PXCOMPKT(pComPkt, CHMPX_COM_RESULT_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, 0);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_RESULT_UPDATEDATA, pImData->GetSelfChmpxId(), chmpxid, true, 0);
 
 	pResultUpdateData->head.type	= CHMPX_COM_RESULT_UPDATEDATA;
 	pResultUpdateData->head.result	= CHMPX_COM_RES_SUCCESS;
@@ -9465,6 +10585,174 @@ bool ChmEventSock::PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pC
 	mergeidmap[pResultUpdateData->chmpxid] = pResultUpdateData->result;
 
 	fullock::flck_unlock_noshared_mutex(&mergeidmap_lockval);			// UNLOCK
+	return true;
+}
+
+//
+// PxComSendVersionReq uses sock directly.
+//
+// [NOTE]
+// If you need to lock the socket, you must lock it before calling this method.
+//
+bool ChmEventSock::PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_sock_close)
+{
+	if(CHM_INVALID_SOCK == sock || CHM_INVALID_CHMPXID == chmpxid){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+
+	// Make packet
+	PCOMPKT	pComPkt;
+	if(NULL == (pComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_VERSION_REQ))){
+		ERR_CHMPRN("Could not allocate memory for COMPKT.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+	PPXCOM_VERSION_REQ		pVersionReq	= CVT_COMPTR_VERSION_REQ(pComAll);
+	SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_VERSION_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
+
+	pVersionReq->head.type		= CHMPX_COM_VERSION_REQ;
+	pVersionReq->head.result	= CHMPX_COM_RES_SUCCESS;
+	pVersionReq->head.length	= sizeof(PXCOM_VERSION_REQ);
+
+	// Send request
+	//
+	// [NOTE]
+	// Should lock the socket in caller if you need.
+	//
+	bool	is_closed = false;
+	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pComPkt, is_closed, false, sock_retry_count, sock_wait_time)){		// as default nonblocking
+		ERR_CHMPRN("Failed to send CHMPX_COM_VERSION_REQ to sock(%d).", sock);
+
+		// [NOTE]
+		// When this method is called from InitialAllServerVersion(), the sock is not mapped.
+		// Then we close sock when need_sock_close is true.
+		//
+		if(need_sock_close && is_closed){
+			if(!RawNotifyHup(sock)){
+				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
+			}
+		}
+		CHM_Free(pComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
+
+	return true;
+}
+
+// [NOTE]
+// CHMPX_COM_VERSION_REQ can only be accepted from a socket that is being accepted.
+// Therefore, instead of processing in the reception main loop, CHMPX_COM_VERSION_RES is
+// returned directly in this method.
+//
+bool ChmEventSock::PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, PPXCOM_ALL pComAll)
+{
+	if(CHM_INVALID_SOCK == sock || !pComHead || !pComAll){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*				pImData		= pChmCntrl->GetImDataObj();
+	//PPXCOM_VERSION_REQ	pVersionReq	= CVT_COMPTR_VERSION_REQ(pComAll);	// unused now
+
+	// Update self last status updating time 
+	if(!pImData->UpdateSelfLastStatusTime()){
+		ERR_CHMPRN("Could not update own updating status time, but continue...");
+	}
+
+	// get version information
+	uint64_t	chmpx_com_version	= COM_VERSION_2;
+	uint64_t	chmpx_cur_version	= IS_COM_CURRENT_VERSION(comproto_ver) ? COM_VERSION_2 : COM_VERSION_1;
+	uint64_t	chmpx_bin_version	= chmpx_get_bin_version();
+	string		chmpx_str_version	= chmpx_get_raw_version(false);
+	string		commit_hash			= chmpx_get_raw_version(true);
+
+	// make response data
+	PCOMPKT	pResComPkt;
+	if(NULL == (pResComPkt = ChmEventSock::AllocatePxComPacket(CHMPX_COM_VERSION_RES))){
+		ERR_CHMPRN("Could not allocation memory.");
+		return false;
+	}
+
+	// compkt
+	PPXCOM_ALL			pResComAll	= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+	PPXCOM_VERSION_RES	pVersionRes	= CVT_COMPTR_VERSION_RES(pResComAll);
+	SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_VERSION_RES, pComHead->term_ids.chmpxid, pComHead->dept_ids.chmpxid, true, 0L);	// switch chmpxid
+
+	pVersionRes->head.type			= CHMPX_COM_VERSION_RES;
+	pVersionRes->head.result		= CHMPX_COM_RES_SUCCESS;					// always success
+	pVersionRes->head.length		= sizeof(PXCOM_VERSION_RES);
+	pVersionRes->chmpx_com_version	= chmpx_com_version;
+	pVersionRes->chmpx_cur_version	= chmpx_cur_version;
+	pVersionRes->chmpx_bin_version	= chmpx_bin_version;
+	memset(pVersionRes->chmpx_str_version,	0,							CHMPX_VERSION_MAX);
+	strncpy(pVersionRes->chmpx_str_version,	chmpx_str_version.c_str(),	CHMPX_VERSION_MAX - 1);
+	memset(pVersionRes->commit_hash,		0,							COMMIT_HASH_MAX);
+	strncpy(pVersionRes->commit_hash,		commit_hash.c_str(),		COMMIT_HASH_MAX - 1);
+
+	// Send request
+	if(!ChmEventSock::LockedSend(sock, GetSSL(sock), pResComPkt)){				// as default nonblocking
+		ERR_CHMPRN("Failed to send CHMPX_COM_VERSION_RES to sock(%d).", sock);
+		CHM_Free(pResComPkt);
+		return false;
+	}
+	CHM_Free(pResComPkt);
+
+	return true;
+}
+
+bool ChmEventSock::PxComReceiveVersionRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& com_proto_version)
+{
+	if(!pComHead || !pComAll || !ppResComPkt){
+		ERR_CHMPRN("Parameter are wrong.");
+		return false;
+	}
+	if(IsEmpty()){
+		ERR_CHMPRN("Object is not initialized.");
+		return false;
+	}
+	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
+	PPXCOM_VERSION_RES	pVersionRes	= CVT_COMPTR_VERSION_RES(pComAll);
+	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
+	*ppResComPkt					= NULL;
+
+	if(pComHead->term_ids.chmpxid == selfchmpxid){
+		// To me
+		if(CHMPX_COM_RES_SUCCESS != pVersionRes->head.result){
+			// Something error occured by status response
+			ERR_CHMPRN("PXCOM_VERSION_RES is failed, probably responser does not have CHMPX communication version, it measn CHMPX older than v1.0.71");
+			com_proto_version = COM_VERSION_1;
+			return true;
+		}
+		// Succeed version response
+
+		// set communication protocol version
+		com_proto_version = pVersionRes->chmpx_com_version;
+		if(pVersionRes->chmpx_cur_version < com_proto_version){
+			com_proto_version = pVersionRes->chmpx_cur_version;
+			if(COM_VERSION_2 < com_proto_version){
+				com_proto_version = COM_VERSION_2;
+			}
+		}
+
+		// for messages
+		MSG_CHMPRN("PXCOM_VERSION_RES succeed : CHMPX version %s(0x%016" PRIx64 ") : commit(%s) - Communication protocol version 0x%016" PRIx64 ".", pVersionRes->chmpx_str_version, pVersionRes->chmpx_bin_version, pVersionRes->commit_hash, pVersionRes->chmpx_com_version);
+	}else{
+		// To other chmpxid
+		ERR_CHMPRN("Received PXCOM_VERSION_RES packet, but terminal chmpxid(0x%016" PRIx64 ") is not self chmpxid(0x%016" PRIx64 ").", pComHead->term_ids.chmpxid, selfchmpxid);
+		return false;
+	}
 	return true;
 }
 

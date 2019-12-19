@@ -54,6 +54,7 @@ using namespace	std;
 #define	OPT_CTLPORT				"CTLPORT"
 #define	OPT_CTLPORT2			"CNTLPORT"
 #define	OPT_CTLPORT3			"CNTRLPORT"
+#define	OPT_CUK					"CUK"
 #define	OPT_DBG					"D"
 #define	OPT_DBG2				"G"
 #define	OPT_DBGFILEPATH			"DFILE"
@@ -108,13 +109,14 @@ static void SigUsr1handler(int signum)
 static bool PrintUsage(const char* prgname)
 {
 	cout << "[Usage]" << endl;
-	cout << (prgname ? prgname : "prgname") << " [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]" << endl;
+	cout << (prgname ? prgname : "prgname") << " [-conf <file> | -json <json>] [-ctlport <port>] [-cuk <cuk>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]" << endl;
 	cout << (prgname ? prgname : "prgname") << " [ -h | -v ]" << endl;
 	cout << endl;
 	cout << "[option]" << endl;
 	cout << "  -conf <path>         specify the configuration file(.ini .yaml .json) path" << endl;
 	cout << "  -json <json string>  specify the configuration json string" << endl;
 	cout << "  -ctlport <port>      specify the self control port(*)" << endl;
+	cout << "  -cuk <cuk>           specify the self CUK string" << endl;
 	cout << "  -d <param>           specify the debugging output mode:" << endl;
 	cout << "                        silent - no output" << endl;
 	cout << "                        err    - output error level" << endl;
@@ -198,6 +200,13 @@ int main(int argc, char** argv)
 		}
 	}
 
+	// parameter - cuk
+	const char*	selfcuk = NULL;
+	string		strselfcuk;
+	if(opts.Get(OPT_CUK, strselfcuk)){
+		selfcuk = strselfcuk.c_str();
+	}
+
 	// parameter - debug
 	bool		is_dbgopt	= false;
 	ChmDbgMode	dbgmode		= CHMDBG_SILENT;
@@ -262,7 +271,7 @@ int main(int argc, char** argv)
 
 	// Initialize
 	ChmCntrl	chmobj;
-	if(!chmobj.InitializeOnChmpx(config.c_str(), ctlport)){
+	if(!chmobj.InitializeOnChmpx(config.c_str(), ctlport, selfcuk)){
 		cout << "ERROR: Could not initialize process." << endl;
 		cout << "You can see detail about error, execute with \"-d\" option." << endl;
 		exit(EXIT_FAILURE);

@@ -518,6 +518,39 @@ const char* chmpx_get_version(void)
 	return stc_version;
 }
 
+const char* chmpx_get_raw_version(bool is_commit_hash)
+{
+	if(is_commit_hash){
+		return chmpx_commit_hash;
+	}else{
+		return VERSION;
+	}
+}
+
+// [NOTE]
+// This function converts a version string (period-delimited decimal string) to 64-bit binary.
+// For conversion, the decimal number of each part is digitized and converted into 64-bit
+// binary in 16-bit units. In other words, the version string is in the range of '0' to 
+// '65535.65535.65535.65535'.
+//
+uint64_t chmpx_get_bin_version(void)
+{
+	static uint64_t	stc_bin_version	= 0;
+	static bool		stc_init		= false;
+
+	if(!stc_init){
+		strlst_t	strverarr;
+		if(str_split(VERSION, strverarr, '.', true)){
+			for(strlst_t::const_iterator iter = strverarr.begin(); strverarr.end() != iter; ++iter){
+				stc_bin_version	*= 0x10000;										// shift 16bit
+				stc_bin_version	+= cvt_string_to_number(iter->c_str(), true);	// decimal
+			}
+		}
+		stc_init = true;
+	}
+	return stc_bin_version;
+}
+
 //---------------------------------------------------------
 // Key Value Pair Utilities
 //---------------------------------------------------------

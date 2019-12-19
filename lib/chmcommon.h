@@ -54,7 +54,7 @@
 // Templates & macros
 //---------------------------------------------------------
 #if defined(__cplusplus)
-template<typename T> inline bool CHMEMPTYSTR(const T& pstr)
+template<typename T> inline bool CHMEMPTYSTR(const T pstr)
 {
 	return (NULL == (pstr) || '\0' == *(pstr)) ? true : false;
 }
@@ -81,6 +81,14 @@ template<typename T> inline bool CHMEMPTYSTR(const T& pstr)
 #define	CHM_INVALID_SOCK			(-1)
 #define	CHM_INVALID_TID				0
 #define	CHM_MAX_PATH_LEN			1024
+#define	CHMPX_VERSION_MAX			32
+#define	COMMIT_HASH_MAX				32
+#define	CUK_MAX						2048						// the CUK value is usually around 512 bytes, thus 2Kbytes is the upper limit with a margin.
+#define	CUSTOM_ID_SEED_MAX			2048						// 2Kbytes maximum.
+#define	EXTERNAL_EP_MAX				4							// can set 4 external endpoints
+#define	GATEWAY_PEER_MAX			4							// can set 4 gateways
+#define	FORWARD_PEER_MAX			(GATEWAY_PEER_MAX)
+#define	REVERSE_PEER_MAX			(GATEWAY_PEER_MAX)
 
 #if defined(__cplusplus)
 #define	CHM_INVALID_CHMPXHANDLE		static_cast<uint64_t>(CHM_INVALID_HANDLE)

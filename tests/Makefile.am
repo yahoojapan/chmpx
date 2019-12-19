@@ -47,7 +47,17 @@ AM_CPPFLAGS		= $(k2hash_CFLAGS) $(fullock_CFLAGS) -I../lib
 
 TESTS = test.sh
 
-EXTRA_DIST = test.sh test_server.ini test_slave.ini test_slave.yaml test_server.yaml test_server.json test_slave.json test_json_string.data chmpxnssutil.sh
+EXTRA_DIST =	test.sh \
+				chmpxnssutil.sh \
+				cfg_test_server.ini \
+				cfg_test_server.json \
+				cfg_test_server.result \
+				cfg_test_server.yaml \
+				cfg_test_slave.ini \
+				cfg_test_slave.json \
+				cfg_test_slave.result \
+				cfg_test_slave.yaml \
+				cfg_test_json_string.data
 
 #
 # VIM modelines

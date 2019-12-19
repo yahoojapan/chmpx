@@ -69,7 +69,6 @@ class ChmIMData
 		int					eqfd;			// backup
 		bool				isChmpxProc;	// CHMPX process or Client library
 		pid_t				ChmpxPid;		// backup chmpx pid for checking process down on slave
-		hnamesslmap_t		hnamesslmap;	// Cache for hostname:ctlport mapping(using for checking existed host:port).
 
 	protected:
 		static bool MakeFilePath(const char* groupname, short port, MKFPMODE mode, std::string& shmpath);
@@ -80,7 +79,7 @@ class ChmIMData
 		off_t GetLockOffsetForMQ(void) const;
 		bool CloseShm(void);
 		bool InitializeShm(void);
-		bool InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself);
+		bool InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO* pself, const char* pnormalizedname);
 		bool IsAttachedShm(void) const { return (NULL != pChmShm); }
 		bool AttachShm(void);													// For client process library
 		bool InitializeOther(void);
@@ -104,7 +103,7 @@ class ChmIMData
 		bool WriteLockClientPidList(FLRwlRcsv& lockobj) const { return RawLockClientPidList(lockobj, false); }
 
 		// Do not call these method, must call SetSlaveAll
-		bool SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl);
+		bool SetSlaveBase(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t& endpoints, const hostport_list_t& ctlendpoints, const hostport_list_t& forward_peers, const hostport_list_t& reverse_peers, const PCHMPXSSL pssl);
 		bool SetSlaveSock(chmpxid_t chmpxid, int sock);
 		bool SetSlaveStatus(chmpxid_t chmpxid, chmpxsts_t status);
 
@@ -193,7 +192,7 @@ class ChmIMData
 		long GetUpServerCount(void) const;
 		chmpxpos_t GetSelfServerPos(void) const;
 		chmpxpos_t GetNextServerPos(chmpxpos_t startpos, chmpxpos_t nowpos, bool is_skip_self, bool is_cycle) const;
-		bool GetNextServerBase(std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
+		bool GetNextServerBase(std::string* pname, chmpxid_t* pchmpxid, short* pport, short* pctlport, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
 		chmpxid_t GetNextServerChmpxId(void) const;
 		chmpxid_t GetNextRingChmpxId(chmpxid_t chmpxid = CHM_INVALID_CHMPXID) const;
 
@@ -202,7 +201,7 @@ class ChmIMData
 		chmpxid_t GetChmpxIdBySock(int sock, int type = CLOSETG_BOTH) const;
 		chmpxid_t GetChmpxIdByToServerSock(int sock) const { return GetChmpxIdBySock(sock, CLOSETG_SERVERS); }
 		chmpxid_t GetChmpxIdByFromSlaveSock(int sock) const { return GetChmpxIdBySock(sock, CLOSETG_SLAVES); }
-		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport) const;
+		chmpxid_t GetChmpxIdByToServerName(const char* hostname, short ctlport, const char* cuk, const char* ctlendpoints, const char* custom_seed) const;
 		chmpxid_t GetChmpxIdByStatus(chmpxsts_t status, bool part_match = false) const;
 		chmpxid_t GetRandomServerChmpxId(bool without_suspend = false);
 		chmpxid_t GetServerChmpxIdByHash(chmhash_t hash) const;
@@ -211,8 +210,8 @@ class ChmIMData
 		long GetServerChmpxIdByBaseHash(chmhash_t basehash, chmpxidlist_t& chmpxids) const;
 		long GetServerChmpxIdForMerge(chmpxidlist_t& list) const;
 		long GetServerChmpxIds(chmpxidlist_t& list) const;
-		bool GetServerBase(long pos, std::string& name, chmpxid_t& chmpxid, short& port, short& ctlport) const;
-		bool GetServerBase(chmpxid_t chmpxid, std::string& name, short& port, short& ctlport) const;
+		bool GetServerBase(long pos, std::string* pname = NULL, chmpxid_t* pchmpxid = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
+		bool GetServerBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL) const;
 		bool GetServerBase(chmpxid_t chmpxid, CHMPXSSL& ssl) const;
 		bool GetServerSocks(chmpxid_t chmpxid, socklist_t& socklist, int& ctlsock) const;
 		bool GetServerSock(chmpxid_t chmpxid, socklist_t& socklist) const { int tmp; return GetServerSocks(chmpxid, socklist, tmp); }
@@ -235,8 +234,9 @@ class ChmIMData
 		bool GetSelfPendingHash(chmhash_t& hash) const { chmhash_t tmp; return GetSelfHash(tmp, hash); }
 		chmpxsts_t GetSelfStatus(void) const;
 		bool GetSelfSsl(CHMPXSSL& ssl) const;
+		bool GetSelfBase(std::string* pname = NULL, short* pport = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		long GetSlaveChmpxIds(chmpxidlist_t& list) const;
-		bool GetSlaveBase(chmpxid_t chmpxid, std::string& name, short& ctlport) const;
+		bool GetSlaveBase(chmpxid_t chmpxid, std::string* pname = NULL, short* pctlport = NULL, std::string* pcuk = NULL, std::string* pcustom_seed = NULL, hostport_list_t* pendpoints = NULL, hostport_list_t* pctlendpoints = NULL, hostport_list_t* pforward_peers = NULL, hostport_list_t* preverse_peers = NULL) const;
 		bool GetSlaveSock(chmpxid_t chmpxid, socklist_t& socklist) const;
 		bool IsConnectSlave(chmpxid_t chmpxid) const { socklist_t tmplist; return (GetSlaveSock(chmpxid, tmplist) && !tmplist.empty()); }
 		chmpxsts_t GetSlaveStatus(chmpxid_t chmpxid) const;
@@ -255,7 +255,7 @@ class ChmIMData
 		bool SetSelfBaseHash(chmhash_t hash) { return SetSelfHash(hash, 0L, HASHTG_BASE); }
 		bool SetSelfPendingHash(chmhash_t hash) { return SetSelfHash(0L, hash, HASHTG_PENDING); }
 		bool SetSelfStatus(chmpxsts_t status);
-		bool SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlport, const PCHMPXSSL pssl, int sock, chmpxsts_t status);
+		bool SetSlaveAll(chmpxid_t chmpxid, const char* hostname, short ctlport, const char* cuk, const char* custom_seed, const hostport_list_t* pendpoints, const hostport_list_t* pctlendpoints, const hostport_list_t* pforward_peers, const hostport_list_t* preverse_peers, const PCHMPXSSL pssl, int sock, chmpxsts_t status);
 		bool RemoveSlaveSock(chmpxid_t chmpxid, int sock);
 		bool CheckSockInAllChmpx(int sock) const;
 
@@ -279,7 +279,9 @@ class ChmIMData
 		bool IsNeedDetach(void) const;
 
 		// Others
-		bool IsAllowHostname(const char* hostname, const short* pport = NULL, PCHMPXSSL* ppssl = NULL);
+		CHMPXID_SEED_TYPE GetChmpxSeedType(void) const;
+		bool IsAllowHost(const char* hostname);
+		bool IsAllowHostStrictly(const char* hostname, short ctlport, const char* cuk, std::string& normalizedname, PCHMPXSSL pssl);
 };
 
 #endif	// CHMIMDATA_H

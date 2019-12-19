@@ -1,0 +1,71 @@
+configuration{
+	GROUP           = TESTSCRPT
+	REVISION        = 3
+	MODE            = SLAVE
+	DELIVER MODE    = RANDOM
+	SELF CTLPORT    = 8022
+	SELF CUK        = 18608d9ac0caef6f12386c03f81ca090
+	MAXCHMPX        = 4
+	REPLICA         = 0
+	MAXMQSERVER     = 2
+	MAXMQCLIENT     = 2
+	MQPERATTACH     = 1
+	MAXQPERSERVERMQ = 2
+	MAXQPERCLIENTMQ = 1
+	MAXMQPERCLIENT  = 1
+	MAXHISTLOG      = 10000
+	RWTIMEOUT       = 100
+	RETRYCNT        = 1000
+	CONTIMEOUT      = 500000
+	MQRWTIMEOUT     = 50
+	MQRETRYCNT      = 20000
+	MQACK           = on
+	DOMERGE         = off
+	AUTOMERGE       = on
+	MERGETIMEOUT    = 0
+	SOCKTHREADCNT   = 0
+	MQTHREADCNT     = 0
+	MAXSOCKPOOL     = 1
+	SOCKPOOLTIMEOUT = 60
+	K2HFULLMAP      = yes
+	K2HMASKBIT      = 8
+	K2HCMASKBIT     = 4
+	K2HMAXELE       = 8
+	SSL_MIN_VER     = DEFAULT
+	NSSDB_DIR       = n/a
+	server[1]{
+		PORT          = 8020
+		CTLPORT       = 8021
+		ENDPOINTS     = {
+			127.0.0.2 ( 18020 )
+		}
+		CTLENDPOINTS  = {
+			127.0.0.2 ( 18021 )
+		}
+		FORWARD_PEERS = {
+			127.0.0.2
+		}
+		REVERSE_PEERS = {
+			127.0.0.2
+		}
+		CUK           = 8eea94179dc383bcdd552fa488f43ec2
+		CUSTOM_ID_SEED= n/a
+		SSL           = no
+	}
+	slave[1]{
+		PORT          = -1
+		CTLPORT       = 8022
+		CTLENDPOINTS  = {
+			127.0.0.1 ( 18022 )
+		}
+		FORWARD_PEERS = {
+			127.0.0.1
+		}
+		REVERSE_PEERS = {
+			127.0.0.1
+		}
+		CUK           = 18608d9ac0caef6f12386c03f81ca090
+		CUSTOM_ID_SEED= n/a
+		SSL           = no
+	}
+}

@@ -68,6 +68,12 @@ using namespace	std;
 #define	INICFG_MODE_STR					"MODE"
 #define	INICFG_DELIVERMODE_STR			"DELIVERMODE"
 #define	INICFG_REPLICA_STR				"REPLICA"
+#define	INICFG_CHMPXIDTYPE_STR			"CHMPXIDTYPE"				// after v1.0.71
+#define	INICFG_CHMPXIDTYPE_NAME_STR		"NAME"						// after v1.0.71
+#define	INICFG_CHMPXIDTYPE_CUK_STR		"CUK"						// after v1.0.71
+#define	INICFG_CHMPXIDTYPE_EPS1_STR		"CTLENDPOINTS"				// after v1.0.71
+#define	INICFG_CHMPXIDTYPE_EPS2_STR		"CTLEPS"					// after v1.0.71
+#define	INICFG_CHMPXIDTYPE_CUSTOM_STR	"CUSTOM"					// after v1.0.71
 #define	INICFG_MAXCHMPX_STR				"MAXCHMPX"
 #define	INICFG_MAXMQSERVER_STR			"MAXMQSERVER"
 #define	INICFG_MAXMQCLIENT_STR			"MAXMQCLIENT"
@@ -80,6 +86,7 @@ using namespace	std;
 #define	INICFG_PORT_STR					"PORT"
 #define	INICFG_CTLPORT_STR				"CTLPORT"
 #define	INICFG_SELFCTLPORT_STR			"SELFCTLPORT"
+#define	INICFG_SELFCUK_STR				"SELFCUK"					// after v1.0.71
 #define	INICFG_RWTIMEOUT_STR			"RWTIMEOUT"
 #define	INICFG_RETRYCNT_STR				"RETRYCNT"
 #define	INICFG_MQRWTIMEOUT_STR			"MQRWTIMEOUT"
@@ -107,10 +114,15 @@ using namespace	std;
 #define	INICFG_K2HCMASKBIT_STR			"K2HCMASKBIT"
 #define	INICFG_K2HMAXELE_STR			"K2HMAXELE"
 #define	INICFG_NAME_STR					"NAME"
+#define	INICFG_CUK_STR					"CUK"						// after v1.0.71
+#define	INICFG_ENDPOINTS_STR			"ENDPOINTS"					// after v1.0.71
+#define	INICFG_CTLENDPOINTS_STR			"CTLENDPOINTS"				// after v1.0.71
+#define	INICFG_FORWARD_PEER_STR			"FORWARD_PEERS"				// after v1.0.71
+#define	INICFG_REVERSE_PEER_STR			"REVERSE_PEERS"				// after v1.0.71
+#define	INICFG_CUSTOM_ID_SEED_STR		"CUSTOM_ID_SEED"			// after v1.0.71
 
 #define	INICFG_INCLUDE_STR				"INCLUDE"
 #define	INICFG_KV_SEP					"="
-
 #define	INICFG_BOOL_ON					"ON"
 #define	INICFG_BOOL_YES					"YES"
 #define	INICFG_BOOL_OFF					"OFF"
@@ -171,10 +183,74 @@ static chmss_ver_t ChmCvtSSLTLS_VER(const char* poption)
 	return result;
 }
 
+static const char* ChmCvtSSLTLS_VERSTR(chmss_ver_t version)
+{
+	for(size_t cnt = 0; cnt < (sizeof(chm_ssltls_ver_table) / sizeof(CHM_SSLTLS_VER_ENT)); ++cnt){
+		if(chm_ssltls_ver_table[cnt].version == version){
+			return chm_ssltls_ver_table[cnt].stropt;
+		}
+	}
+	return NULL;
+}
+
+//---------------------------------------------------------
+// Utilities
+//---------------------------------------------------------
+static bool CvtChmpxidType(const char* strtype, CHMPXID_SEED_TYPE& type)
+{
+	if(CHMEMPTYSTR(strtype)){
+		MSG_CHMPRN("Parameter is empty.");
+		return false;
+	}
+
+	if(0 == strcasecmp(strtype, INICFG_CHMPXIDTYPE_NAME_STR)){
+		type = CHMPXID_SEED_NAME;
+	}else if(0 == strcasecmp(strtype, INICFG_CHMPXIDTYPE_CUK_STR)){
+		type = CHMPXID_SEED_CUK;
+	}else if(0 == strcasecmp(strtype, INICFG_CHMPXIDTYPE_EPS1_STR)){
+		type = CHMPXID_SEED_CTLENDPOINTS;
+	}else if(0 == strcasecmp(strtype, INICFG_CHMPXIDTYPE_EPS2_STR)){
+		type = CHMPXID_SEED_CTLENDPOINTS;
+	}else if(0 == strcasecmp(strtype, INICFG_CHMPXIDTYPE_CUSTOM_STR)){
+		type = CHMPXID_SEED_CUSTOM;
+	}else{
+		MSG_CHMPRN("CHMPXID TYPE is not defined value(%s).", strtype);
+		return false;
+	}
+	return true;
+}
+
+static bool CvtHostPortStringToList(const string& target, short default_port, hostport_list_t& reslist)
+{
+	reslist.clear();
+
+	if(target.empty()){
+		MSG_CHMPRN("Parameter is empty.");
+		return true;
+	}
+
+	strlst_t	hostports;
+	if(!str_split(target.c_str(), hostports, ',')){
+		ERR_CHMPRN("Failed to parse %s string by \".\"", target.c_str());
+		return false;
+	}
+	for(strlst_t::const_iterator iter = hostports.begin(); hostports.end() != iter; ++iter){
+		HOSTPORTPAIR	pair;
+		pair.host.clear();
+		pair.port = default_port;
+		if(!ChmNetDb::ParseHostPortString(*iter, default_port, pair.host, pair.port) || pair.host.empty()){
+			ERR_CHMPRN("Could not parse host/port from %s, then skip this and continue...", iter->c_str());
+			continue;
+		}
+		reslist.push_back(pair);
+	}
+	return true;
+}
+
 //---------------------------------------------------------
 // CHMConf Class Factory
 //---------------------------------------------------------
-CHMConf* CHMConf::GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config, short ctlport, bool is_check_env, string* normalize_config)
+CHMConf* CHMConf::GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config, short ctlport, const char* cuk, bool is_check_env, string* normalize_config)
 {
 	string		tmpconf("");
 	CHMCONFTYPE	conftype = check_chmconf_type_ex(config, (is_check_env ? CHM_CONFFILE_ENV_NAME : NULL), (is_check_env ? CHM_JSONCONF_ENV_NAME : NULL), &tmpconf);
@@ -182,16 +258,16 @@ CHMConf* CHMConf::GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config,
 	CHMConf*	result = NULL;
 	switch(conftype){
 		case	CHMCONF_TYPE_INI_FILE:
-			result = new CHMIniConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport);
+			result = new CHMIniConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport, cuk);
 			break;
 		case	CHMCONF_TYPE_YAML_FILE:
-			result = new CHMYamlConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport);
+			result = new CHMYamlConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport, cuk);
 			break;
 		case	CHMCONF_TYPE_JSON_FILE:
-			result = new CHMJsonConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport);
+			result = new CHMJsonConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport, cuk);
 			break;
 		case	CHMCONF_TYPE_JSON_STRING:
-			result = new CHMJsonStringConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport);
+			result = new CHMJsonStringConf(eventqfd, pcntrl, tmpconf.c_str(), ctlport, cuk);
 			break;
 		case	CHMCONF_TYPE_UNKNOWN:
 		case	CHMCONF_TYPE_NULL:
@@ -206,6 +282,44 @@ CHMConf* CHMConf::GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config,
 }
 
 //---------------------------------------------------------
+// Class methods
+//---------------------------------------------------------
+string CHMConf::GetChmpxidTypeString(CHMPXID_SEED_TYPE type)
+{
+	string	result;
+	switch(type){
+		case CHMPXID_SEED_NAME:
+			result = INICFG_CHMPXIDTYPE_NAME_STR;
+			break;
+		case CHMPXID_SEED_CUK:
+			result = INICFG_CHMPXIDTYPE_CUK_STR;
+			break;
+		case CHMPXID_SEED_CTLENDPOINTS:
+			result = INICFG_CHMPXIDTYPE_EPS1_STR;
+			break;
+		case CHMPXID_SEED_CUSTOM:
+			result = INICFG_CHMPXIDTYPE_CUSTOM_STR;
+			break;
+		default:
+			result = "Unkown";
+			break;
+	}
+	return result;
+}
+
+string CHMConf::GetSslVersionString(chmss_ver_t version)
+{
+	const char*	pVersion = ChmCvtSSLTLS_VERSTR(version);
+	string		strVersion;
+	if(CHMEMPTYSTR(pVersion)){
+		strVersion = "Unknown";
+	}else{
+		strVersion = pVersion;
+	}
+	return strVersion;
+}
+
+//---------------------------------------------------------
 // Class variables
 //---------------------------------------------------------
 int	CHMConf::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
@@ -213,7 +327,9 @@ int	CHMConf::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
 //---------------------------------------------------------
 // CHMConf Class
 //---------------------------------------------------------
-CHMConf::CHMConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* pJson) : ChmEventBase(eventqfd, pcntrl), ctlport_param(ctlport), type(CONF_UNKNOWN), inotifyfd(CHM_INVALID_HANDLE), watchfd(CHM_INVALID_HANDLE), pchmcfginfo(NULL)
+CHMConf::CHMConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* cuk, const char* pJson) :
+	ChmEventBase(eventqfd, pcntrl), ctlport_param(ctlport), cuk_param(CHMEMPTYSTR(cuk) ? "" : cuk), type(CONF_UNKNOWN),
+	inotifyfd(CHM_INVALID_HANDLE), watchfd(CHM_INVALID_HANDLE), pchmcfginfo(NULL)
 {
 	// [NOTE] Either file or json string.
 	//
@@ -579,6 +695,9 @@ bool CHMConf::GetConfiguration(CHMCFGINFO& config, bool is_check_update)
 	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
+		if(!pchmcfginfo){
+			return false;
+		}
 	}
 
 	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
@@ -588,7 +707,15 @@ bool CHMConf::GetConfiguration(CHMCFGINFO& config, bool is_check_update)
 	return true;
 }
 
-bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update)
+//
+// Check strictly or generosity to exist in hostname(IP address) in all config information.
+//
+// [NOTE]
+// If both pctlport(and pcuk) is NULL, check for generosity.
+// And if pnodeinfos is not null, returns a list of all config information that may contain hostname(IP address).
+// If both pctlport(and pcuk) is not NULL, do a strict check.
+//
+bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, bool with_reverse, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -603,101 +730,279 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO
 		CheckUpdate();
 	}
 
-	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+	// strict
+	bool	is_strict;
+	string	strcuk;
+	if(pctlport){
+		is_strict = true;
+		if(!CHMEMPTYSTR(cuk)){
+			strcuk = cuk;
+		}
+	}else{
+		is_strict = false;
+	}
 
-	string		globalname;
-	strlst_t	server_list;
-	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
-		server_list.clear();
-		server_list.push_back(iter->name);
-		if(IsInHostnameList(hostname, server_list, globalname, true)){
-			if(CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport){
-				// found
-				svrnodeinfo = *iter;
-				fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
-				return true;
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));			// LOCK
+
+	string				normalizedname;
+	chmnode_cfginfos_t*	pcfgnodelist = is_server ? &(pchmcfginfo->servers) : &(pchmcfginfo->slaves);
+	for(chmnode_cfginfos_t::const_iterator iter = pcfgnodelist->begin(); pcfgnodelist->end() != iter; ++iter){
+		// check
+		if(RawCheckContainsNodeInfo(hostname, (*iter), normalizedname, is_server, with_forward, with_reverse)){
+			// matched
+			if(!is_strict){
+				if(pnodeinfos){
+					pnodeinfos->push_back(*iter);
+				}
+				if(pnormnames){
+					pnormnames->push_back(normalizedname);
+				}
+				if(!pnodeinfos && !pnormnames){
+					// not need to wait for loop end, because not need to make info list.
+					fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);		// UNLOCK
+					MSG_CHMPRN("Found host(%s) in %s node list.", hostname, is_server ? "server" : "slave");
+					return true;
+				}
+
+			}else{
+				if((CHM_INVALID_PORT == *pctlport || *pctlport == iter->ctlport) && strcuk == iter->cuk){
+					// strictly matched
+					if(pnodeinfos){
+						pnodeinfos->push_back(*iter);
+					}
+					if(pnormnames){
+						pnormnames->push_back(normalizedname);
+					}
+					// if strict checking, break by found one node
+					fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
+					MSG_CHMPRN("Found host(%s) in %s node list strictly.", hostname, is_server ? "server" : "slave");
+					return true;
+				}
 			}
 		}
 	}
-	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);						// UNLOCK
 
-	MSG_CHMPRN("Not found host(%s) in server node list.", hostname);
+	if((pnodeinfos && !pnodeinfos->empty()) || (pnormnames && !pnormnames->empty())){
+		// found
+		MSG_CHMPRN("Found host(%s) in %s node list.", hostname, is_server ? "server" : "slave");
+		return true;
+	}
+	MSG_CHMPRN("Not found host(%s) in %s node list.", hostname, is_server ? "server" : "slave");
 
 	return false;
 }
 
-bool CHMConf::GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update)
+bool CHMConf::CheckContainsServerInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
 {
-	return GetServerInfo("localhost", pchmcfginfo->self_ctlport, svrnodeinfo, is_check_update);
+	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, false, pnodeinfos, pnormnames, true, is_check_update);	// check forward peers
 }
 
-bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update)
+bool CHMConf::CheckContainsSlaveInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
 {
-	if(CHMEMPTYSTR(hostname)){
-		ERR_CHMPRN("Parameter is wrong.");
+	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, false, pnodeinfos, pnormnames, false, is_check_update);	// check forward peers
+}
+
+bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
+{
+	CHMNODE_CFGINFO	tmpinfo;
+	string			normalizedname;
+
+	// self server
+	if(GetSelfServerInfo(tmpinfo, normalizedname, is_check_update)){
+		// check
+		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, true, false, true)){		// check reverse peers
+			// found
+			if(pnodeinfos){
+				pnodeinfos->push_back(tmpinfo);
+			}
+			if(pnormnames){
+				pnormnames->push_back(normalizedname);
+			}
+			if(!pnodeinfos && !pnormnames){
+				MSG_CHMPRN("Hostname(%s) is found in self-server without reverse peer to globalname(%s).", hostname, normalizedname.c_str());
+				return true;
+			}
+		}
+	}
+
+	// self slave
+	if(GetSelfSlaveInfo(tmpinfo, normalizedname, false)){										// already update
+		// check
+		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, false, false, true)){	// check reverse peers
+			// found
+			if(pnodeinfos){
+				pnodeinfos->push_back(tmpinfo);
+			}
+			if(pnormnames){
+				pnormnames->push_back(normalizedname);
+			}
+			if(!pnodeinfos && !pnormnames){
+				MSG_CHMPRN("Hostname(%s) is found in self-slave without reverse peer to globalname(%s).", hostname, normalizedname.c_str());
+				return true;
+			}
+		}
+	}
+
+	// server
+	if(CheckContainsServerInfoList(hostname, pnodeinfos, pnormnames, false)){					// check forward peers
+		if(!pnodeinfos && !pnormnames){
+			// not need to wait for loop end, because not need to make info list.
+			MSG_CHMPRN("Hostname(%s) is found in server with forward peer.", hostname);
+			return true;
+		}
+	}
+
+	// slave
+	if(CheckContainsSlaveInfoList(hostname, pnodeinfos, pnormnames, false)){					// check forward peers
+		if(!pnodeinfos && !pnormnames){
+			// not need to wait for loop end, because not need to make info list.
+			MSG_CHMPRN("Hostname(%s) is found in slave with forward peer.", hostname);
+			return true;
+		}
+	}
+	if((pnodeinfos && !pnodeinfos->empty()) || (pnormnames && !pnormnames->empty())){
+		// found
+		MSG_CHMPRN("Hostname(%s) is found in some server/slave.", hostname);
+		return true;
+	}
+
+	MSG_CHMPRN("Not found host(%s) in server and slave node list.", hostname);
+	return false;
+}
+
+bool CHMConf::GetServerInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& svrnodeinfo, string& normalizedname, bool is_check_update)
+{
+	chmnode_cfginfos_t	nodeinfos;
+	strlst_t			normnames;
+	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, true, is_check_update) || nodeinfos.empty()){
 		return false;
 	}
+	svrnodeinfo		= nodeinfos.front();
+	normalizedname	= normnames.front();
+	return true;
+}
+
+bool CHMConf::GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, string& normalizedname, bool is_check_update)
+{
+	return GetServerInfo("localhost", pchmcfginfo->self_ctlport, pchmcfginfo->self_cuk.c_str(), svrnodeinfo, normalizedname, is_check_update);
+}
+
+bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& slvnodeinfo, string& normalizedname, bool is_check_update)
+{
+	chmnode_cfginfos_t	nodeinfos;
+	strlst_t			normnames;
+	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, false, is_check_update) || nodeinfos.empty()){
+		return false;
+	}
+	slvnodeinfo		= nodeinfos.front();
+	normalizedname	= normnames.front();
+	return true;
+}
+
+bool CHMConf::GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, string& normalizedname, bool is_check_update)
+{
+	return GetSlaveInfo("localhost", pchmcfginfo->self_ctlport, pchmcfginfo->self_cuk.c_str(), slvnodeinfo, normalizedname, is_check_update);
+}
+
+bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& nodeinfo, string& normalizedname, bool is_only_server, bool is_check_update)
+{
 	if(IsFileType() && !CheckConfFile()){
 		return false;
 	}
-
 	// Load & Check	configuration file.
 	if(is_check_update || !pchmcfginfo){
 		CheckUpdate();
 	}
 
-	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
-
-	string		globalname;
-	strlst_t	slave_list;
-	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
-		slave_list.clear();
-		slave_list.push_back(iter->name);
-		if(IsMatchHostname(hostname, slave_list, globalname)){
-			if(CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport){
-				// found
-				slvnodeinfo 	= *iter;
-				slvnodeinfo.name= globalname;							// replace globalname to name
-				fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
-				return true;
-			}
-		}
-	}
-	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
-
-	MSG_CHMPRN("Not found host(%s) in slave node list.", hostname);
-
-	return false;
-}
-
-bool CHMConf::GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update)
-{
-	return GetSlaveInfo("localhost", pchmcfginfo->self_ctlport, slvnodeinfo, is_check_update);
-}
-
-bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& nodeinfo, bool is_only_server, bool is_check_update)
-{
-	if(IsFileType() && !CheckConfFile()){
-		return false;
-	}
-	// Load & Check	configuration file.
-	if(is_check_update || !pchmcfginfo){
-		CheckUpdate();
-	}
-
-	if(GetServerInfo(hostname, ctlport, nodeinfo, false)){		// already checked update
+	chmnode_cfginfos_t	nodeinfos;
+	strlst_t			normnames;
+	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, true, false) && !nodeinfos.empty()){	// already checked update
+		nodeinfo		= nodeinfos.front();
+		normalizedname	= normnames.front();
 		return true;
 	}
 	if(is_only_server){
 		return false;
 	}
+
 	// if not only server, next check slave nodes.
-	return GetSlaveInfo(hostname, ctlport, nodeinfo, false);	// already checked update
+	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, false, false) && !nodeinfos.empty()){	// already checked update
+		nodeinfo		= nodeinfos.front();
+		normalizedname	= normnames.front();
+		return true;
+	}
+	return false;
 }
 
-bool CHMConf::GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, bool is_check_update)
+bool CHMConf::GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, string& normalizedname, bool is_check_update)
 {
-	return GetNodeInfo("localhost", pchmcfginfo->self_ctlport, nodeinfo, pchmcfginfo->is_server_mode, is_check_update);
+	return GetNodeInfo("localhost", pchmcfginfo->self_ctlport, pchmcfginfo->self_cuk.c_str(), nodeinfo, normalizedname, pchmcfginfo->is_server_mode, is_check_update);
+}
+
+//
+// Check to exist in hostname(IP address) in node information.
+//
+bool CHMConf::RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, string& normalizedname, bool is_server, bool with_forward, bool with_reverse)
+{
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+
+	// check name
+	strlst_t	node_list;
+	node_list.clear();
+	node_list.push_back(nodeinfos.name);
+	normalizedname.clear();
+	if(is_server){
+		if(IsInHostnameList(hostname, node_list, normalizedname, true)){
+			return true;
+		}
+	}else{
+		if(IsMatchHostname(hostname, node_list, normalizedname)){
+			return true;
+		}
+	}
+
+	// check forward peers
+	if(with_forward && !nodeinfos.forward_peers.empty()){
+		node_list.clear();
+		normalizedname.clear();
+		for(hostport_list_t::const_iterator hpiter = nodeinfos.forward_peers.begin(); nodeinfos.forward_peers.end() != hpiter; ++hpiter){
+			node_list.push_back(hpiter->host);
+		}
+		// check
+		if(is_server){
+			if(IsInHostnameList(hostname, node_list, normalizedname, true)){
+				return true;
+			}
+		}else{
+			if(IsMatchHostname(hostname, node_list, normalizedname)){
+				return true;
+			}
+		}
+	}
+
+	// check reverse peers
+	if(with_reverse && !nodeinfos.reverse_peers.empty()){
+		node_list.clear();
+		normalizedname.clear();
+		for(hostport_list_t::const_iterator hpiter = nodeinfos.reverse_peers.begin(); nodeinfos.reverse_peers.end() != hpiter; ++hpiter){
+			node_list.push_back(hpiter->host);
+		}
+		// check
+		if(is_server){
+			if(IsInHostnameList(hostname, node_list, normalizedname, true)){
+				return true;
+			}
+		}else{
+			if(IsMatchHostname(hostname, node_list, normalizedname)){
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool CHMConf::GetServerList(strlst_t& server_list)
@@ -706,16 +1011,38 @@ bool CHMConf::GetServerList(strlst_t& server_list)
 		ERR_CHMPRN("Could not get configuration file(%s) contents.", cfgfile.c_str());
 		return false;
 	}
+	server_list.clear();
+
 	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
 
-	server_list.clear();
-	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
-		server_list.push_back(iter->name);
+	// List the endpoint server names first.
+	strlst_t							tmp_list;
+	chmnode_cfginfos_t::const_iterator	iter;
+	for(iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
+		for(hostport_list_t::const_iterator hpiter = iter->endpoints.begin(); hpiter != iter->endpoints.end(); ++hpiter){
+			tmp_list.push_back(hpiter->host);
+		}
+	}
+	// Add name
+	for(iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
+		tmp_list.push_back(iter->name);
 	}
 
+	// to unique(without sort)
+	for(strlst_t::iterator siter = tmp_list.begin(); tmp_list.end() != siter; ++siter){
+		bool	found;
+		found = false;
+		for(strlst_t::iterator diter = server_list.begin(); server_list.end() != diter; ++diter){
+			if(*diter == *siter){
+				found = true;
+				break;
+			}
+		}
+		if(!found){
+			server_list.push_back(*siter);
+		}
+	}
 	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
-
-	server_list.sort(strarr_sort());
 
 	return true;
 }
@@ -748,12 +1075,34 @@ bool CHMConf::GetSlaveList(strlst_t& slave_list)
 
 	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
 
-	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
-		slave_list.push_back(iter->name);
+	// List the endpoint server names first.
+	strlst_t							tmp_list;
+	chmnode_cfginfos_t::const_iterator	iter;
+	for(iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
+		for(hostport_list_t::const_iterator hpiter = iter->endpoints.begin(); hpiter != iter->endpoints.end(); ++hpiter){
+			tmp_list.push_back(hpiter->host);
+		}
+	}
+	// Add name
+	for(iter = pchmcfginfo->slaves.begin(); iter != pchmcfginfo->slaves.end(); ++iter){
+		tmp_list.push_back(iter->name);
+	}
+
+	// to unique(without sort)
+	for(strlst_t::iterator siter = tmp_list.begin(); tmp_list.end() != siter; ++siter){
+		bool	found;
+		found = false;
+		for(strlst_t::iterator diter = slave_list.begin(); slave_list.end() != diter; ++diter){
+			if(*diter == *siter){
+				found = true;
+				break;
+			}
+		}
+		if(!found){
+			slave_list.push_back(*siter);
+		}
 	}
 	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
-
-	slave_list.sort(strarr_sort());
 
 	return true;
 }
@@ -798,7 +1147,7 @@ bool CHMConf::IsSsl(void) const
 //---------------------------------------------------------
 // CHMIniConf Class
 //---------------------------------------------------------
-CHMIniConf::CHMIniConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport) : CHMConf(eventqfd, pcntrl, file, ctlport, NULL)
+CHMIniConf::CHMIniConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* cuk) : CHMConf(eventqfd, pcntrl, file, ctlport, cuk, NULL)
 {
 	type = CHMConf::CONF_INI;
 }
@@ -1011,6 +1360,16 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		ccvals.server_mode = true;
 	}
 
+	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_CHMPXIDTYPE_STR)){
+		MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section, thus it is set default value(seed from name).", cfgfile.c_str(), INICFG_CHMPXIDTYPE_STR, INICFG_GLOBAL_SEC_STR);
+		chmcfginfo.chmpxid_type = CHMPXID_SEED_NAME;
+	}else{
+		if(!CvtChmpxidType(chmcfgraw.global[INICFG_CHMPXIDTYPE_STR].c_str(), chmcfginfo.chmpxid_type)){
+			ERR_CHMPRN("configuration file(%s) have \"%s\" in %s section, but value %s does not defined.", cfgfile.c_str(), INICFG_CHMPXIDTYPE_STR, INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_CHMPXIDTYPE_STR].c_str());
+			return false;
+		}
+	}
+
 	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_DELIVERMODE_STR)){
 		ERR_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_DELIVERMODE_STR, INICFG_GLOBAL_SEC_STR);
 		return false;
@@ -1159,6 +1518,17 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		}
 	}else{
 		chmcfginfo.self_ctlport = ctlport_param;
+	}
+
+	if(cuk_param.empty()){
+		if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_SELFCUK_STR)){
+			MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s section.", cfgfile.c_str(), INICFG_SELFCUK_STR, INICFG_GLOBAL_SEC_STR);
+			chmcfginfo.self_cuk.clear();
+		}else{
+			chmcfginfo.self_cuk = chmcfgraw.global[INICFG_SELFCUK_STR];
+		}
+	}else{
+		chmcfginfo.self_cuk = cuk_param;
 	}
 
 	if(chmcfgraw.global.end() == chmcfgraw.global.find(INICFG_RETRYCNT_STR)){
@@ -1559,6 +1929,70 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			svrnode.ctlport = static_cast<short>(atoi((*iter)[INICFG_CTLPORT_STR].c_str()));
 		}
 
+		if(iter->end() == iter->find(INICFG_CUK_STR)){
+			if(CHMPXID_SEED_CUK == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"CUK\".", cfgfile.c_str(), INICFG_CUK_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+			svrnode.cuk.clear();
+		}else{
+			svrnode.cuk = (*iter)[INICFG_CUK_STR];
+		}
+
+		if(iter->end() == iter->find(INICFG_ENDPOINTS_STR)){
+			if(CHMPXID_SEED_CTLENDPOINTS == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"end points\".", cfgfile.c_str(), INICFG_ENDPOINTS_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+			svrnode.endpoints.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_ENDPOINTS_STR], svrnode.port, svrnode.endpoints)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_ENDPOINTS_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_CTLENDPOINTS_STR)){
+			if(CHMPXID_SEED_CTLENDPOINTS == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"control end points\".", cfgfile.c_str(), INICFG_CTLENDPOINTS_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+			svrnode.ctlendpoints.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_CTLENDPOINTS_STR], svrnode.ctlport, svrnode.ctlendpoints)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_CTLENDPOINTS_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_FORWARD_PEER_STR)){
+			svrnode.forward_peers.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_FORWARD_PEER_STR], CHM_INVALID_PORT, svrnode.forward_peers)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_FORWARD_PEER_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_REVERSE_PEER_STR)){
+			svrnode.reverse_peers.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_REVERSE_PEER_STR], CHM_INVALID_PORT, svrnode.reverse_peers)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_REVERSE_PEER_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_CUSTOM_ID_SEED_STR)){
+			if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"custom seed\".", cfgfile.c_str(), INICFG_CUSTOM_ID_SEED_STR, svrnode.name.c_str(), INICFG_SVRNODE_SEC_STR);
+				return false;
+			}
+			svrnode.custom_seed.clear();
+		}else{
+			svrnode.custom_seed = (*iter)[INICFG_CUSTOM_ID_SEED_STR];
+		}
+
 		// SSL
 		//
 		if(iter->end() == iter->find(INICFG_SSL_STR)){
@@ -1771,13 +2205,13 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			chmcfginfo.servers.push_back(svrnode);
 
 			// whichever server mode or not?
-			if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport){
+			if(!ccvals.server_mode_by_comp && chmcfginfo.self_ctlport == svrnode.ctlport && chmcfginfo.self_cuk == svrnode.cuk){
 				bool	is_break_loop = false;
 				for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
 					for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
 						if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
 							MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());
-							ccvals.is_server_by_ctlport	= true;
+							ccvals.server_mode_by_comp	= true;
 							is_break_loop				= true;
 							break;
 						}
@@ -1831,13 +2265,14 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			}
 		}
 	}
+
 	// [NOTE]
-	// The server list might have duplicate server name & port.
+	// The server list might have duplicate server name & port & cuk.
 	// Because the port number can not be specified in configuration file, so if there is some server nodes on same server
 	// and one specifies port and the other does not specify port(using default port).
 	// On this case, the list have duplicate server.
 	//
-	chmcfginfo.servers.unique(chm_node_cfg_info_same_name_port());		// uniq about server node must be name and port
+	chmcfginfo.servers.unique(chm_node_cfg_info_same_name_other());		// uniq about server node must be name and port and cuk
 	chmcfginfo.servers.sort(chm_node_cfg_info_sort());
 
 	// slave node section
@@ -1867,9 +2302,62 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		}else{
 			slvnode.ctlport = static_cast<short>(atoi((*iter)[INICFG_CTLPORT_STR].c_str()));
 		}
+
+		if(iter->end() == iter->find(INICFG_CUK_STR)){
+			if(CHMPXID_SEED_CUK == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"CUK\".", cfgfile.c_str(), INICFG_CUK_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+			slvnode.cuk.clear();
+		}else{
+			slvnode.cuk = (*iter)[INICFG_CUK_STR];
+		}
+
+		if(iter->end() == iter->find(INICFG_CTLENDPOINTS_STR)){
+			if(CHMPXID_SEED_CTLENDPOINTS == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"control end points\".", cfgfile.c_str(), INICFG_CTLENDPOINTS_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+			slvnode.ctlendpoints.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_CTLENDPOINTS_STR], slvnode.ctlport, slvnode.ctlendpoints)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_CTLENDPOINTS_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_FORWARD_PEER_STR)){
+			slvnode.forward_peers.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_FORWARD_PEER_STR], CHM_INVALID_PORT, slvnode.forward_peers)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_FORWARD_PEER_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_REVERSE_PEER_STR)){
+			slvnode.reverse_peers.clear();
+		}else{
+			if(!CvtHostPortStringToList((*iter)[INICFG_REVERSE_PEER_STR], CHM_INVALID_PORT, slvnode.reverse_peers)){
+				MSG_CHMPRN("configuration file(%s) has \"%s\" in %s server node in %s section, but failed to parse it with something error.", cfgfile.c_str(), INICFG_REVERSE_PEER_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+		}
+
+		if(iter->end() == iter->find(INICFG_CUSTOM_ID_SEED_STR)){
+			if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"custom seed\".", cfgfile.c_str(), INICFG_CUSTOM_ID_SEED_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
+				return false;
+			}
+			slvnode.custom_seed.clear();
+		}else{
+			slvnode.custom_seed = (*iter)[INICFG_CUSTOM_ID_SEED_STR];
+		}
+
 		slvnode.port		= CHM_INVALID_PORT;
 		slvnode.is_ssl		= false;
 		slvnode.verify_peer	= ccvals.found_ssl_verify_peer;
+		slvnode.endpoints.clear();
 
 		// SSL_CAPATH
 		//
@@ -1974,12 +2462,12 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 
 		chmcfginfo.slaves.push_back(slvnode);
 	}
-	chmcfginfo.slaves.unique(chm_node_cfg_info_same_name_port());		// uniq about slave node must be name and port
+	chmcfginfo.slaves.unique(chm_node_cfg_info_same_name_other());		// uniq about slave node must be name and port and cuk
 	chmcfginfo.slaves.sort(chm_node_cfg_info_sort());
 
 	// Re-check for server/slave mode by self control port number.
 	//
-	if(ccvals.is_server_by_ctlport){
+	if(ccvals.server_mode_by_comp){
 		if(!ccvals.server_mode){
 			WAN_CHMPRN("configuration file(%s) does not have \"%s\" in %s section, but self control port(%d) found in server list, so run server mode.", cfgfile.c_str(), INICFG_MODE_STR, INICFG_GLOBAL_SEC_STR, chmcfginfo.self_ctlport);
 			chmcfginfo.is_server_mode = true;
@@ -2024,7 +2512,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 //---------------------------------------------------------
 // Loading Yaml Utilities for CHMYamlBaseConf Class
 //---------------------------------------------------------
-static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals, short default_ctlport)
+static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals, short default_ctlport, const string& default_cuk)
 {
 	// Must start yaml mapping event.
 	yaml_event_t	yevent;
@@ -2040,6 +2528,10 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 	yaml_event_delete(&yevent);
 
 	// Set default value in GLOBAL section
+	chmcfginfo.groupname.clear();
+	chmcfginfo.revision				= -1;
+	chmcfginfo.is_server_mode		= false;
+	chmcfginfo.is_random_mode		= false;
 	chmcfginfo.max_chmpx_count		= DEFAULT_CHMPX_COUNT;
 	chmcfginfo.replica_count		= DEFAULT_REPLICA_COUNT;
 	chmcfginfo.max_server_mq_cnt	= DEFAULT_SERVER_MQ_CNT;
@@ -2051,6 +2543,8 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 	chmcfginfo.max_histlog_count	= DEFAULT_HISTLOG_COUNT;
 	chmcfginfo.date					= 0L;
 	chmcfginfo.self_ctlport			= default_ctlport;
+	chmcfginfo.self_cuk				= default_cuk;
+	chmcfginfo.chmpxid_type			= CHMPXID_SEED_NAME;
 	chmcfginfo.retrycnt				= CHMEVENTSOCK_RETRY_DEFAULT;
 	chmcfginfo.mq_retrycnt			= ChmEventMq::DEFAULT_RETRYCOUNT;
 	chmcfginfo.mq_ack				= true;
@@ -2098,6 +2592,20 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 		// check event
 		if(YAML_MAPPING_END_EVENT == yevent.type){
 			// End of mapping event
+			if(result){
+				if(chmcfginfo.groupname.empty()){
+					ERR_CHMPRN("Not found \"%s\" in %s section in configuration.", INICFG_GROUP_STR, INICFG_GLOBAL_SEC_STR);
+					result = false;
+				}
+				if(-1 == chmcfginfo.revision){
+					ERR_CHMPRN("Not found \"%s\" in %s section in configuration.", INICFG_VERSION_STR, INICFG_GLOBAL_SEC_STR);
+					result = false;
+				}
+				if(CHMPXID_SEED_CUK == chmcfginfo.chmpxid_type && chmcfginfo.self_cuk.empty()){
+					ERR_CHMPRN("\"%s\" in %s section in configuration is \"cuk seed\", but not specified self \"CUK\".", INICFG_CHMPXIDTYPE_STR, INICFG_GLOBAL_SEC_STR);
+					result = false;
+				}
+			}
 			is_loop = false;
 
 		}else if(YAML_SCALAR_EVENT == yevent.type){
@@ -2124,6 +2632,12 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 						result = false;
 					}
 					ccvals.server_mode = true;
+
+				}else if(0 == strcasecmp(INICFG_CHMPXIDTYPE_STR, key.c_str())){
+					if(!CvtChmpxidType(reinterpret_cast<const char*>(yevent.data.scalar.value), chmcfginfo.chmpxid_type)){
+						ERR_CHMPRN("Found \"%s\" in %s section, but value %s does not defined.", INICFG_CHMPXIDTYPE_STR, INICFG_GLOBAL_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
 
 				}else if(0 == strcasecmp(INICFG_DELIVERMODE_STR, key.c_str())){
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_DELIVERMODE_RANDOM_STR)){
@@ -2217,6 +2731,11 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 				}else if(0 == strcasecmp(INICFG_SELFCTLPORT_STR, key.c_str())){
 					if(CHM_INVALID_PORT == default_ctlport){
 						chmcfginfo.self_ctlport = static_cast<short>(atoi(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+					}
+
+				}else if(0 == strcasecmp(INICFG_SELFCUK_STR, key.c_str())){
+					if(default_cuk.empty()){
+						chmcfginfo.self_cuk = reinterpret_cast<const char*>(yevent.data.scalar.value);
 					}
 
 				}else if(0 == strcasecmp(INICFG_RETRYCNT_STR, key.c_str())){
@@ -2507,7 +3026,6 @@ static bool ChmYamlLoadConfigurationGlobalSec(yaml_parser_t& yparser, CHMCFGINFO
 		}
 		yaml_event_delete(&yevent);
 	}
-
 	return result;
 }
 
@@ -2529,8 +3047,11 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 		yaml_event_delete(&yevent);
 	}
 
+	// Set default value in GLOBAL section
+	chmcfginfo.servers.clear();
+
 	// Clear default values
-	ccvals.is_server_by_ctlport		= false;	// for check server/slave mode by checking control port and server name.
+	ccvals.server_mode_by_comp		= false;	// for check server/slave mode by checking control port and cuk and server name.
 	ccvals.found_ssl				= false;
 	ccvals.found_ssl_verify_peer	= false;
 
@@ -2579,6 +3100,12 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				svrnode.server_prikey	= ccvals.server_prikey;
 				svrnode.slave_cert		= ccvals.slave_cert;
 				svrnode.slave_prikey	= ccvals.slave_prikey;
+				svrnode.cuk.clear();
+				svrnode.endpoints.clear();
+				svrnode.ctlendpoints.clear();
+				svrnode.forward_peers.clear();
+				svrnode.reverse_peers.clear();
+				svrnode.custom_seed.clear();
 			}
 
 		}else if(YAML_MAPPING_END_EVENT == yevent.type){
@@ -2608,6 +3135,29 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				if(CHM_INVALID_PORT == svrnode.ctlport){
 					ERR_CHMPRN("Invalid control port number for %s server node.", svrnode.name.c_str());
 					result = false;
+				}
+				if(CHMPXID_SEED_CUK == chmcfginfo.chmpxid_type){
+					if(svrnode.cuk.empty()){
+						ERR_CHMPRN("Not found CUK value in %s section, but chmpxid seed is from \"CUK\".", CFG_SVRNODE_SEC_STR);
+						result = false;
+					}
+				}
+				if(CHMPXID_SEED_CTLENDPOINTS == chmcfginfo.chmpxid_type){
+					if(svrnode.ctlendpoints.empty()){
+						ERR_CHMPRN("Not found CTLENDPOINTS value in %s section, but chmpxid seed is from \"control end points\".", CFG_SVRNODE_SEC_STR);
+						result = false;
+					}
+				}
+				if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
+					if(svrnode.custom_seed.empty()){
+						ERR_CHMPRN("Not found CUSTOM_SEED value in %s section, but chmpxid seed is from \"custom seed\".", CFG_SVRNODE_SEC_STR);
+						result = false;
+					}
+				}else{
+					if(!svrnode.custom_seed.empty()){
+						ERR_CHMPRN("Found CUSTOM_SEED value in %s section, but chmpxid seed is not from \"custom seed\".", CFG_SVRNODE_SEC_STR);
+						result = false;
+					}
 				}
 				if(!svrnode.is_ssl && svrnode.verify_peer){
 					ERR_CHMPRN("Found %s with value(ON) in %s section, but %s is OFF.", INICFG_SSL_VERIFY_PEER_STR, CFG_SVRNODE_SEC_STR, INICFG_SSL_STR);
@@ -2654,6 +3204,22 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 					}
 				}
 
+				// [NOTE]
+				// If the (CTL)EPS port is not specified, CHM_INVALID_PORT is set as
+				// the temporary port number, so set these as default ports(svrnode.port).
+				//
+				hostport_list_t::iterator	epsiter;
+				for(epsiter = svrnode.endpoints.begin(); svrnode.endpoints.end() != epsiter; ++epsiter){
+					if(CHM_INVALID_PORT == epsiter->port){
+						epsiter->port = svrnode.port;
+					}
+				}
+				for(epsiter = svrnode.ctlendpoints.begin(); svrnode.ctlendpoints.end() != epsiter; ++epsiter){
+					if(CHM_INVALID_PORT == epsiter->port){
+						epsiter->port = svrnode.ctlport;
+					}
+				}
+
 				// Expand name(simple regex)
 				// Need to expand for server node, because node name is compared directly and is used by connecting.
 				// So that, we expand server node name here.
@@ -2685,13 +3251,13 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						chmcfginfo.servers.push_back(svrnode);
 
 						// whichever server mode or not?
-						if(!ccvals.is_server_by_ctlport && chmcfginfo.self_ctlport == svrnode.ctlport){
+						if(!ccvals.server_mode_by_comp && chmcfginfo.self_ctlport == svrnode.ctlport){
 							bool	is_break_loop = false;
 							for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
 								for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
 									if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
 										MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());
-										ccvals.is_server_by_ctlport	= true;
+										ccvals.server_mode_by_comp	= true;
 										is_break_loop				= true;
 										break;
 									}
@@ -2733,6 +3299,42 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 
 				}else if(0 == strcasecmp(INICFG_CTLPORT_STR, key.c_str())){
 					svrnode.ctlport = static_cast<short>(atoi(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+
+				}else if(0 == strcasecmp(INICFG_CUK_STR, key.c_str())){
+					svrnode.cuk = reinterpret_cast<const char*>(yevent.data.scalar.value);
+
+				}else if(0 == strcasecmp(INICFG_ENDPOINTS_STR, key.c_str())){
+					// [NOTE]
+					// we want to use svrnode.port as the default port, but CHM_INVALID_PORT is used
+					// instead because it may not be set at this point.
+					// After this process is over, replace CHM_INVALID_PORT with the default port.
+					//
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, svrnode.endpoints)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_ENDPOINTS_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_CTLENDPOINTS_STR, key.c_str())){
+					// [NOTE] See INICFG_ENDPOINTS_STR comment.
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, svrnode.ctlendpoints)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_CTLENDPOINTS_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_FORWARD_PEER_STR, key.c_str())){
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, svrnode.forward_peers)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_FORWARD_PEER_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_REVERSE_PEER_STR, key.c_str())){
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, svrnode.reverse_peers)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_REVERSE_PEER_STR, CFG_SVRNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_CUSTOM_ID_SEED_STR, key.c_str())){
+					svrnode.custom_seed = reinterpret_cast<const char*>(yevent.data.scalar.value);
 
 				}else if(0 == strcasecmp(INICFG_SSL_STR, key.c_str())){
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_BOOL_ON) || 0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_BOOL_YES)){
@@ -2942,12 +3544,12 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 		}
 		if(result){
 			// [NOTE]
-			// The server list might have duplicate server name & port.
+			// The server list might have duplicate server name & port &cuk.
 			// Because the port number can not be specified in configuration file, so if there is some server nodes on same server
 			// and one specifies port and the other does not specify port(using default port).
 			// On this case, the list have duplicate server.
 			//
-			chmcfginfo.servers.unique(chm_node_cfg_info_same_name_port());		// uniq about server node must be name and port
+			chmcfginfo.servers.unique(chm_node_cfg_info_same_name_other());		// uniq about server node must be name and port
 			chmcfginfo.servers.sort(chm_node_cfg_info_sort());
 		}
 	}
@@ -2972,6 +3574,9 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 		}
 		yaml_event_delete(&yevent);
 	}
+
+	// Set default value in GLOBAL section
+	chmcfginfo.slaves.clear();
 
 	// temporary data
 	CHMNODE_CFGINFO	slvnode;
@@ -3008,6 +3613,12 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				slvnode.capath			= ccvals.capath;
 				slvnode.slave_cert		= ccvals.slave_cert;
 				slvnode.slave_prikey	= ccvals.slave_prikey;
+				slvnode.cuk.clear();
+				slvnode.endpoints.clear();
+				slvnode.ctlendpoints.clear();
+				slvnode.forward_peers.clear();
+				slvnode.reverse_peers.clear();
+				slvnode.custom_seed.clear();
 			}
 
 		}else if(YAML_MAPPING_END_EVENT == yevent.type){
@@ -3023,6 +3634,29 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				if(slvnode.name.empty()){
 					ERR_CHMPRN("Found some value in %s section, but NAME is empty.", CFG_SLVNODE_SEC_STR);
 					result = false;
+				}
+				if(CHMPXID_SEED_CUK == chmcfginfo.chmpxid_type){
+					if(slvnode.cuk.empty()){
+						ERR_CHMPRN("Not found CUK value in %s section, but chmpxid seed is from \"CUK\".", CFG_SLVNODE_SEC_STR);
+						result = false;
+					}
+				}
+				if(CHMPXID_SEED_CTLENDPOINTS == chmcfginfo.chmpxid_type){
+					if(slvnode.ctlendpoints.empty()){
+						ERR_CHMPRN("Not found CTLENDPOINTS value in %s section, but chmpxid seed is from \"control end points\".", CFG_SLVNODE_SEC_STR);
+						result = false;
+					}
+				}
+				if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
+					if(slvnode.custom_seed.empty()){
+						ERR_CHMPRN("Not found CUSTOM_SEED value in %s section, but chmpxid seed is from \"custom seed\".", CFG_SLVNODE_SEC_STR);
+						result = false;
+					}
+				}else{
+					if(!slvnode.custom_seed.empty()){
+						ERR_CHMPRN("Found CUSTOM_SEED value in %s section, but chmpxid seed is not from \"custom seed\".", CFG_SLVNODE_SEC_STR);
+						result = false;
+					}
 				}
 				if(!ccvals.found_ssl && !slvnode.capath.empty()){
 					// There is not SSL, but CApath is set.
@@ -3052,6 +3686,16 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 						// SSL_SLAVE_CERT, SSL_SLAVE_PRIKEY must not be set.
 						ERR_CHMPRN("Found %s with value(%s) and %s with(%s) in %s slave node in %s section.", INICFG_SLAVE_CERT_STR, slvnode.slave_cert.c_str(), INICFG_SLAVE_PRIKEY_STR, slvnode.slave_prikey.c_str(), slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
 						result = false;
+					}
+				}
+
+				// [NOTE]
+				// If the CTLEPS port is not specified, CHM_INVALID_PORT is set as
+				// the temporary port number, so set these as default ports(slvnode.port).
+				//
+				for(hostport_list_t::iterator epsiter = slvnode.ctlendpoints.begin(); slvnode.ctlendpoints.end() != epsiter; ++epsiter){
+					if(CHM_INVALID_PORT == epsiter->port){
+						epsiter->port = slvnode.ctlport;
 					}
 				}
 
@@ -3088,6 +3732,35 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 
 				}else if(0 == strcasecmp(INICFG_CTLPORT_STR, key.c_str())){
 					slvnode.ctlport = static_cast<short>(atoi(reinterpret_cast<const char*>(yevent.data.scalar.value)));
+
+				}else if(0 == strcasecmp(INICFG_CUK_STR, key.c_str())){
+					slvnode.cuk = reinterpret_cast<const char*>(yevent.data.scalar.value);
+
+				}else if(0 == strcasecmp(INICFG_CTLENDPOINTS_STR, key.c_str())){
+					// [NOTE]
+					// we want to use slvnode.ctlport as the default port, but CHM_INVALID_PORT is used
+					// instead because it may not be set at this point.
+					// After this process is over, replace CHM_INVALID_PORT with the default port.
+					//
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, slvnode.ctlendpoints)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_CTLENDPOINTS_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_FORWARD_PEER_STR, key.c_str())){
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, slvnode.forward_peers)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_FORWARD_PEER_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_REVERSE_PEER_STR, key.c_str())){
+					if(!CvtHostPortStringToList(string(reinterpret_cast<const char*>(yevent.data.scalar.value)), CHM_INVALID_PORT, slvnode.reverse_peers)){
+						ERR_CHMPRN("Found %s in %s section, but value %s is something wrong.", INICFG_REVERSE_PEER_STR, CFG_SLVNODE_SEC_STR, reinterpret_cast<const char*>(yevent.data.scalar.value));
+						result = false;
+					}
+
+				}else if(0 == strcasecmp(INICFG_CUSTOM_ID_SEED_STR, key.c_str())){
+					slvnode.custom_seed = reinterpret_cast<const char*>(yevent.data.scalar.value);
 
 				}else if(0 == strcasecmp(INICFG_CAPATH_STR, key.c_str())){
 					if(0 == strcasecmp(reinterpret_cast<const char*>(yevent.data.scalar.value), INICFG_STRING_NULL)){
@@ -3177,14 +3850,14 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 	}
 
 	if(result){
-		chmcfginfo.slaves.unique(chm_node_cfg_info_same_name_port());		// uniq about slave node must be name and port
+		chmcfginfo.slaves.unique(chm_node_cfg_info_same_name_other());		// uniq about slave node must be name and port
 		chmcfginfo.slaves.sort(chm_node_cfg_info_sort());
 	}
 
 	return result;
 }
 
-static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, short default_ctlport)
+static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, short default_ctlport, const string& default_cuk)
 {
 	CHMYamlDataStack	other_stack;
 	CHMCONF_CCV			ccvals;
@@ -3387,7 +4060,7 @@ static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO&
 							}
 						}else{
 							// Load GLOBAL section
-							if(!ChmYamlLoadConfigurationGlobalSec(yparser, chmcfginfo, ccvals, default_ctlport)){
+							if(!ChmYamlLoadConfigurationGlobalSec(yparser, chmcfginfo, ccvals, default_ctlport, default_cuk)){
 								ERR_CHMPRN("Something error occured in loading %s section.", CFG_GLOBAL_SEC_STR);
 								result = false;
 							}
@@ -3446,7 +4119,7 @@ static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO&
 	if(result){
 		// Re-check for server/slave mode by self control port number.
 		//
-		if(ccvals.is_server_by_ctlport){
+		if(ccvals.server_mode_by_comp){
 			if(!ccvals.server_mode){
 				WAN_CHMPRN("There is no \"%s\" in %s section, but self control port(%d) found in server list, so run server mode.", INICFG_MODE_STR, INICFG_GLOBAL_SEC_STR, chmcfginfo.self_ctlport);
 				chmcfginfo.is_server_mode = true;
@@ -3491,7 +4164,7 @@ static bool ChmYamlLoadConfigurationTopLevel(yaml_parser_t& yparser, CHMCFGINFO&
 //---------------------------------------------------------
 // CHMYamlBaseConf Class
 //---------------------------------------------------------
-CHMYamlBaseConf::CHMYamlBaseConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* pJson) : CHMConf(eventqfd, pcntrl, file, ctlport, pJson)
+CHMYamlBaseConf::CHMYamlBaseConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* cuk, const char* pJson) : CHMConf(eventqfd, pcntrl, file, ctlport, cuk, pJson)
 {
 }
 
@@ -3543,7 +4216,7 @@ bool CHMYamlBaseConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 	}
 
 	// Do parsing
-	bool	result = ChmYamlLoadConfigurationTopLevel(yparser, chmcfginfo, ctlport_param);
+	bool	result = ChmYamlLoadConfigurationTopLevel(yparser, chmcfginfo, ctlport_param, cuk_param);
 
 	yaml_parser_delete(&yparser);
 	if(fp){
@@ -3555,7 +4228,7 @@ bool CHMYamlBaseConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 //---------------------------------------------------------
 // CHMJsonConf Class
 //---------------------------------------------------------
-CHMJsonConf::CHMJsonConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport) : CHMYamlBaseConf(eventqfd, pcntrl, file, ctlport, NULL)
+CHMJsonConf::CHMJsonConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* cuk) : CHMYamlBaseConf(eventqfd, pcntrl, file, ctlport, cuk, NULL)
 {
 	type = CHMConf::CONF_JSON;
 }
@@ -3567,7 +4240,7 @@ CHMJsonConf::~CHMJsonConf()
 //---------------------------------------------------------
 // CHMJsonStringConf Class
 //---------------------------------------------------------
-CHMJsonStringConf::CHMJsonStringConf(int eventqfd, ChmCntrl* pcntrl, const char* pJson, short ctlport) : CHMYamlBaseConf(eventqfd, pcntrl, NULL, ctlport, pJson)
+CHMJsonStringConf::CHMJsonStringConf(int eventqfd, ChmCntrl* pcntrl, const char* pJson, short ctlport, const char* cuk) : CHMYamlBaseConf(eventqfd, pcntrl, NULL, ctlport, cuk, pJson)
 {
 	type = CHMConf::CONF_JSON_STR;		// default
 }
@@ -3579,7 +4252,7 @@ CHMJsonStringConf::~CHMJsonStringConf()
 //---------------------------------------------------------
 // CHMYamlConf Class
 //---------------------------------------------------------
-CHMYamlConf::CHMYamlConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport) : CHMYamlBaseConf(eventqfd, pcntrl, file, ctlport, NULL)
+CHMYamlConf::CHMYamlConf(int eventqfd, ChmCntrl* pcntrl, const char* file, short ctlport, const char* cuk) : CHMYamlBaseConf(eventqfd, pcntrl, file, ctlport, cuk, NULL)
 {
 	type = CHMConf::CONF_YAML;
 }

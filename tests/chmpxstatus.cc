@@ -116,14 +116,15 @@ inline std::string PRN_TIMESPEC(const timespec& ts)
 static void Help(char* progname)
 {
 	PRN("");
-	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] [-self] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
-	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] -wait -live [down|up] -ring [serviceout|servicein|slave] -(no)suspend [-timeout <second>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
+	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] [-cuk <cuk>] [-self] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
+	PRN("Usage: %s -conf <configuration file path> [-ctlport <port>] [-cuk <cuk>] -wait -live [down|up] -ring [serviceout|servicein|slave] -(no)suspend [-timeout <second>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]", progname ? programname(progname) : "program");
 	PRN("Usage: %s -h", progname ? programname(progname) : "program");
 	PRN("");
 	PRN("Option");
 	PRN("  -conf <file name>    configuration file( .ini / .json / .yaml ) path");
 	PRN("  -json <json>         configuration JSON string\n");
 	PRN("  -ctlport <port>      specify the self control port(*)");
+	PRN("  -cuk <cuk>           specify the self CUK");
 	PRN("  -self                print only self chmpx");
 	PRN("  -wait                to wait until the state changes to the specified value");
 	PRN("  -live <param>        Specify live status by waiting mode");
@@ -234,6 +235,12 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		PRN("  pending hash                               = 0x%016" PRIx64 ,pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.pending_hash);
 		PRN("  port                                       = %d",			pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.port);
 		PRN("  control port                               = %d",			pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlport);
+		PRN("  cuk                                        = %s",			pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.cuk);
+		PRN("  custom id seed                             = %s",			pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.custom_seed);
+		PRN("  endpoints                                  = %s",			get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.endpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("  control endpoints                          = %s",			get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("  forward peers                              = %s",			get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.forward_peers, FORWARD_PEER_MAX).c_str());
+		PRN("  reverse peers                              = %s",			get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.reverse_peers, REVERSE_PEER_MAX).c_str());
 		PRN("  ssl                                        = %s",			pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.is_ssl ? "yes" : "no");
 
 		if(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.is_ssl){
@@ -275,6 +282,12 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		PRN("    pending hash                             = 0x%016" PRIx64 ,pchmpxlist->chmpx.pending_hash);
 		PRN("    port                                     = %d",			pchmpxlist->chmpx.port);
 		PRN("    control port                             = %d",			pchmpxlist->chmpx.ctlport);
+		PRN("    cuk                                      = %s",			pchmpxlist->chmpx.cuk);
+		PRN("    custom id seed                           = %s",			pchmpxlist->chmpx.custom_seed);
+		PRN("    endpoints                                = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.endpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("    control endpoints                        = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("    forward peers                            = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.forward_peers, FORWARD_PEER_MAX).c_str());
+		PRN("    reverse peers                            = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.reverse_peers, REVERSE_PEER_MAX).c_str());
 		PRN("    ssl                                      = %s",			pchmpxlist->chmpx.is_ssl ? "yes" : "no");
 
 		if(pchmpxlist->chmpx.is_ssl){
@@ -317,6 +330,12 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		PRN("    pending hash                             = 0x%016" PRIx64 ,pchmpxlist->chmpx.pending_hash);
 		PRN("    port                                     = %d",			pchmpxlist->chmpx.port);
 		PRN("    control port                             = %d",			pchmpxlist->chmpx.ctlport);
+		PRN("    cuk                                      = %s",			pchmpxlist->chmpx.cuk);
+		PRN("    custom id seed                           = %s",			pchmpxlist->chmpx.custom_seed);
+		PRN("    endpoints                                = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.endpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("    control endpoints                        = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str());
+		PRN("    forward peers                            = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.forward_peers, FORWARD_PEER_MAX).c_str());
+		PRN("    reverse peers                            = %s",			get_hostport_pairs_string(pchmpxlist->chmpx.reverse_peers, REVERSE_PEER_MAX).c_str());
 		PRN("    ssl                                      = %s",			pchmpxlist->chmpx.is_ssl ? "yes" : "no");
 
 		if(pchmpxlist->chmpx.is_ssl){
@@ -447,6 +466,12 @@ static bool PrintSelfInfo(ChmCntrl* pchmobj)
 	PRN("  pending hash                               = 0x%016" PRIx64 ,pInfo->pending_hash);
 	PRN("  port                                       = %d",			pInfo->port);
 	PRN("  control port                               = %d",			pInfo->ctlport);
+	PRN("    cuk                                      = %s",			pInfo->cuk);
+	PRN("    custom id seed                           = %s",			pInfo->custom_seed);
+	PRN("    endpoints                                = %s",			get_hostport_pairs_string(pInfo->endpoints, EXTERNAL_EP_MAX).c_str());
+	PRN("    control endpoints                        = %s",			get_hostport_pairs_string(pInfo->ctlendpoints, EXTERNAL_EP_MAX).c_str());
+	PRN("    forward peers                            = %s",			get_hostport_pairs_string(pInfo->forward_peers, FORWARD_PEER_MAX).c_str());
+	PRN("    reverse peers                            = %s",			get_hostport_pairs_string(pInfo->reverse_peers, REVERSE_PEER_MAX).c_str());
 	PRN("  ssl                                        = %s",			pInfo->is_ssl ? "yes" : "no");
 
 	if(pInfo->is_ssl){
@@ -584,9 +609,17 @@ int main(int argc, char** argv)
 		}
 	}
 
+	// cuk
+	string	strcuk;
+	{
+		if(!opts.Get("cuk", strcuk)){
+			strcuk.clear();
+		}
+	}
+
 	// Initialize
 	ChmCntrl	chmobj;
-	if(!chmobj.OnlyAttachInitialize(config.c_str(), ctlport)){
+	if(!chmobj.OnlyAttachInitialize(config.c_str(), ctlport, (strcuk.empty() ? NULL : strcuk.c_str()))){
 		ERR("Could not initialize(attach) chmpx shared memory.");
 		PRN("You can see detail about error, execute with \"-d\"(\"-g\") option.");
 		exit(EXIT_FAILURE);
