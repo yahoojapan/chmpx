@@ -259,21 +259,41 @@ typedef struct chmpx_inotify_com{
 //
 typedef uint64_t						pxcomtype_t;		// type for packet
 typedef uint64_t						pxcomres_t;			// result code for PXCOM_XXX
+typedef uint64_t						comver_t;			// Protocol version
 
 // [NOTICE]
-// CHMPX_COM_STATUS_REQ & CHMPX_COM_STATUS_RES is pull-type for status and server information updating.
-// CHMPX_COM_STATUS_UPDATE is push to all server for updating by sending server's all status.
-// So CHMPX_COM_STATUS_UPDATE is not used now because of taking very careful(no recovering if failed).
+// CHMPX_COM_N2_STATUS_REQ & CHMPX_COM_N2_STATUS_RES is pull-type for status and server information updating.
+// CHMPX_COM_N2_STATUS_UPDATE is push to all server for updating by sending server's all status.
+// So CHMPX_COM_N2_STATUS_UPDATE is not used now because of taking very careful(no recovering if failed).
+//
+// [NOTE] - [DEPRECATED 1.0.71]
+// Communication protocols with this mark have been deprecated since v1.0.71.
+// v1.0.71 or later uses version 2 of the communication protocol.(version 1 is
+// before v1.0.71.)
+// CHMPX determines the communication protocol and automatically switches the
+// version. Set "CHMPX_COM_PROTO_VER=1" to forcibly use communication protocol
+// version 1. Since the communication protocol version of the server node that
+// is started first takes precedence, connecting a version 1 node to a version
+// 2 server node RING may cause problems.
+// If CHMPX v1.0.71 or earlier is running and you force to use communicate with
+// version 1, you can set the environment variable "CHMPX_COM_PROTO_VER=1".
+// If you are using a version of CHMPX that can only use version 1 of the
+// communication protocol, you must upgrade all CHMPX versions. To upgrade a
+// mixed version environment safely, first set the environment variable
+// "CHMPX_COM_PROTO_VER=1" and restart CHMPX. And upgrade all CHMPX. When the
+// upgrade is complete, restart without environment variables.
+// (Specify the protocol version in the environment variable CHMPX_COM_PROTO_VER.
+// Currently, it is "1" before v1.0.71 and "2" after v1.0.71.)
 //
 #define	CHMPX_COM_UNKNOWN				0					// Unknown
-#define	CHMPX_COM_STATUS_REQ			1					// Get server nodes status
-#define	CHMPX_COM_STATUS_RES			2					// Result(Response) server nodes status
-#define	CHMPX_COM_CONINIT_REQ			3					// Send initial connect information
-#define	CHMPX_COM_CONINIT_RES			4					// Result(Response) initial connect information
-#define	CHMPX_COM_JOIN_RING				5					// [loop in RING] server up & join ring
-#define	CHMPX_COM_STATUS_UPDATE			6					// [loop in RING] status update
-#define	CHMPX_COM_STATUS_CONFIRM		7					// [loop in RING] status confirm
-#define	CHMPX_COM_STATUS_CHANGE			8					// [loop in RING] status change(notice)
+#define	CHMPX_COM_STATUS_REQ			1					// [DEPRECATED 1.0.71] Get server nodes status						-> Use CHMPX_COM_N2_STATUS_REQ
+#define	CHMPX_COM_STATUS_RES			2					// [DEPRECATED 1.0.71] Result(Response) server nodes status			-> Use CHMPX_COM_N2_STATUS_RES
+#define	CHMPX_COM_CONINIT_REQ			3					// [DEPRECATED 1.0.71] Send initial connect information				-> Use CHMPX_COM_N2_CONINIT_REQ
+#define	CHMPX_COM_CONINIT_RES			4					// [DEPRECATED 1.0.71] Result(Response) initial connect information	-> Use CHMPX_COM_N2_CONINIT_RES
+#define	CHMPX_COM_JOIN_RING				5					// [DEPRECATED 1.0.71] [loop in RING] server up & join ring			-> Use CHMPX_COM_N2_JOIN_RING
+#define	CHMPX_COM_STATUS_UPDATE			6					// [DEPRECATED 1.0.71] [loop in RING] status update					-> Use CHMPX_COM_N2_STATUS_UPDATE
+#define	CHMPX_COM_STATUS_CONFIRM		7					// [DEPRECATED 1.0.71] [loop in RING] status confirm				-> Use CHMPX_COM_N2_STATUS_CONFIRM
+#define	CHMPX_COM_STATUS_CHANGE			8					// [DEPRECATED 1.0.71] [loop in RING] status change(notice)			-> Use CHMPX_COM_N2_STATUS_CHANGE
 #define	CHMPX_COM_MERGE_START			9					// [loop in RING] start merging
 #define	CHMPX_COM_MERGE_ABORT			10					// [loop in RING] abort merging
 #define	CHMPX_COM_MERGE_COMPLETE		11					// [loop in RING] complete merging
@@ -285,28 +305,21 @@ typedef uint64_t						pxcomres_t;			// result code for PXCOM_XXX
 #define	CHMPX_COM_MERGE_NOSUSPEND		17					// [loop in RING] reset(nosuspend) auto merging(v1.0.54)
 #define	CHMPX_COM_MERGE_SUSPEND_GET		18					// Request suspend merging suspend at initializing(v1.0.57)
 #define	CHMPX_COM_MERGE_SUSPEND_RES		19					// Response suspend merging status at initializing(v1.0.57)
+#define	CHMPX_COM_VERSION_REQ			20					// Get communication protocol version and other version(after v1.0.71)
+#define	CHMPX_COM_VERSION_RES			21					// Result(Response) communication protocol version and other version(after v1.0.71)
+#define	CHMPX_COM_N2_STATUS_REQ			22					// Get server nodes status(after v1.0.71)
+#define	CHMPX_COM_N2_STATUS_RES			23					// Result(Response) server nodes status(after v1.0.71)
+#define	CHMPX_COM_N2_CONINIT_REQ		24					// Send initial connect information(after v1.0.71)
+#define	CHMPX_COM_N2_CONINIT_RES		25					// Result(Response) initial connect information(after v1.0.71)
+#define	CHMPX_COM_N2_JOIN_RING			26					// [loop in RING] server up & join ring(after v1.0.71)
+#define	CHMPX_COM_N2_STATUS_UPDATE		27					// [loop in RING] status update(after v1.0.71)
+#define	CHMPX_COM_N2_STATUS_CONFIRM		28					// [loop in RING] status confirm(after v1.0.71)
+#define	CHMPX_COM_N2_STATUS_CHANGE		29					// [loop in RING] status change/notice(after v1.0.71)
 
-#define	STRPXCOMTYPE(type)			(	CHMPX_COM_UNKNOWN			== type ? "CHMPX_COM_UNKNOWN"			: \
-										CHMPX_COM_STATUS_REQ		== type ? "CHMPX_COM_STATUS_REQ"		: \
-										CHMPX_COM_STATUS_RES		== type ? "CHMPX_COM_STATUS_RES"		: \
-										CHMPX_COM_CONINIT_REQ		== type ? "CHMPX_COM_CONINIT_REQ"		: \
-										CHMPX_COM_CONINIT_RES		== type ? "CHMPX_COM_CONINIT_RES"		: \
-										CHMPX_COM_JOIN_RING			== type ? "CHMPX_COM_JOIN_RING"			: \
-										CHMPX_COM_STATUS_UPDATE		== type ? "CHMPX_COM_STATUS_UPDATE"		: \
-										CHMPX_COM_STATUS_CONFIRM	== type ? "CHMPX_COM_STATUS_CONFIRM"	: \
-										CHMPX_COM_STATUS_CHANGE		== type ? "CHMPX_COM_STATUS_CHANGE"		: \
-										CHMPX_COM_MERGE_START		== type ? "CHMPX_COM_MERGE_START"		: \
-										CHMPX_COM_MERGE_ABORT		== type ? "CHMPX_COM_MERGE_ABORT"		: \
-										CHMPX_COM_MERGE_COMPLETE	== type ? "CHMPX_COM_MERGE_COMPLETE"	: \
-										CHMPX_COM_SERVER_DOWN		== type ? "CHMPX_COM_SERVER_DOWN"		: \
-										CHMPX_COM_REQ_UPDATEDATA	== type ? "CHMPX_COM_REQ_UPDATEDATA"	: \
-										CHMPX_COM_RES_UPDATEDATA	== type ? "CHMPX_COM_RES_UPDATEDATA"	: \
-										CHMPX_COM_RESULT_UPDATEDATA	== type ? "CHMPX_COM_RESULT_UPDATEDATA"	: \
-										CHMPX_COM_MERGE_SUSPEND		== type ? "CHMPX_COM_MERGE_SUSPEND"		: \
-										CHMPX_COM_MERGE_NOSUSPEND	== type ? "CHMPX_COM_MERGE_NOSUSPEND"	: \
-										CHMPX_COM_MERGE_SUSPEND_GET	== type ? "CHMPX_COM_MERGE_SUSPEND_GET"	: \
-										CHMPX_COM_MERGE_SUSPEND_RES	== type ? "CHMPX_COM_MERGE_SUSPEND_RES"	: \
-										"NOT_DEFINED_TYPE"	)
+// [NOTE]
+// The STRPXCOMTYPE() macro has been moved to the chmeventsock.cc file.
+// See comments in chmeventsock.cc for details.
+//
 
 #define	CHMPX_COM_RES_SUCCESS			0					// no error
 #define	CHMPX_COM_RES_ERROR				1					// error
@@ -337,46 +350,54 @@ typedef struct chmpx_com_head{
 	size_t			length;					// Length for this packet
 }CHMPX_ATTR_PACKED PXCOM_HEAD, *PPXCOM_HEAD;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_status_req{
 	PXCOM_HEAD		head;
 }CHMPX_ATTR_PACKED PXCOM_STATUS_REQ, *PPXCOM_STATUS_REQ;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_status_res{
 	PXCOM_HEAD		head;
 	long			count;
 	off_t			pchmpxsvr_offset;
 }CHMPX_ATTR_PACKED PXCOM_STATUS_RES, *PPXCOM_STATUS_RES;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_coninit_req{
 	PXCOM_HEAD		head;
 	chmpxid_t		chmpxid;
 	short			ctlport;
 }CHMPX_ATTR_PACKED PXCOM_CONINIT_REQ, *PPXCOM_CONINIT_REQ;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_coninit_res{
 	PXCOM_HEAD		head;
 }CHMPX_ATTR_PACKED PXCOM_CONINIT_RES, *PPXCOM_CONINIT_RES;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_join_ring{
 	PXCOM_HEAD		head;
-	CHMPXSVR		server;
+	CHMPXSVRV1		server;
 }CHMPX_ATTR_PACKED PXCOM_JOIN_RING, *PPXCOM_JOIN_RING;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_status_update{							// same as STATUS_RES
 	PXCOM_HEAD		head;
 	long			count;
 	off_t			pchmpxsvr_offset;
 }CHMPX_ATTR_PACKED PXCOM_STATUS_UPDATE, *PPXCOM_STATUS_UPDATE;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_status_confirm{						// same as STATUS_RES
 	PXCOM_HEAD		head;
 	long			count;
 	off_t			pchmpxsvr_offset;
 }CHMPX_ATTR_PACKED PXCOM_STATUS_CONFIRM, *PPXCOM_STATUS_CONFIRM;
 
+// [DEPRECATED 1.0.71]
 typedef struct chmpx_com_status_change{							// same as JOIN_RING
 	PXCOM_HEAD		head;
-	CHMPXSVR		server;
+	CHMPXSVRV1		server;
 }CHMPX_ATTR_PACKED PXCOM_STATUS_CHANGE, *PPXCOM_STATUS_CHANGE;
 
 typedef struct chmpx_com_merge_start{							// same as STATUS_REQ
@@ -438,6 +459,68 @@ typedef struct chmpx_com_merge_suspend_res{
 	bool			is_suspend;
 }CHMPX_ATTR_PACKED PXCOM_MERGE_SUSPEND_RES, *PPXCOM_MERGE_SUSPEND_RES;
 
+typedef struct chmpx_com_version_req{
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_VERSION_REQ, *PPXCOM_VERSION_REQ;
+
+typedef struct chmpx_com_version_res{
+	PXCOM_HEAD		head;
+	comver_t		chmpx_com_version;							// maximum version of communication that chmpx can use
+	comver_t		chmpx_cur_version;							// communication version used in the current RING
+	uint64_t		chmpx_bin_version;							// chmpx binary version value
+	char			chmpx_str_version[CHMPX_VERSION_MAX];		// chmpx binary version string
+	char			commit_hash[COMMIT_HASH_MAX];				// chmpx binary commit hash value
+}CHMPX_ATTR_PACKED PXCOM_VERSION_RES, *PPXCOM_VERSION_RES;
+
+typedef struct chmpx_com_n2_status_req{
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_N2_STATUS_REQ, *PPXCOM_N2_STATUS_REQ;
+
+typedef struct chmpx_com_n2_status_res{
+	PXCOM_HEAD		head;
+	long			count;
+	off_t			pchmpxsvr_offset;
+}CHMPX_ATTR_PACKED PXCOM_N2_STATUS_RES, *PPXCOM_N2_STATUS_RES;
+
+typedef struct chmpx_com_n2_coninit_req{
+	PXCOM_HEAD		head;
+	char			name[NI_MAXHOST];								// = 1025 for getnameinfo()
+	chmpxid_t		chmpxid;
+	short			ctlport;
+	char			cuk[CUK_MAX];
+	char			custom_seed[CUSTOM_ID_SEED_MAX];
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+	CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];
+	CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];
+}CHMPX_ATTR_PACKED PXCOM_N2_CONINIT_REQ, *PPXCOM_N2_CONINIT_REQ;
+
+typedef struct chmpx_com_n2_coninit_res{
+	PXCOM_HEAD		head;
+}CHMPX_ATTR_PACKED PXCOM_N2_CONINIT_RES, *PPXCOM_N2_CONINIT_RES;
+
+typedef struct chmpx_com_n2_join_ring{
+	PXCOM_HEAD		head;
+	CHMPXSVR		server;
+}CHMPX_ATTR_PACKED PXCOM_N2_JOIN_RING, *PPXCOM_N2_JOIN_RING;
+
+typedef struct chmpx_com_n2_status_update{							// same as STATUS_RES
+	PXCOM_HEAD		head;
+	long			count;
+	off_t			pchmpxsvr_offset;
+}CHMPX_ATTR_PACKED PXCOM_N2_STATUS_UPDATE, *PPXCOM_N2_STATUS_UPDATE;
+
+typedef struct chmpx_com_n2_status_confirm{							// same as STATUS_RES
+	PXCOM_HEAD		head;
+	long			count;
+	off_t			pchmpxsvr_offset;
+}CHMPX_ATTR_PACKED PXCOM_N2_STATUS_CONFIRM, *PPXCOM_N2_STATUS_CONFIRM;
+
+typedef struct chmpx_com_n2_status_change{							// same as JOIN_RING
+	PXCOM_HEAD		head;
+	CHMPXSVR		server;
+}CHMPX_ATTR_PACKED PXCOM_N2_STATUS_CHANGE, *PPXCOM_N2_STATUS_CHANGE;
+
 typedef union chmpx_com_all{
 	PXCOM_HEAD				val_head;
 	PXCOM_STATUS_REQ		val_status_req;
@@ -459,6 +542,16 @@ typedef union chmpx_com_all{
 	PXCOM_MERGE_NOSUSPEND	val_merge_nosuspend;
 	PXCOM_MERGE_SUSPEND_GET	val_merge_suspend_get;
 	PXCOM_MERGE_SUSPEND_RES	val_merge_suspend_res;
+	PXCOM_VERSION_REQ		val_version_req;
+	PXCOM_VERSION_RES		val_version_res;
+	PXCOM_N2_STATUS_REQ		val_n2_status_req;
+	PXCOM_N2_STATUS_RES		val_n2_status_res;
+	PXCOM_N2_CONINIT_REQ	val_n2_coninit_req;
+	PXCOM_N2_CONINIT_RES	val_n2_coninit_res;
+	PXCOM_N2_JOIN_RING		val_n2_join_ring;
+	PXCOM_N2_STATUS_UPDATE	val_n2_status_update;
+	PXCOM_N2_STATUS_CONFIRM	val_n2_status_confirm;
+	PXCOM_N2_STATUS_CHANGE	val_n2_status_change;
 }CHMPX_ATTR_PACKED PXCOM_ALL, *PPXCOM_ALL;
 
 //------------
@@ -505,15 +598,15 @@ typedef union chmpx_com_all{
 #define	HTON_PPXCOM_CONINIT_REQ(pdata)	\
 		{ \
 			HTON_PPXCOM_HEAD(&((pdata)->head)); \
-			(pdata)->chmpxid		= htobe64((pdata)->chmpxid); \
-			(pdata)->ctlport		= htobe16((pdata)->ctlport); \
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
+			(pdata)->ctlport			= htobe16((pdata)->ctlport); \
 		}
 
 #define	NTOH_PPXCOM_CONINIT_REQ(pdata)	\
 		{ \
 			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
-			(pdata)->chmpxid		= be64toh((pdata)->chmpxid); \
-			(pdata)->ctlport		= be16toh((pdata)->ctlport); \
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid); \
+			(pdata)->ctlport			= be16toh((pdata)->ctlport); \
 		}
 
 #define	HTON_PPXCOM_CONINIT_RES(pdata)	\
@@ -529,13 +622,13 @@ typedef union chmpx_com_all{
 #define	HTON_PPXCOM_JOIN_RING(pdata)	\
 		{ \
 			HTON_PPXCOM_HEAD(&((pdata)->head)); \
-			HTON_PCHMPXSVR(&((pdata)->server)); \
+			HTON_PCHMPXSVRV1(&((pdata)->server)); \
 		}
 
 #define	NTOH_PPXCOM_JOIN_RING(pdata)	\
 		{ \
 			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
-			NTOH_PCHMPXSVR(&((pdata)->server)); \
+			NTOH_PCHMPXSVRV1(&((pdata)->server)); \
 		}
 
 #define	HTON_PPXCOM_STATUS_UPDATE(pdata)	\
@@ -569,13 +662,13 @@ typedef union chmpx_com_all{
 #define	HTON_PPXCOM_STATUS_CHANGE(pdata)	\
 		{ \
 			HTON_PPXCOM_HEAD(&((pdata)->head)); \
-			HTON_PCHMPXSVR(&((pdata)->server)); \
+			HTON_PCHMPXSVRV1(&((pdata)->server)); \
 		}
 
 #define	NTOH_PPXCOM_STATUS_CHANGE(pdata)	\
 		{ \
 			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
-			NTOH_PCHMPXSVR(&((pdata)->server)); \
+			NTOH_PCHMPXSVRV1(&((pdata)->server)); \
 		}
 
 #define	HTON_PPXCOM_MERGE_START(pdata)	\
@@ -611,25 +704,25 @@ typedef union chmpx_com_all{
 #define	HTON_PPXCOM_SERVER_DOWN(pdata)	\
 		{ \
 			HTON_PPXCOM_HEAD(&((pdata)->head)); \
-			(pdata)->chmpxid= htobe64((pdata)->chmpxid); \
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
 		}
 
 #define	NTOH_PPXCOM_SERVER_DOWN(pdata)	\
 		{ \
 			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
-			(pdata)->chmpxid= be64toh((pdata)->chmpxid); \
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid); \
 		}
 
 #define	HTON_PPXCOM_REQ_IDMAP(pdata)	\
 		{ \
-			(pdata)->chmpxid	= htobe64((pdata)->chmpxid);	\
-			(pdata)->req_status	= htobe64((pdata)->req_status);	\
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid);	\
+			(pdata)->req_status			= htobe64((pdata)->req_status);	\
 		}
 
 #define	NTOH_PPXCOM_REQ_IDMAP(pdata)	\
 		{ \
-			(pdata)->chmpxid	= be64toh((pdata)->chmpxid);	\
-			(pdata)->req_status	= be64toh((pdata)->req_status);	\
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid);	\
+			(pdata)->req_status			= be64toh((pdata)->req_status);	\
 		}
 
 #define	HTON_PXCOMMON_MERGE_PARAM(pdata)	\
@@ -742,6 +835,162 @@ typedef union chmpx_com_all{
 			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
 		}
 
+#define	HTON_PPXCOM_VERSION_REQ(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_VERSION_REQ(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	HTON_PPXCOM_VERSION_RES(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->chmpx_com_version	= htobe64((pdata)->chmpx_com_version); \
+			(pdata)->chmpx_cur_version	= htobe64((pdata)->chmpx_cur_version); \
+			(pdata)->chmpx_bin_version	= htobe64((pdata)->chmpx_bin_version); \
+		}
+
+#define	NTOH_PPXCOM_VERSION_RES(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->chmpx_com_version	= be64toh((pdata)->chmpx_com_version); \
+			(pdata)->chmpx_cur_version	= be64toh((pdata)->chmpx_cur_version); \
+			(pdata)->chmpx_bin_version	= be64toh((pdata)->chmpx_bin_version); \
+		}
+
+#define	HTON_PPXCOM_N2_STATUS_REQ(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_N2_STATUS_REQ(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	HTON_PPXCOM_N2_STATUS_RES(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= htobe64((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= htobe64((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	NTOH_PPXCOM_N2_STATUS_RES(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= be64toh((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= be64toh((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	HTON_PPXCOM_N2_CONINIT_REQ(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
+			(pdata)->ctlport			= htobe16((pdata)->ctlport); \
+			{ \
+				int	_hton_hostport_pair_cnt; \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->endpoints[_hton_hostport_pair_cnt].port = htobe16((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = htobe16((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < FORWARD_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = htobe16((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < REVERSE_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = htobe16((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
+				} \
+			} \
+		}
+
+#define	NTOH_PPXCOM_N2_CONINIT_REQ(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid); \
+			(pdata)->ctlport			= be16toh((pdata)->ctlport); \
+			{ \
+				int	_hton_hostport_pair_cnt; \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->endpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < FORWARD_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < REVERSE_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
+				} \
+			} \
+		}
+
+#define	HTON_PPXCOM_N2_CONINIT_RES(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	NTOH_PPXCOM_N2_CONINIT_RES(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+		}
+
+#define	HTON_PPXCOM_N2_JOIN_RING(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			HTON_PCHMPXSVR(&((pdata)->server)); \
+		}
+
+#define	NTOH_PPXCOM_N2_JOIN_RING(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			NTOH_PCHMPXSVR(&((pdata)->server)); \
+		}
+
+#define	HTON_PPXCOM_N2_STATUS_UPDATE(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= htobe64((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= htobe64((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	NTOH_PPXCOM_N2_STATUS_UPDATE(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= be64toh((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= be64toh((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	HTON_PPXCOM_N2_STATUS_CONFIRM(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= htobe64((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= htobe64((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	NTOH_PPXCOM_N2_STATUS_CONFIRM(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			(pdata)->count				= be64toh((pdata)->count); \
+			(pdata)->pchmpxsvr_offset	= be64toh((pdata)->pchmpxsvr_offset); \
+		}
+
+#define	HTON_PPXCOM_N2_STATUS_CHANGE(pdata)	\
+		{ \
+			HTON_PPXCOM_HEAD(&((pdata)->head)); \
+			HTON_PCHMPXSVR(&((pdata)->server)); \
+		}
+
+#define	NTOH_PPXCOM_N2_STATUS_CHANGE(pdata)	\
+		{ \
+			NTOH_PPXCOM_HEAD(&((pdata)->head)); \
+			NTOH_PCHMPXSVR(&((pdata)->server)); \
+		}
+
 //---------------------------------------------------------
 // Communication Packets
 //---------------------------------------------------------
@@ -750,10 +999,16 @@ typedef union chmpx_com_all{
 //
 typedef uint64_t			comtype_t;			// type for packet
 typedef uint64_t			c2ctype_t;			// COM_C2C type for duplication
-typedef uint64_t			comver_t;			// Protocol version
 
 // Version
-#define	COM_VERSION_1		1L					// First version 1
+#define	COM_VERSION_UNINIT	0L					// version 1(older than v1.0.70)
+#define	COM_VERSION_1		1L					// version 1(older than v1.0.70)
+#define	COM_VERSION_2		2L					// version 2
+
+// [NOTE]
+// If it is not initialized, it is judged as current because
+// it is not connected to RING.
+#define	IS_COM_CURRENT_VERSION(version)			(COM_VERSION_2 == version || COM_VERSION_UNINIT == version)
 
 // Type for packet
 #define	COM_UNKNOWN			0					// Unknown
@@ -826,8 +1081,8 @@ typedef struct com_packet{
 //------------
 #define	COPY_PKID(pdest, psrc)	\
 		{ \
-			(pdest)->chmpxid	= (psrc)->chmpxid; \
-			(pdest)->msgid		= (psrc)->msgid; \
+			(pdest)->chmpxid			= (psrc)->chmpxid; \
+			(pdest)->msgid				= (psrc)->msgid; \
 		}
 
 #define	COPY_COMHEAD(pdest, psrc)	\
@@ -847,8 +1102,8 @@ typedef struct com_packet{
 #define	COPY_COMPKT(pdest, psrc)	\
 		{ \
 			COPY_COMHEAD(&((pdest)->head), &((psrc)->head));	\
-			(pdest)->length	= (psrc)->length; \
-			(pdest)->offset	= (psrc)->offset; \
+			(pdest)->length				= (psrc)->length; \
+			(pdest)->offset				= (psrc)->offset; \
 		}
 
 //------------
@@ -856,26 +1111,26 @@ typedef struct com_packet{
 //------------
 #define	HTON_PPCKID(pdata)	\
 		{ \
-			(pdata)->chmpxid= htobe64((pdata)->chmpxid); \
-			(pdata)->msgid	= htobe64((pdata)->msgid); \
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
+			(pdata)->msgid				= htobe64((pdata)->msgid); \
 		}
 
 #define	NTOH_PPCKID(pdata)	\
 		{ \
-			(pdata)->chmpxid= be64toh((pdata)->chmpxid); \
-			(pdata)->msgid	= be64toh((pdata)->msgid); \
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid); \
+			(pdata)->msgid				= be64toh((pdata)->msgid); \
 		}
 
 #define	HTON_TIMESPEC(ptr)	\
 		{ \
-			(ptr)->tv_sec	= htobe64((ptr)->tv_sec); \
-			(ptr)->tv_nsec	= htobe64((ptr)->tv_nsec); \
+			(ptr)->tv_sec				= htobe64((ptr)->tv_sec); \
+			(ptr)->tv_nsec				= htobe64((ptr)->tv_nsec); \
 		} \
 
 #define	NTOH_TIMESPEC(ptr)	\
 		{ \
-			(ptr)->tv_sec	= be64toh((ptr)->tv_sec); \
-			(ptr)->tv_nsec	= be64toh((ptr)->tv_nsec); \
+			(ptr)->tv_sec				= be64toh((ptr)->tv_sec); \
+			(ptr)->tv_nsec				= be64toh((ptr)->tv_nsec); \
 		} \
 
 #define	HTON_PCOMHEAD(pdata)	\
@@ -909,20 +1164,21 @@ typedef struct com_packet{
 #define	HTON_PCOMPKT(pdata)	\
 		{ \
 			HTON_PCOMHEAD(&((pdata)->head)); \
-			(pdata)->length	= htobe64((pdata)->length); \
-			(pdata)->offset	= htobe64((pdata)->offset); \
+			(pdata)->length				= htobe64((pdata)->length); \
+			(pdata)->offset				= htobe64((pdata)->offset); \
 		}
 
 #define	NTOH_PCOMPKT(pdata)	\
 		{ \
 			NTOH_PCOMHEAD(&((pdata)->head)); \
-			(pdata)->length	= be64toh((pdata)->length); \
-			(pdata)->offset	= be64toh((pdata)->offset); \
+			(pdata)->length				= be64toh((pdata)->length); \
+			(pdata)->offset				= be64toh((pdata)->offset); \
 		}
 
 //------------
 // Utility Macros
 //------------
+#define	CVT_COMPTR_HEAD(pComAll)				&((pComAll)->val_head)
 #define	CVT_COMPTR_STATUS_REQ(pComAll)			&((pComAll)->val_status_req)
 #define	CVT_COMPTR_STATUS_RES(pComAll)			&((pComAll)->val_status_res)
 #define	CVT_COMPTR_CONINIT_REQ(pComAll)			&((pComAll)->val_coninit_req)
@@ -942,6 +1198,16 @@ typedef struct com_packet{
 #define	CVT_COMPTR_MERGE_NOSUSPEND(pComAll)		&((pComAll)->val_merge_nosuspend)
 #define	CVT_COMPTR_MERGE_SUSPEND_GET(pComAll)	&((pComAll)->val_merge_suspend_get)
 #define	CVT_COMPTR_MERGE_SUSPEND_RES(pComAll)	&((pComAll)->val_merge_suspend_res)
+#define	CVT_COMPTR_VERSION_REQ(pComAll)			&((pComAll)->val_version_req)
+#define	CVT_COMPTR_VERSION_RES(pComAll)			&((pComAll)->val_version_res)
+#define	CVT_COMPTR_N2_STATUS_REQ(pComAll)		&((pComAll)->val_n2_status_req)
+#define	CVT_COMPTR_N2_STATUS_RES(pComAll)		&((pComAll)->val_n2_status_res)
+#define	CVT_COMPTR_N2_CONINIT_REQ(pComAll)		&((pComAll)->val_n2_coninit_req)
+#define	CVT_COMPTR_N2_CONINIT_RES(pComAll)		&((pComAll)->val_n2_coninit_res)
+#define	CVT_COMPTR_N2_JOIN_RING(pComAll)		&((pComAll)->val_n2_join_ring)
+#define	CVT_COMPTR_N2_STATUS_UPDATE(pComAll)	&((pComAll)->val_n2_status_update)
+#define	CVT_COMPTR_N2_STATUS_CONFIRM(pComAll)	&((pComAll)->val_n2_status_confirm)
+#define	CVT_COMPTR_N2_STATUS_CHANGE(pComAll)	&((pComAll)->val_n2_status_change)
 
 #define	SIZEOF_CHMPX_COM(type)					(	CHMPX_COM_STATUS_REQ		 == type ? sizeof(PXCOM_STATUS_REQ)			: \
 													CHMPX_COM_STATUS_RES		 == type ? sizeof(PXCOM_STATUS_RES)			: \
@@ -962,15 +1228,25 @@ typedef struct com_packet{
 													CHMPX_COM_MERGE_NOSUSPEND	 == type ? sizeof(PXCOM_MERGE_NOSUSPEND)	: \
 													CHMPX_COM_MERGE_SUSPEND_GET	 == type ? sizeof(PXCOM_MERGE_SUSPEND_GET)	: \
 													CHMPX_COM_MERGE_SUSPEND_RES	 == type ? sizeof(PXCOM_MERGE_SUSPEND_RES)	: \
+													CHMPX_COM_VERSION_REQ		 == type ? sizeof(PXCOM_VERSION_REQ)		: \
+													CHMPX_COM_VERSION_RES		 == type ? sizeof(PXCOM_VERSION_RES)		: \
+													CHMPX_COM_N2_STATUS_REQ		 == type ? sizeof(PXCOM_N2_STATUS_REQ)		: \
+													CHMPX_COM_N2_STATUS_RES		 == type ? sizeof(PXCOM_N2_STATUS_RES)		: \
+													CHMPX_COM_N2_CONINIT_REQ	 == type ? sizeof(PXCOM_N2_CONINIT_REQ)		: \
+													CHMPX_COM_N2_CONINIT_RES	 == type ? sizeof(PXCOM_N2_CONINIT_RES)		: \
+													CHMPX_COM_N2_JOIN_RING		 == type ? sizeof(PXCOM_N2_JOIN_RING)		: \
+													CHMPX_COM_N2_STATUS_UPDATE	 == type ? sizeof(PXCOM_N2_STATUS_UPDATE)	: \
+													CHMPX_COM_N2_STATUS_CONFIRM	 == type ? sizeof(PXCOM_N2_STATUS_CONFIRM)	: \
+													CHMPX_COM_N2_STATUS_CHANGE	 == type ? sizeof(PXCOM_N2_STATUS_CHANGE)	: \
 													0L)
 
 #define	CVT_COM_ALL_PTR_PXCOMPKT(pComPkt)		(	CHM_OFFSET((pComPkt), sizeof(COMPKT), PPXCOM_ALL)	)
 
-#define	SET_PXCOMPKT(pComPkt, comtype, dept_chmpxid, term_chmpxid, is_timespec, extlength)	\
+#define	SET_PXCOMPKT(pComPkt, comver, comtype, dept_chmpxid, term_chmpxid, is_timespec, extlength)	\
 		{ \
 			(pComPkt)->length				= sizeof(COMPKT) + SIZEOF_CHMPX_COM(comtype) + extlength; \
 			(pComPkt)->offset				= sizeof(COMPKT); \
-			(pComPkt)->head.version			= COM_VERSION_1; \
+			(pComPkt)->head.version			= (COM_VERSION_2 == comver ? COM_VERSION_2 : COM_VERSION_1); \
 			(pComPkt)->head.type			= COM_PX2PX; \
 			(pComPkt)->head.c2ctype			= COM_C2C_IGNORE; \
 			(pComPkt)->head.dept_ids.chmpxid= dept_chmpxid; \
@@ -994,17 +1270,10 @@ typedef struct com_packet{
 //------------
 // Debug Macros
 //------------
-#define	DUMPCOM_COMPKT_TYPE(action, pComPkt)	\
-		if(chm_debug_mode >= CHMDBG_DUMP){ \
-			if(COM_PX2PX == (pComPkt)->head.type){ \
-				PPXCOM_ALL	pComAll = CVT_COM_ALL_PTR_PXCOMPKT((pComPkt)); \
-				MSG_CHMPRN("%s COMPKT type(%s) : PXCOM_ALL type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type), STRPXCOMTYPE(pComAll->val_head.type)); \
-			}else if(COM_C2C == (pComPkt)->head.type){ \
-				MSG_CHMPRN("%s COMPKT type(%s) : COM_C2C type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type), STRCOMC2CTYPE((pComPkt)->head.c2ctype)); \
-			}else{ \
-				MSG_CHMPRN("%s COMPKT type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE((pComPkt)->head.type)); \
-			} \
-		}
+// [NOTE]
+// The DUMPCOM_COMPKT_TYPE() macro has been moved to the chmeventsock.cc file.
+// See comments in chmeventsock.cc for details.
+//
 
 #define	DUMPCOM_COMPKT(headmsg, pComPkt)	\
 		if(chm_debug_mode >= CHMDBG_DUMP){ \

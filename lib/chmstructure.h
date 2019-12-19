@@ -49,15 +49,26 @@ typedef enum chmpx_mode{
 	CHMPX_SLAVE
 }CHMPXMODE;
 
+typedef enum chmpxid_seed_type{
+	CHMPXID_SEED_NAME = 0,							// default, seed from name and control port(before v1.0.71)
+	CHMPXID_SEED_CUK,								// seed from cuk
+	CHMPXID_SEED_CTLENDPOINTS,						// seed from control endpoints(no particular order)
+	CHMPXID_SEED_CUSTOM								// seed from CUSTOM_ID_SEED
+}CHMPXID_SEED_TYPE;
+
 //---------------------------------------------------------
 // Symbols for CHMINFO structure version
 //---------------------------------------------------------
+// Version 1.0	after chmpx version 1.0.59
+// Version 1.1	after chmpx version 1.0.71
+//
 // [NOTE]
 // Before CHMPX version 1.0.59, those do not have the CHMINFO structure version.
 //
 #define	CHM_CHMINFO_VERSION_BUFLEN		32
 #define	CHM_CHMINFO_VERSION_PREFIX		"CHMINFO_VERSION"
-#define	CHM_CHMINFO_CUR_VERSION			"1.0"
+#define	CHM_CHMINFO_OLD_VERSION_1_0		"1.0"
+#define	CHM_CHMINFO_CUR_VERSION			"1.1"
 #define	CHM_CHMINFO_CUR_VERSION_STR		CHM_CHMINFO_VERSION_PREFIX " " CHM_CHMINFO_CUR_VERSION
 
 //---------------------------------------------------------
@@ -620,6 +631,13 @@ typedef struct chm_sock_list{
 }CHMSOCKLIST, *PCHMSOCKLIST;
 
 //---------------------------------
+// Peer Information(Host + Port)
+typedef struct chmpx_host_port_raw_pair{
+	char			name[NI_MAXHOST];					// = 1025 for getnameinfo()
+	short			port;
+}CHMPXHP_RAWPAIR, *PCHMPXHP_RAWPAIR;
+
+//---------------------------------
 // Chmpx
 typedef struct chmpx{
 	chmpxid_t		chmpxid;
@@ -643,6 +661,13 @@ typedef struct chmpx{
 	int				selfctlsock;						// If only self chmpx, selfctlsock means listening ctlport. not self does not use.
 	time_t			last_status_time;
 	chmpxsts_t		status;
+														// [NOTE] adding after v1.0.71
+	char			cuk[CUK_MAX];						// cuk
+	char			custom_seed[CUSTOM_ID_SEED_MAX];	// custom id seed
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];			// external endpoint host/port information
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];		// external endpoint host/control port information
+	CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];	// forward gateway(NAT) peer hostname(ip address)
+	CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];	// reverse gateway(NAT) peer hostname(ip address)
 }CHMPX, *PCHMPX;
 
 // Chmpx list
@@ -741,54 +766,55 @@ typedef struct client_proc_list{
 // as a setting value of the entire CHMPX process.
 //
 typedef struct chminfo{
-	char			chminfo_version[CHM_CHMINFO_VERSION_BUFLEN];	// version number for CHMINFO(old version does not have this member)
-	size_t			chminfo_size;									// CHMINFO structure size(old version does not have this member)
-	pid_t			pid;
-	time_t			start_time;
-	CHMPXMAN		chmpx_man;
-	chmss_ver_t		ssl_min_ver;									// SSL/TLS minimum version(old version does not have this member, and see NOTE)
-	char			nssdb_dir[CHM_MAX_PATH_LEN];					// NSSDB directory path like "SSL_DIR" environment for NSS
-	int				evsock_thread_cnt;								// socket thread count
-	int				evmq_thread_cnt;								// MQ thread count
-	bool			is_random_deliver;
-	bool			is_auto_merge;
-	bool			is_auto_merge_suspend;							// suspend auto merging flag for that is_auto_merge is true
-	bool			is_do_merge;
-	long			max_mqueue;										// = max MQ count
-	long			chmpx_mqueue;									// = Chmpx MQ count
-	long			max_q_per_chmpxmq;								// = max queue per chmpx MQ
-	long			max_q_per_cltmq;								// = max queue per client MQ
-	long			max_mq_per_client;								// = MQ per client
-	long			mq_per_attach;									// = MQ per attach
-	bool			mq_ack;											// MQ ACK
-	int				max_sock_pool;									// max socket count per chmpx
-	time_t			sock_pool_timeout;								// timeout value till closing for not used socket in pool
-	int				sock_retrycnt;									// retry count for socket
-	suseconds_t		timeout_wait_socket;							// wait timeout for read/write socket
-	suseconds_t		timeout_wait_connect;							// wait timeout for connect socket
-	int				mq_retrycnt;									// retry count for MQ
-	long			timeout_wait_mq;								// wait timeout for MQ
-	time_t			timeout_merge;									// wait timeout for merging
-	msgid_t			base_msgid;
-	long			chmpx_msg_count;								// MQ count for chmpx process
-	PMQMSGHEADLIST	chmpx_msgs;										// MQ list for chmpx process
-	long			activated_msg_count;							// Activated MQ count for client process
-	PMQMSGHEADLIST	activated_msgs;									// Activated MQ list for client process
-	long			assigned_msg_count;								// Assigned(NOT activated) MQ count for client process
-	PMQMSGHEADLIST	assigned_msgs;									// Assigned(NOT activated) MQ list for client process
-	long			free_msg_count;
-	PMQMSGHEADLIST	free_msgs;
-	msgid_t			last_msgid_chmpx;								// last random msgid for chmpx process
-	msgid_t			last_msgid_activated;							// last random activated msgid for client process
-	msgid_t			last_msgid_assigned;							// last random assigned msgid for client process
-	PMQMSGHEADLIST	rel_chmpxmsgarea;								// same as in CHMSHM
-	PCLTPROCLIST	client_pids;									// Client process(pid) list
-	PCLTPROCLIST	free_pids;
-	bool			k2h_fullmap;
-	int				k2h_mask_bitcnt;
-	int				k2h_cmask_bitcnt;
-	int				k2h_max_element;
-	long			histlog_count;									// history log count
+	char				chminfo_version[CHM_CHMINFO_VERSION_BUFLEN];// version number for CHMINFO(old version does not have this member)
+	size_t				chminfo_size;								// CHMINFO structure size(old version does not have this member)
+	pid_t				pid;
+	time_t				start_time;
+	CHMPXMAN			chmpx_man;
+	CHMPXID_SEED_TYPE	chmpxid_type;								// Seed type for creating chmpxid
+	chmss_ver_t			ssl_min_ver;								// SSL/TLS minimum version(old version does not have this member, and see NOTE)
+	char				nssdb_dir[CHM_MAX_PATH_LEN];				// NSSDB directory path like "SSL_DIR" environment for NSS
+	int					evsock_thread_cnt;							// socket thread count
+	int					evmq_thread_cnt;							// MQ thread count
+	bool				is_random_deliver;
+	bool				is_auto_merge;
+	bool				is_auto_merge_suspend;						// suspend auto merging flag for that is_auto_merge is true
+	bool				is_do_merge;
+	long				max_mqueue;									// = max MQ count
+	long				chmpx_mqueue;								// = Chmpx MQ count
+	long				max_q_per_chmpxmq;							// = max queue per chmpx MQ
+	long				max_q_per_cltmq;							// = max queue per client MQ
+	long				max_mq_per_client;							// = MQ per client
+	long				mq_per_attach;								// = MQ per attach
+	bool				mq_ack;										// MQ ACK
+	int					max_sock_pool;								// max socket count per chmpx
+	time_t				sock_pool_timeout;							// timeout value till closing for not used socket in pool
+	int					sock_retrycnt;								// retry count for socket
+	suseconds_t			timeout_wait_socket;						// wait timeout for read/write socket
+	suseconds_t			timeout_wait_connect;						// wait timeout for connect socket
+	int					mq_retrycnt;								// retry count for MQ
+	long				timeout_wait_mq;							// wait timeout for MQ
+	time_t				timeout_merge;								// wait timeout for merging
+	msgid_t				base_msgid;
+	long				chmpx_msg_count;							// MQ count for chmpx process
+	PMQMSGHEADLIST		chmpx_msgs;									// MQ list for chmpx process
+	long				activated_msg_count;						// Activated MQ count for client process
+	PMQMSGHEADLIST		activated_msgs;								// Activated MQ list for client process
+	long				assigned_msg_count;							// Assigned(NOT activated) MQ count for client process
+	PMQMSGHEADLIST		assigned_msgs;								// Assigned(NOT activated) MQ list for client process
+	long				free_msg_count;
+	PMQMSGHEADLIST		free_msgs;
+	msgid_t				last_msgid_chmpx;							// last random msgid for chmpx process
+	msgid_t				last_msgid_activated;						// last random activated msgid for client process
+	msgid_t				last_msgid_assigned;						// last random assigned msgid for client process
+	PMQMSGHEADLIST		rel_chmpxmsgarea;							// same as in CHMSHM
+	PCLTPROCLIST		client_pids;								// Client process(pid) list
+	PCLTPROCLIST		free_pids;
+	bool				k2h_fullmap;
+	int					k2h_mask_bitcnt;
+	int					k2h_cmask_bitcnt;
+	int					k2h_max_element;
+	long				histlog_count;								// history log count
 }CHMINFO, *PCHMINFO;
 
 //---------------------------------
@@ -827,28 +853,47 @@ typedef struct chmshm{
 //---------------------------------------------------------
 // Chmpx ssl information(notice: all member is byte order)
 typedef struct chmpx_ssl{
-	bool		is_ssl;
-	bool		verify_peer;
-	bool		is_ca_file;
-	char		capath[CHM_MAX_PATH_LEN];
-	char		server_cert[CHM_MAX_PATH_LEN];
-	char		server_prikey[CHM_MAX_PATH_LEN];
-	char		slave_cert[CHM_MAX_PATH_LEN];
-	char		slave_prikey[CHM_MAX_PATH_LEN];
+	bool			is_ssl;
+	bool			verify_peer;
+	bool			is_ca_file;
+	char			capath[CHM_MAX_PATH_LEN];
+	char			server_cert[CHM_MAX_PATH_LEN];
+	char			server_prikey[CHM_MAX_PATH_LEN];
+	char			slave_cert[CHM_MAX_PATH_LEN];
+	char			slave_prikey[CHM_MAX_PATH_LEN];
 }CHMPX_ATTR_PACKED CHMPXSSL, *PCHMPXSSL;
 
 // Chmpx server information
 typedef struct chmpx_server{
-	chmpxid_t	chmpxid;
-	char		name[NI_MAXHOST];		// = 1025 for getnameinfo()
-	chmhash_t	base_hash;
-	chmhash_t	pending_hash;
-	short		port;
-	short		ctlport;
-	CHMPXSSL	ssl;
-	time_t		last_status_time;
-	chmpxsts_t	status;
+	chmpxid_t		chmpxid;
+	char			name[NI_MAXHOST];					// = 1025 for getnameinfo()
+	chmhash_t		base_hash;
+	chmhash_t		pending_hash;
+	short			port;
+	short			ctlport;
+	CHMPXSSL		ssl;
+	time_t			last_status_time;
+	chmpxsts_t		status;
+	char			cuk[CUK_MAX];						// adding after v1.0.71
+	char			custom_seed[CUSTOM_ID_SEED_MAX];	// adding after v1.0.71
+	CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];			// adding after v1.0.71
+	CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];		// adding after v1.0.71
+	CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];	// adding after v1.0.71
+	CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];	// adding after v1.0.71
 }CHMPX_ATTR_PACKED CHMPXSVR, *PCHMPXSVR;
+
+// Old chmpx server information for backward compatibility
+typedef struct chmpx_server_v1{
+	chmpxid_t		chmpxid;
+	char			name[NI_MAXHOST];					// = 1025 for getnameinfo()
+	chmhash_t		base_hash;
+	chmhash_t		pending_hash;
+	short			port;
+	short			ctlport;
+	CHMPXSSL		ssl;
+	time_t			last_status_time;
+	chmpxsts_t		status;
+}CHMPX_ATTR_PACKED CHMPXSVRV1, *PCHMPXSVRV1;
 
 #define	COPY_PCHMPXSVR(pdest, psrc)	\
 		{ \
@@ -862,15 +907,82 @@ typedef struct chmpx_server{
 			(pdest)->ssl.is_ca_file				= (psrc)->ssl.is_ca_file; \
 			(pdest)->last_status_time			= (psrc)->last_status_time; \
 			(pdest)->status						= (psrc)->status; \
-			memcpy((pdest)->name,				(psrc)->name, NI_MAXHOST); \
-			memcpy((pdest)->ssl.capath,			(psrc)->ssl.capath, CHM_MAX_PATH_LEN); \
-			memcpy((pdest)->ssl.server_cert,	(psrc)->ssl.server_cert, CHM_MAX_PATH_LEN); \
-			memcpy((pdest)->ssl.server_prikey,	(psrc)->ssl.server_prikey, CHM_MAX_PATH_LEN); \
-			memcpy((pdest)->ssl.slave_cert,		(psrc)->ssl.slave_cert, CHM_MAX_PATH_LEN); \
-			memcpy((pdest)->ssl.slave_prikey,	(psrc)->ssl.slave_prikey, CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->name,				(psrc)->name,				NI_MAXHOST); \
+			memcpy((pdest)->ssl.capath,			(psrc)->ssl.capath,			CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.server_cert,	(psrc)->ssl.server_cert,	CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.server_prikey,	(psrc)->ssl.server_prikey,	CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.slave_cert,		(psrc)->ssl.slave_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.slave_prikey,	(psrc)->ssl.slave_prikey,	CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->cuk,				(psrc)->cuk,				CUK_MAX); \
+			memcpy((pdest)->custom_seed,		(psrc)->custom_seed,		CUSTOM_ID_SEED_MAX); \
+			{ \
+				int	_copy_chmpxsvr_cnt; \
+				for(_copy_chmpxsvr_cnt = 0; _copy_chmpxsvr_cnt < EXTERNAL_EP_MAX; ++_copy_chmpxsvr_cnt){ \
+					memcpy((pdest)->endpoints[_copy_chmpxsvr_cnt].name, (psrc)->endpoints[_copy_chmpxsvr_cnt].name, NI_MAXHOST); \
+					(pdest)->endpoints[_copy_chmpxsvr_cnt].port = (psrc)->endpoints[_copy_chmpxsvr_cnt].port; \
+				} \
+				for(_copy_chmpxsvr_cnt = 0; _copy_chmpxsvr_cnt < EXTERNAL_EP_MAX; ++_copy_chmpxsvr_cnt){ \
+					memcpy((pdest)->ctlendpoints[_copy_chmpxsvr_cnt].name, (psrc)->ctlendpoints[_copy_chmpxsvr_cnt].name, NI_MAXHOST); \
+					(pdest)->ctlendpoints[_copy_chmpxsvr_cnt].port = (psrc)->ctlendpoints[_copy_chmpxsvr_cnt].port; \
+				} \
+				for(_copy_chmpxsvr_cnt = 0; _copy_chmpxsvr_cnt < FORWARD_PEER_MAX; ++_copy_chmpxsvr_cnt){ \
+					memcpy((pdest)->forward_peers[_copy_chmpxsvr_cnt].name, (psrc)->forward_peers[_copy_chmpxsvr_cnt].name, NI_MAXHOST); \
+					(pdest)->forward_peers[_copy_chmpxsvr_cnt].port = (psrc)->forward_peers[_copy_chmpxsvr_cnt].port; \
+				} \
+				for(_copy_chmpxsvr_cnt = 0; _copy_chmpxsvr_cnt < REVERSE_PEER_MAX; ++_copy_chmpxsvr_cnt){ \
+					memcpy((pdest)->reverse_peers[_copy_chmpxsvr_cnt].name, (psrc)->reverse_peers[_copy_chmpxsvr_cnt].name, NI_MAXHOST); \
+					(pdest)->reverse_peers[_copy_chmpxsvr_cnt].port = (psrc)->reverse_peers[_copy_chmpxsvr_cnt].port; \
+				} \
+			} \
+		}
+
+#define	COPY_PCHMPXSVRV1(pdest, psrc)	\
+		{ \
+			(pdest)->chmpxid					= (psrc)->chmpxid; \
+			(pdest)->base_hash					= (psrc)->base_hash; \
+			(pdest)->pending_hash				= (psrc)->pending_hash; \
+			(pdest)->port						= (psrc)->port; \
+			(pdest)->ctlport					= (psrc)->ctlport; \
+			(pdest)->ssl.is_ssl					= (psrc)->ssl.is_ssl; \
+			(pdest)->ssl.verify_peer			= (psrc)->ssl.verify_peer; \
+			(pdest)->ssl.is_ca_file				= (psrc)->ssl.is_ca_file; \
+			(pdest)->last_status_time			= (psrc)->last_status_time; \
+			(pdest)->status						= (psrc)->status; \
+			memcpy((pdest)->name,				(psrc)->name,				NI_MAXHOST); \
+			memcpy((pdest)->ssl.capath,			(psrc)->ssl.capath,			CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.server_cert,	(psrc)->ssl.server_cert,	CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.server_prikey,	(psrc)->ssl.server_prikey,	CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.slave_cert,		(psrc)->ssl.slave_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pdest)->ssl.slave_prikey,	(psrc)->ssl.slave_prikey,	CHM_MAX_PATH_LEN); \
 		}
 
 #define	HTON_PCHMPXSVR(pdata)	\
+		{ \
+			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
+			(pdata)->base_hash			= htobe64((pdata)->base_hash); \
+			(pdata)->pending_hash		= htobe64((pdata)->pending_hash); \
+			(pdata)->port				= htobe16((pdata)->port); \
+			(pdata)->ctlport			= htobe16((pdata)->ctlport); \
+			(pdata)->last_status_time	= htobe64((pdata)->last_status_time); \
+			(pdata)->status				= htobe64((pdata)->status); \
+			{ \
+				int	_hton_hostport_pair_cnt; \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->endpoints[_hton_hostport_pair_cnt].port = htobe16((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = htobe16((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < FORWARD_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = htobe16((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < REVERSE_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = htobe16((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
+				} \
+			} \
+		}
+
+#define	HTON_PCHMPXSVRV1(pdata)	\
 		{ \
 			(pdata)->chmpxid			= htobe64((pdata)->chmpxid); \
 			(pdata)->base_hash			= htobe64((pdata)->base_hash); \
@@ -890,6 +1002,93 @@ typedef struct chmpx_server{
 			(pdata)->ctlport			= be16toh((pdata)->ctlport); \
 			(pdata)->last_status_time	= be64toh((pdata)->last_status_time); \
 			(pdata)->status				= be64toh((pdata)->status); \
+			{ \
+				int	_hton_hostport_pair_cnt; \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->endpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < FORWARD_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
+				} \
+				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < REVERSE_PEER_MAX; ++_hton_hostport_pair_cnt){ \
+					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
+				} \
+			} \
+		}
+
+#define	NTOH_PCHMPXSVRV1(pdata)	\
+		{ \
+			(pdata)->chmpxid			= be64toh((pdata)->chmpxid); \
+			(pdata)->base_hash			= be64toh((pdata)->base_hash); \
+			(pdata)->pending_hash		= be64toh((pdata)->pending_hash); \
+			(pdata)->port				= be16toh((pdata)->port); \
+			(pdata)->ctlport			= be16toh((pdata)->ctlport); \
+			(pdata)->last_status_time	= be64toh((pdata)->last_status_time); \
+			(pdata)->status				= be64toh((pdata)->status); \
+		}
+
+#define	CVT_PCHMPXSVRV1_TO_PCHMPXSVR(pv2, pv1)	\
+		{ \
+			(pv2)->chmpxid					= (pv1)->chmpxid; \
+			(pv2)->base_hash				= (pv1)->base_hash; \
+			(pv2)->pending_hash				= (pv1)->pending_hash; \
+			(pv2)->port						= (pv1)->port; \
+			(pv2)->ctlport					= (pv1)->ctlport; \
+			(pv2)->ssl.is_ssl				= (pv1)->ssl.is_ssl; \
+			(pv2)->ssl.verify_peer			= (pv1)->ssl.verify_peer; \
+			(pv2)->ssl.is_ca_file			= (pv1)->ssl.is_ca_file; \
+			(pv2)->last_status_time			= (pv1)->last_status_time; \
+			(pv2)->status					= (pv1)->status; \
+			memcpy((pv2)->name,				(pv1)->name,				NI_MAXHOST); \
+			memcpy((pv2)->ssl.capath,		(pv1)->ssl.capath,			CHM_MAX_PATH_LEN); \
+			memcpy((pv2)->ssl.server_cert,	(pv1)->ssl.server_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pv2)->ssl.server_prikey,(pv1)->ssl.server_prikey,	CHM_MAX_PATH_LEN); \
+			memcpy((pv2)->ssl.slave_cert,	(pv1)->ssl.slave_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pv2)->ssl.slave_prikey,	(pv1)->ssl.slave_prikey,	CHM_MAX_PATH_LEN); \
+			memset((pv2)->cuk,				0,							CUK_MAX); \
+			memset((pv2)->custom_seed,		0,							CUSTOM_ID_SEED_MAX); \
+			{ \
+				int	_copy_hostport_pair_cnt; \
+				for(_copy_hostport_pair_cnt = 0; _copy_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_copy_hostport_pair_cnt){ \
+					memset((pv2)->endpoints[_copy_hostport_pair_cnt].name, 0, NI_MAXHOST); \
+					(pv2)->endpoints[_copy_hostport_pair_cnt].port = CHM_INVALID_PORT; \
+				} \
+				for(_copy_hostport_pair_cnt = 0; _copy_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_copy_hostport_pair_cnt){ \
+					memset((pv2)->ctlendpoints[_copy_hostport_pair_cnt].name, 0, NI_MAXHOST); \
+					(pv2)->ctlendpoints[_copy_hostport_pair_cnt].port = CHM_INVALID_PORT; \
+				} \
+				for(_copy_hostport_pair_cnt = 0; _copy_hostport_pair_cnt < FORWARD_PEER_MAX; ++_copy_hostport_pair_cnt){ \
+					memset((pv2)->forward_peers[_copy_hostport_pair_cnt].name, 0, NI_MAXHOST); \
+					(pv2)->forward_peers[_copy_hostport_pair_cnt].port = CHM_INVALID_PORT; \
+				} \
+				for(_copy_hostport_pair_cnt = 0; _copy_hostport_pair_cnt < REVERSE_PEER_MAX; ++_copy_hostport_pair_cnt){ \
+					memset((pv2)->reverse_peers[_copy_hostport_pair_cnt].name, 0, NI_MAXHOST); \
+					(pv2)->reverse_peers[_copy_hostport_pair_cnt].port = CHM_INVALID_PORT; \
+				} \
+			} \
+		}
+
+#define	CVT_PCHMPXSVR_TO_PCHMPXSVRV1(pv1, pv2)	\
+		{ \
+			(pv1)->chmpxid					= (pv2)->chmpxid; \
+			(pv1)->base_hash				= (pv2)->base_hash; \
+			(pv1)->pending_hash				= (pv2)->pending_hash; \
+			(pv1)->port						= (pv2)->port; \
+			(pv1)->ctlport					= (pv2)->ctlport; \
+			(pv1)->ssl.is_ssl				= (pv2)->ssl.is_ssl; \
+			(pv1)->ssl.verify_peer			= (pv2)->ssl.verify_peer; \
+			(pv1)->ssl.is_ca_file			= (pv2)->ssl.is_ca_file; \
+			(pv1)->last_status_time			= (pv2)->last_status_time; \
+			(pv1)->status					= (pv2)->status; \
+			memcpy((pv1)->name,				(pv2)->name,				NI_MAXHOST); \
+			memcpy((pv1)->ssl.capath,		(pv2)->ssl.capath,			CHM_MAX_PATH_LEN); \
+			memcpy((pv1)->ssl.server_cert,	(pv2)->ssl.server_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pv1)->ssl.server_prikey,(pv2)->ssl.server_prikey,	CHM_MAX_PATH_LEN); \
+			memcpy((pv1)->ssl.slave_cert,	(pv2)->ssl.slave_cert,		CHM_MAX_PATH_LEN); \
+			memcpy((pv1)->ssl.slave_prikey,	(pv2)->ssl.slave_prikey,	CHM_MAX_PATH_LEN); \
 		}
 
 DECL_EXTERN_C_END

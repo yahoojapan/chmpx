@@ -222,6 +222,8 @@ extern bool is_chmpx_proc_exists(chmpx_h handle);
 //---------------------------------------------------------
 extern void chmpx_print_version(FILE* stream);
 extern const char* chmpx_get_version(void);
+extern const char* chmpx_get_raw_version(bool is_commit_hash);
+extern uint64_t chmpx_get_bin_version(void);
 
 //---------------------------------------------------------
 // Utility Functions(Key Value Pair)

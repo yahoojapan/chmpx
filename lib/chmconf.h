@@ -40,19 +40,102 @@
 //---------------------------------------------------------
 // Structures
 //---------------------------------------------------------
+//
+// configuration information for host and port
+//
+typedef struct host_port_pair{
+	std::string		host;
+	short			port;
+
+	host_port_pair() :
+		host(""),
+		port(0)
+	{}
+
+	host_port_pair(const struct host_port_pair& other) :
+		host(other.host),
+		port(other.port)
+	{}
+
+	bool compare(const struct host_port_pair& other) const
+	{
+		return (host == other.host && port == other.port);
+	}
+	struct host_port_pair& operator=(const struct host_port_pair& other)
+	{
+		host	= other.host;
+		port	= other.port;
+		return *this;
+	}
+	bool operator==(const struct host_port_pair& other) const
+	{
+		return compare(other);
+	}
+	bool operator!=(const struct host_port_pair& other) const
+	{
+		return !compare(other);
+	}
+	std::string get_string(void) const
+	{
+		std::string	result(host);
+		if(CHM_INVALID_PORT != port){
+			result += ":";
+			result += to_string(port);
+		}
+		return result;
+	}
+}HOSTPORTPAIR, *PHOSTPORTPAIR;
+
+typedef std::list<HOSTPORTPAIR>	hostport_list_t;
+
+inline std::string get_hostports_string(const hostport_list_t& list)
+{
+	std::string	result;
+	for(hostport_list_t::const_iterator iter = list.begin(); list.end() != iter; ++iter){
+		if(!result.empty()){
+			result += ",";
+		}
+		result += iter->get_string();
+	}
+	return result;
+}
+
+inline bool compare_hostports(const hostport_list_t& src1, const hostport_list_t& src2)
+{
+	if(src1.size() != src2.size()){
+		return false;
+	}
+	hostport_list_t::const_iterator	iter1;
+	hostport_list_t::const_iterator	iter2;
+	for(iter1 = src1.begin(), iter2 = src2.begin(); iter1 != src1.end() && iter2 != src2.end(); ++iter1, ++iter2){
+		if(iter1->host != iter2->host || iter1->port != iter2->port){
+			return false;
+		}
+	}
+	return true;
+}
+
+//
 // configuration information for node
+//
 typedef struct chm_node_cfg_info{
 	std::string		name;
 	short			port;
 	short			ctlport;
 	bool			is_ssl;
-	bool			verify_peer;		// verify ssl client peer on server
+	bool			verify_peer;			// verify ssl client peer on server
 	bool			is_ca_file;
 	std::string		capath;
 	std::string		server_cert;
 	std::string		server_prikey;
 	std::string		slave_cert;
 	std::string		slave_prikey;
+	std::string		cuk;					// after v1.0.71
+	hostport_list_t	endpoints;				// after v1.0.71
+	hostport_list_t	ctlendpoints;			// after v1.0.71
+	hostport_list_t	forward_peers;			// after v1.0.71
+	hostport_list_t	reverse_peers;			// after v1.0.71
+	std::string		custom_seed;			// after v1.0.71
 
 	chm_node_cfg_info() :
 		name(""),
@@ -65,7 +148,9 @@ typedef struct chm_node_cfg_info{
 		server_cert(""),
 		server_prikey(""),
 		slave_cert(""),
-		slave_prikey("")
+		slave_prikey(""),
+		cuk(""),							// after v1.0.71
+		custom_seed("")						// after v1.0.71
 	{}
 
 	chm_node_cfg_info(const struct chm_node_cfg_info& other) :
@@ -79,7 +164,13 @@ typedef struct chm_node_cfg_info{
 		server_cert(other.server_cert),
 		server_prikey(other.server_prikey),
 		slave_cert(other.slave_cert),
-		slave_prikey(other.slave_prikey)
+		slave_prikey(other.slave_prikey),
+		cuk(other.cuk),						// after v1.0.71
+		endpoints(other.endpoints),			// after v1.0.71
+		ctlendpoints(other.ctlendpoints),	// after v1.0.71
+		forward_peers(other.forward_peers),	// after v1.0.71
+		reverse_peers(other.reverse_peers),	// after v1.0.71
+		custom_seed(other.custom_seed)		// after v1.0.71
 	{}
 
 	bool compare(const struct chm_node_cfg_info& other) const
@@ -94,7 +185,13 @@ typedef struct chm_node_cfg_info{
 			server_cert		== other.server_cert	&&
 			server_prikey	== other.server_prikey	&&
 			slave_cert		== other.slave_cert		&&
-			slave_prikey	== other.slave_prikey	)
+			slave_prikey	== other.slave_prikey	&&
+			cuk				== other.cuk			&&		// after v1.0.71
+			endpoints		== other.endpoints		&&		// after v1.0.71
+			ctlendpoints	== other.ctlendpoints	&&		// after v1.0.71
+			forward_peers	== other.forward_peers	&&		// after v1.0.71
+			reverse_peers	== other.reverse_peers	&&		// after v1.0.71
+			custom_seed		== other.custom_seed	)		// after v1.0.71
 		{
 			return true;
 		}
@@ -113,6 +210,12 @@ typedef struct chm_node_cfg_info{
 		server_prikey	= other.server_prikey;
 		slave_cert		= other.slave_cert;
 		slave_prikey	= other.slave_prikey;
+		cuk				= other.cuk;					// after v1.0.71
+		endpoints		= other.endpoints;				// after v1.0.71
+		ctlendpoints	= other.ctlendpoints;			// after v1.0.71
+		forward_peers	= other.forward_peers;			// after v1.0.71
+		reverse_peers	= other.reverse_peers;			// after v1.0.71
+		custom_seed		= other.custom_seed;			// after v1.0.71
 
 		return *this;
 	}
@@ -134,7 +237,11 @@ struct chm_node_cfg_info_sort
     {
 		if(lchmnodecfginfo.name == rchmnodecfginfo.name){
 			if(lchmnodecfginfo.port == rchmnodecfginfo.port){
-				return lchmnodecfginfo.ctlport < rchmnodecfginfo.ctlport;
+				if(lchmnodecfginfo.ctlport == rchmnodecfginfo.ctlport){
+					return lchmnodecfginfo.cuk < rchmnodecfginfo.cuk;
+				}else{
+					return lchmnodecfginfo.ctlport < rchmnodecfginfo.ctlport;
+				}
 			}else{
 				return lchmnodecfginfo.port < rchmnodecfginfo.port;
 			}
@@ -152,21 +259,41 @@ struct chm_node_cfg_info_same_name
     }
 };
 
-struct chm_node_cfg_info_same_name_port
+struct chm_node_cfg_info_same_name_other
 {
 	bool operator()(const CHMNODE_CFGINFO& lchmnodecfginfo, const CHMNODE_CFGINFO& rchmnodecfginfo) const
     {
-		return (lchmnodecfginfo.name == rchmnodecfginfo.name && lchmnodecfginfo.ctlport == rchmnodecfginfo.ctlport);
+		return (lchmnodecfginfo.name == rchmnodecfginfo.name && lchmnodecfginfo.ctlport == rchmnodecfginfo.ctlport && lchmnodecfginfo.cuk == rchmnodecfginfo.cuk);
     }
 };
 
+struct chm_node_cfg_info_same_eps
+{
+	bool operator()(const CHMNODE_CFGINFO& lchmnodecfginfo, const CHMNODE_CFGINFO& rchmnodecfginfo) const
+    {
+		return (lchmnodecfginfo.endpoints == rchmnodecfginfo.endpoints && lchmnodecfginfo.ctlendpoints == rchmnodecfginfo.ctlendpoints);
+    }
+};
+
+struct chm_node_cfg_info_same_eps_peers
+{
+	bool operator()(const CHMNODE_CFGINFO& lchmnodecfginfo, const CHMNODE_CFGINFO& rchmnodecfginfo) const
+    {
+		return (lchmnodecfginfo.endpoints == rchmnodecfginfo.endpoints && lchmnodecfginfo.ctlendpoints == rchmnodecfginfo.ctlendpoints && lchmnodecfginfo.forward_peers == rchmnodecfginfo.forward_peers && lchmnodecfginfo.reverse_peers == rchmnodecfginfo.reverse_peers);
+    }
+};
+
+//
 // configuration information for all
+//
 typedef struct chm_cfg_info{
 	std::string			groupname;
 	long				revision;
 	bool				is_server_mode;
 	bool				is_random_mode;
 	short				self_ctlport;
+	std::string			self_cuk;					// after v1.0.71
+	CHMPXID_SEED_TYPE	chmpxid_type;				// after v1.0.71
 	long				max_chmpx_count;
 	long				replica_count;
 	long				max_server_mq_cnt;			// MQ count for server/slave node
@@ -205,6 +332,8 @@ typedef struct chm_cfg_info{
 		is_server_mode(false),
 		is_random_mode(false),
 		self_ctlport(CHM_INVALID_PORT),
+		self_cuk(""),								// after v1.0.71
+		chmpxid_type(CHMPXID_SEED_NAME),
 		max_chmpx_count(0L),
 		replica_count(0L),
 		max_server_mq_cnt(0L),
@@ -242,6 +371,8 @@ typedef struct chm_cfg_info{
 		is_server_mode(other.is_server_mode),
 		is_random_mode(other.is_random_mode),
 		self_ctlport(other.self_ctlport),
+		self_cuk(other.self_cuk),					// after v1.0.71
+		chmpxid_type(other.chmpxid_type),			// after v1.0.71
 		max_chmpx_count(other.max_chmpx_count),
 		replica_count(other.replica_count),
 		max_server_mq_cnt(other.max_server_mq_cnt),
@@ -288,6 +419,7 @@ typedef struct chm_cfg_info{
 			is_server_mode		== other.is_server_mode			&&
 			is_random_mode		== other.is_random_mode			&&
 			self_ctlport		== other.self_ctlport			&&
+			chmpxid_type		== other.chmpxid_type			&&		// after v1.0.71
 			max_chmpx_count		== other.max_chmpx_count		&&
 			replica_count		== other.replica_count			&&
 			max_server_mq_cnt	== other.max_server_mq_cnt		&&
@@ -331,6 +463,8 @@ typedef struct chm_cfg_info{
 		is_server_mode			= other.is_server_mode;
 		is_random_mode			= other.is_random_mode;
 		self_ctlport			= other.self_ctlport;
+		self_cuk				= other.self_cuk;
+		chmpxid_type			= other.chmpxid_type;
 		max_chmpx_count			= other.max_chmpx_count;
 		replica_count			= other.replica_count;
 		max_server_mq_cnt		= other.max_server_mq_cnt;
@@ -401,13 +535,26 @@ typedef struct chm_conf_common_carry_value{
 	std::string	server_prikey;
 	std::string	slave_cert;
 	std::string	slave_prikey;
-	bool		is_server_by_ctlport;			// for check server/slave mode by checking control port and server name.
+	bool		server_mode_by_comp;			// for check server/slave mode by checking control port and cuk and server name.
 	bool		found_ssl;
 	bool		found_ssl_verify_peer;
 
-	chm_conf_common_carry_value() :	port(CHM_INVALID_PORT), ctlport(CHM_INVALID_PORT), server_mode(false), is_ssl(false), verify_peer(false),
-									is_ca_file(false), capath(""), server_cert(""), server_prikey(""), slave_cert(""), slave_prikey(""),
-									is_server_by_ctlport(false), found_ssl(false), found_ssl_verify_peer(false) {}
+	chm_conf_common_carry_value() :
+		port(CHM_INVALID_PORT),
+		ctlport(CHM_INVALID_PORT),
+		server_mode(false),
+		is_ssl(false),
+		verify_peer(false),
+		is_ca_file(false),
+		capath(""),
+		server_cert(""),
+		server_prikey(""),
+		slave_cert(""),
+		slave_prikey(""),
+		server_mode_by_comp(false),
+		found_ssl(false),
+		found_ssl_verify_peer(false)
+	{}
 }CHMCONF_CCV, *PCHMCONF_CCV;
 
 //---------------------------------------------------------
@@ -430,21 +577,26 @@ class CHMConf : public ChmEventBase
 		std::string			cfgfile;
 		std::string			strjson;
 		short				ctlport_param;
+		std::string			cuk_param;
 		CHMConf::ConfType	type;
 		int					inotifyfd;
 		int					watchfd;
 		PCHMCFGINFO			pchmcfginfo;
 
 	protected:
-		CHMConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* pJson = NULL);
+		CHMConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const = 0;
 
 		const CHMCFGINFO* GetConfiguration(bool is_check_update = false);		// thread unsafe
-		bool GetServerInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
-		bool GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, bool is_check_update = false);
-		bool GetSlaveInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update = false);
-		bool GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, bool is_check_update = false);
+		bool RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, bool with_reverse, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update = false);
+		bool CheckContainsServerInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
+		bool CheckContainsSlaveInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
+		bool RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, std::string& normalizedname, bool is_server, bool with_forward, bool with_reverse);
+		bool GetServerInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& svrnodeinfo, std::string& normalizedname, bool is_check_update = false);
+		bool GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, std::string& normalizedname, bool is_check_update = false);
+		bool GetSlaveInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& slvnodeinfo, std::string& normalizedname, bool is_check_update = false);
+		bool GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, std::string& normalizedname, bool is_check_update = false);
 
 		bool IsWatching(void) const { return (CHM_INVALID_HANDLE != watchfd); }
 		uint CheckNotifyEvent(void);
@@ -454,7 +606,10 @@ class CHMConf : public ChmEventBase
 		bool IsJsonStringType(void) const { return (CONF_JSON_STR == type); }
 
 	public:
-		static CHMConf* GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config, short ctlport = CHM_INVALID_PORT, bool is_check_env = true, std::string* normalize_config = NULL);	// Class Factory
+		static CHMConf* GetCHMConf(int eventqfd, ChmCntrl* pcntrl, const char* config, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, bool is_check_env = true, std::string* normalize_config = NULL);	// Class Factory
+		static std::string GetChmpxidTypeString(CHMPXID_SEED_TYPE type);
+		static std::string GetSslVersionString(chmss_ver_t version);
+
 		virtual ~CHMConf();
 
 		virtual bool Clean(void);
@@ -473,8 +628,9 @@ class CHMConf : public ChmEventBase
 		bool CheckUpdate(void);
 		bool GetConfiguration(CHMCFGINFO& config, bool is_check_update = false);
 
-		bool GetNodeInfo(const char* hostname, short ctlport, CHMNODE_CFGINFO& nodeinfo, bool is_only_server, bool is_check_update = false);
-		bool GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, bool is_check_update = false);
+		bool CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
+		bool GetNodeInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& nodeinfo, std::string& normalizedname, bool is_only_server, bool is_check_update = false);
+		bool GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, std::string& normalizedname, bool is_check_update = false);
 
 		bool GetServerList(strlst_t& server_list);
 		bool IsServerList(const char* hostname, std::string& fqdn);
@@ -494,7 +650,7 @@ class CHMIniConf : public CHMConf
 	friend class CHMConf;
 
 	protected:
-		CHMIniConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT);
+		CHMIniConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
 		bool LoadConfigurationRaw(CFGRAW& chmcfgraw) const;
@@ -512,7 +668,7 @@ class CHMYamlBaseConf : public CHMConf
 	friend class CHMConf;
 
 	protected:
-		CHMYamlBaseConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* pJson = NULL);
+		CHMYamlBaseConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
 
@@ -528,7 +684,7 @@ class CHMJsonConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMJsonConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT);
+		CHMJsonConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMJsonConf();
@@ -542,7 +698,7 @@ class CHMJsonStringConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMJsonStringConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* pJson = NULL, short ctlport = CHM_INVALID_PORT);
+		CHMJsonStringConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* pJson = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMJsonStringConf();
@@ -556,7 +712,7 @@ class CHMYamlConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMYamlConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT);
+		CHMYamlConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMYamlConf();

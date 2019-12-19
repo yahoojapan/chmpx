@@ -31,8 +31,8 @@ DECL_EXTERN_C_START
 //---------------------------------------------------------
 // Utilities
 //---------------------------------------------------------
-chmhash_t MakeChmpxId(const char* group, const char* hostname, short port);
-chmhash_t MakeBaseMsgId(const char* group, const char* hostname, short port);
+chmhash_t MakeChmpxId(const char* group, CHMPXID_SEED_TYPE type, const char* hostname, short ctlport, const char* cuk, const char* ctleps, const char* custom);
+chmhash_t MakeBaseMsgId(const char* group, CHMPXID_SEED_TYPE type, const char* hostname, short ctlport, const char* cuk, const char* ctleps, const char* custom);
 
 DECL_EXTERN_C_END
 

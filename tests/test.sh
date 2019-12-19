@@ -99,14 +99,20 @@ fi
 #
 # make parameter for JSON
 #
-JSON_SERVER_PARAM=`grep 'SERVER=' ${BASEDIR}/test_json_string.data 2>/dev/null | sed 's/SERVER=//g' 2>/dev/null`
-JSON_SLAVE_PARAM=`grep 'SLAVE=' ${BASEDIR}/test_json_string.data 2>/dev/null | sed 's/SLAVE=//g' 2>/dev/null`
+JSON_SERVER_PARAM=`grep 'SERVER=' ${BASEDIR}/cfg_test_json_string.data 2>/dev/null | sed 's/SERVER=//g' 2>/dev/null`
+JSON_SLAVE_PARAM=`grep 'SLAVE=' ${BASEDIR}/cfg_test_json_string.data 2>/dev/null | sed 's/SLAVE=//g' 2>/dev/null`
 
 #
 # Test for conf loading
 #
 echo "------ LOAD INI file for server ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_server.ini | grep -v NAME | grep -v DATE > /tmp/conftest_svr_ini_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.ini -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_ini_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server INI."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_ini_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server INI."
 	echo "RESULT --> FAILED"
@@ -116,7 +122,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD INI file for slave -----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_slave.ini | grep -v NAME | grep -v DATE > /tmp/conftest_slv_ini_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.ini -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_ini_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave INI."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_ini_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for slave INI."
 	echo "RESULT --> FAILED"
@@ -126,7 +138,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD YAML file for server ---------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_server.yaml | grep -v NAME | grep -v DATE > /tmp/conftest_svr_yaml_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.yaml -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_yaml_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server YAML."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_yaml_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server YAML."
 	echo "RESULT --> FAILED"
@@ -136,7 +154,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD YAML file for slave ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_slave.yaml | grep -v NAME | grep -v DATE > /tmp/conftest_slv_yaml_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.yaml -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_yaml_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave YAML."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_yaml_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for slave YAML."
 	echo "RESULT --> FAILED"
@@ -146,7 +170,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD JSON file for server ---------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_server.json | grep -v NAME | grep -v DATE > /tmp/conftest_svr_json_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.json -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_json_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server JSON."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_json_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server JSON."
 	echo "RESULT --> FAILED"
@@ -156,7 +186,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD JSON file for slave ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/test_slave.json | grep -v NAME | grep -v DATE > /tmp/conftest_slv_json_${PROCID}.log 2>&1
+${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.json -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_json_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave JSON."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_json_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for slave JSON."
 	echo "RESULT --> FAILED"
@@ -166,7 +202,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD JSON param for server --------------------------"
-${CHMCONFTEST} -json "${JSON_SERVER_PARAM}" | grep -v NAME | grep -v DATE > /tmp/conftest_svr_sjson_${PROCID}.log 2>&1
+${CHMCONFTEST} -json "${JSON_SERVER_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_sjson_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server JSON param."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_sjson_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server JSON param."
 	echo "RESULT --> FAILED"
@@ -176,7 +218,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD JSON param for slave ---------------------------"
-${CHMCONFTEST} -json "${JSON_SLAVE_PARAM}" | grep -v NAME | grep -v DATE > /tmp/conftest_slv_sjson_${PROCID}.log 2>&1
+${CHMCONFTEST} -json "${JSON_SLAVE_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_sjson_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave JSON param."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_sjson_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for slave JSON param."
 	echo "RESULT --> FAILED"
@@ -186,7 +234,13 @@ echo "RESULT --> SUCCEED"
 echo ""
 
 echo "------ LOAD INI conf by env for server ---------------------"
-CHMCONFFILE=${BASEDIR}/test_server.ini ${CHMCONFTEST} | grep -v NAME | grep -v DATE > /tmp/conftest_svr_inienv_${PROCID}.log 2>&1
+CHMCONFFILE=${BASEDIR}/cfg_test_server.ini ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_inienv_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server INI on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_inienv_${PROCID}.log >/dev/null 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server INI on ENV."
 	echo "RESULT --> FAILED"
@@ -195,10 +249,48 @@ fi
 echo "RESULT --> SUCCEED"
 echo ""
 
+echo "------ LOAD INI conf by env for slave ---------------------"
+CHMCONFFILE=${BASEDIR}/cfg_test_slave.ini ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_inienv_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave INI on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_inienv_${PROCID}.log >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave INI on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+echo "RESULT --> SUCCEED"
+echo ""
+
 echo "------ LOAD JSON param by env for server ------------------"
-CHMJSONCONF="${JSON_SERVER_PARAM}" ${CHMCONFTEST} | grep -v NAME | grep -v DATE > /tmp/conftest_svr_jsonenv_${PROCID}.log 2>&1
+CHMJSONCONF="${JSON_SERVER_PARAM}" ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_jsonenv_${PROCID}.log 2>&1
 if [ $? -ne 0 ]; then
 	echo "ERROR: Failed test configuration for server JSON on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_jsonenv_${PROCID}.log >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for server JSON on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+echo "RESULT --> SUCCEED"
+echo ""
+
+echo "------ LOAD JSON param by env for slave ------------------"
+CHMJSONCONF="${JSON_SLAVE_PARAM}" ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_jsonenv_${PROCID}.log 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave JSON on ENV."
+	echo "RESULT --> FAILED"
+	exit 1
+fi
+diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_jsonenv_${PROCID}.log >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+	echo "ERROR: Failed test configuration for slave JSON on ENV."
 	echo "RESULT --> FAILED"
 	exit 1
 fi

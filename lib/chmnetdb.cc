@@ -119,6 +119,32 @@ static void RemoveZoneIndexInList(strlst_t& list)
 	}
 }
 
+static bool CheckZoneIndexString(const string& str, string& nozi)
+{
+	string::size_type	pos = str.find_last_of('%');
+	if(string::npos == pos){
+		return false;
+	}
+	string	befrestr(str, 0, pos);
+	string	laststr(str, pos);
+	if(string::npos != (pos = laststr.find_first_of(" #:.p"))){
+		// If there is a port specification, leave it.
+		//
+		// [NOTE]
+		// However, in this check, it is checked with "p", so if the 
+		// interface has a character string including "p", it will be
+		// judged erroneously. Basically, it is assumed that "p" such
+		// as "eth0" is not included.
+		//
+		laststr = string(laststr, pos);
+	}else{
+		laststr.clear();
+	}
+	nozi = befrestr + laststr;
+
+	return true;
+}
+
 static void RemoveLocalhostKeys(strlst_t& list)
 {
 	for(strlst_t::iterator iter = list.begin(); iter != list.end(); ){
@@ -154,11 +180,153 @@ static bool RemoveLocalhostInCache(CHMNDBCACHE& data)
 	return found;
 }
 
+//
+// Check simple IPv6 string format
+//
+// ex.	"xxxx:....:xxxx"			-> colon is maximum 7
+//		"xxxx:...:nnn.nnn.nnn.nnn"	-> colon is maximum 6 and period is 3(ipv4 mapped ipv6 = "::ffff:172.0.0.1")
+//
+static bool CheckStringIPv6Format(const char* str, bool is_allow_comma)
+{
+	if(CHMEMPTYSTR(str)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	int		colon_cnt	= 0;
+	int		period_cnt	= 0;
+	string	onepart("");
+	for(; '\0' != *str; ++str){
+		if(0 == period_cnt){
+			if(0 == isxdigit(*str)){
+				if(':' == *str){
+					colon_cnt++;
+					if(!is_string_number_ex(onepart.c_str(), 0xffff, true, false)){		// hex string
+						return false;
+					}
+					onepart.clear();
+				}else if('.' == *str){
+					period_cnt++;
+					if(!is_string_number_ex(onepart.c_str(), 0xff, false, true)){		// dec string
+						return false;
+					}
+					onepart.clear();
+				}else{
+					return false;
+				}
+			}else{
+				onepart += *str;
+			}
+		}else{
+			if(0 == isdigit(*str)){
+				if('.' == *str){
+					period_cnt++;
+					if(!is_string_number_ex(onepart.c_str(), 0xff, false, true)){		// dec string
+						return false;
+					}
+					onepart.clear();
+				}else{
+					// not allow colon only after the appearance of period
+					return false;
+				}
+			}else{
+				onepart += *str;
+			}
+		}
+	}
+	if(!onepart.empty()){
+		if(0 == period_cnt){
+			if(!is_string_number_ex(onepart.c_str(), 0xffff, true, false)){
+				return false;
+			}
+		}else{
+			if(!is_string_number_ex(onepart.c_str(), 0xff, false, true)){
+				return false;
+			}
+		}
+	}
+	if(	(0 == period_cnt && 0 < colon_cnt && colon_cnt < 8)	||	// normal IPv6("xxx:xxx...:xxx")
+		(3 == period_cnt && 0 < colon_cnt && colon_cnt < 7)	)	// IPv4 mapped IPv6("::ffff:192.0.0.1")
+	{
+		return true;
+	}
+	return false;
+}
+
+//
+// Check simple IPv4 string format
+//
+// ex.	"xxx.xxx.xxx.xxx"
+//
+static bool CheckStringIPv4Format(const char* str)
+{
+	if(CHMEMPTYSTR(str)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	int		period_cnt = 0;
+	string	onepart("");
+	for(; '\0' != *str; ++str){
+		if(0 == isdigit(*str)){
+			if('.' == *str){
+				period_cnt++;
+				if(!is_string_number_ex(onepart.c_str(), 0xff, false, true)){		// dec string
+					return false;
+				}
+				onepart.clear();
+			}else{
+				return false;
+			}
+		}else{
+			onepart += *str;
+		}
+	}
+	if(onepart.empty()){
+		// last word should not be empty
+		return false;
+	}
+	if(!is_string_number_ex(onepart.c_str(), 0xff, false, true)){
+		return false;
+	}
+	if(3 != period_cnt){
+		return false;
+	}
+	return true;
+}
+
+//
+// Check simple hostname(FQDN)
+//
+static bool CheckStringHostnameFormat(const char* str)
+{
+	if(CHMEMPTYSTR(str)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	bool	found_alpha = false;
+	for(; '\0' != *str; ++str){
+		if(	0 == isalnum(*str)	&&
+			'-' != *str			&&
+			'.' != *str			&&
+			'_' != *str			)		// we should allow this word
+		{
+			return false;
+		}
+		if(0 != isalpha(*str)){
+			found_alpha = true;
+		}
+	}
+	if(!found_alpha){
+		return false;
+	}
+	return true;
+}
+
 //---------------------------------------------------------
 // Class variables
 //---------------------------------------------------------
 const time_t	ChmNetDb::ALIVE_TIME;
 int				ChmNetDb::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
+const size_t	ChmNetDb::PORT_NMATCH;
 
 //---------------------------------------------------------
 // Class methods
@@ -378,9 +546,9 @@ bool ChmNetDb::GetIPv4MappedIPv6Address(const char* target, string& stripv4)
 	int				result;
 	if(1 != (result = inet_pton(AF_INET6, target, &buf))){
 		if(0 == result){
-			MSG_CHMPRN("Could not convert %s by wrong ip address string\n", target);
+			MSG_CHMPRN("Could not convert %s by wrong ip address string", target);
 		}else{
-			MSG_CHMPRN("Could not convert %s by errno(%d)\n", target, errno);
+			MSG_CHMPRN("Could not convert %s by errno(%d)", target, errno);
 		}
 		return false;
 	}
@@ -438,21 +606,182 @@ bool ChmNetDb::IsLocalhostKeyword(const char* host)
 	return false;
 }
 
+bool ChmNetDb::ParseHostPortString(const string& target, short default_port, string& strHost, short& port)
+{
+	if(target.empty()){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+
+	// Cut ZoneIndex, if target has it.
+	string	strBase;
+	if(!CheckZoneIndexString(target, strBase)){
+		strBase = target;
+	}
+	strBase = trim(strBase);
+
+	// check IPv6 normal address format(because *1 pattern)
+	if(CheckStringIPv6Format(strBase.c_str(), true)){		// check with IPv4 mapped IPv6
+		// check IPv6 mapped IPv4 address
+		string	stripv4;
+		if(GetIPv4MappedIPv6Address(strBase.c_str(), stripv4)){
+			// got IPv4 address
+			strHost	= stripv4;
+		}else{
+			strHost	= strBase;
+		}
+		port = default_port;
+
+		MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+		return true;
+	}
+
+	if(!ChmNetDb::Get()->is_init_regobj){
+		WAN_CHMPRN("The regex object for checking the HOST and PORT specifications cannot be initialized. ### Please restart immediately. ###");
+	}
+
+	// replace " port " to " "(for IPv6 format)
+	string				sp_port_key(" port ");
+	string::size_type	pos;
+	if(string::npos != (pos = strBase.find(sp_port_key))){	// Using forward match but no problem (when there are multiple keywords, an error occurs anyway)
+		string	strTmp	= strBase.substr(0, pos);
+		strTmp			+= " ";
+		strTmp			+= strBase.substr(pos + sp_port_key.size());
+		strBase			= trim(strTmp);
+	}
+
+	// check address + port 
+	//
+	//	IPv6		"[2001:db8::1]:<port>"
+	//				"2001:db8::1:<port>"					(*1)
+	//				"2001:db8::1p<port>"
+	//				"2001:db8::1#<port>"
+	//				"2001:db8::1 <port>"("2001:db8::1 port <port>")
+	//	IPv4		"192.168.0.1:<port>"
+	//	FQDN		"example.com:<port>"
+	//
+	// [NOTE]
+	// An error will occur if regobj_checkport is not initialized.
+	//
+	regmatch_t	pmatch[ChmNetDb::PORT_NMATCH];
+	if(0 == regexec(&(ChmNetDb::Get()->regobj_checkport), strBase.c_str(), ChmNetDb::PORT_NMATCH, pmatch, 0)){
+		string	hostpart = trim(string(strBase, pmatch[1].rm_so, pmatch[1].rm_eo));			// "<ip address or hostname>"
+		string	withport = trim(string(strBase, pmatch[2].rm_so, pmatch[2].rm_eo));			// "<sepalator><port>"(ex. ":80")
+		string	portpart = trim(string(strBase, pmatch[3].rm_so, pmatch[3].rm_eo));			// "<port>"
+
+		if(string::npos != hostpart.find(':')){
+			// case of IPv6 address
+
+			// if address has brackets(ex "[ab:cd:ef:...]"), cut brackets.
+			if(2 <= hostpart.length() && '[' == hostpart[0] && ']' == hostpart[hostpart.size() - 1]){
+				hostpart = trim(hostpart.substr(1, hostpart.size() - 2));
+			}
+
+			// check IPv6 mapped IPv4 address
+			string	stripv4;
+			if(GetIPv4MappedIPv6Address(hostpart.c_str(), stripv4)){
+				// got IPv4 address
+				strHost	= stripv4;
+				port	= static_cast<short>(atoi(portpart.c_str()));
+				MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+				return true;
+			}
+
+			// check IPv6 address
+			if(CheckStringIPv6Format(hostpart.c_str(), true)){	// IPv4 mapped IPv6 has already been checked, but allowed it.
+				// got IPv6 address
+				strHost	= hostpart;
+				port	= static_cast<short>(atoi(portpart.c_str()));
+				MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+				return true;
+			}
+		}else{
+			// case of IPv4 address or hostname(FQDN)
+			if(withport.empty() || ':' != withport[0]){
+				// Port specification by ":" is only IPv6, otherwise it is handled as no port specification
+				// Then check IPv4/hostname(already check IPv6).
+				if(CheckStringIPv4Format(strBase.c_str())){
+					// got IPv4 address
+					strHost	= strBase;
+					port	= default_port;
+					MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+					return true;
+				}
+				if(CheckStringHostnameFormat(strBase.c_str())){
+					// got hostname(FQDN)
+					strHost	= strBase;
+					port	= default_port;
+					MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+					return true;
+				}
+			}else{
+				if(CheckStringIPv4Format(hostpart.c_str())){
+					// got IPv4 address
+					strHost	= hostpart;
+					port	= static_cast<short>(atoi(portpart.c_str()));
+					MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+					return true;
+				}
+				if(CheckStringHostnameFormat(hostpart.c_str())){
+					// got hostname(FQDN)
+					strHost	= hostpart;
+					port	= static_cast<short>(atoi(portpart.c_str()));
+					MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+					return true;
+				}
+			}
+		}
+	}else{
+		// Not specified port
+
+		// check IPv4/hostname(already check IPv6)
+		if(CheckStringIPv4Format(strBase.c_str())){
+			// got IPv4 address
+			strHost	= strBase;
+			port	= default_port;
+			MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+			return true;
+		}
+		if(CheckStringHostnameFormat(strBase.c_str())){
+			// got hostname(FQDN)
+			strHost	= strBase;
+			port	= default_port;
+			MSG_CHMPRN("convert host and port(%s) to host(%s) and port(%d).", target.c_str(), strHost.c_str(), port);
+			return true;
+		}
+	}
+	// format error
+	MSG_CHMPRN("host and port(%s) is not IPv4/IPv6/hostname format(with port).", target.c_str());
+
+	return false;
+}
+
 //---------------------------------------------------------
 // Methods
 //---------------------------------------------------------
-ChmNetDb::ChmNetDb() : timeout(ChmNetDb::ALIVE_TIME)
+ChmNetDb::ChmNetDb() : timeout(ChmNetDb::ALIVE_TIME), fulllocalname(""), is_init_regobj(false)
 {
 	static ChmNetDb*	pnetdb = NULL;		// for checking initializing
 	if(!pnetdb){
 		pnetdb = this;
 		InitializeLocalHostInfo();			// initializing
 	}
+	bool	result;
+	string	strregex = "^(.+)([:#p(\\.)( )])([0-9]+)$";
+	if(0 != (result = regcomp(&regobj_checkport, strregex.c_str(), REG_EXTENDED))){
+		ERR_CHMPRN("Could not compile regex from %s by error(%d)", strregex.c_str(), result);
+	}else{
+		is_init_regobj = true;
+	}
 }
 
 ChmNetDb::~ChmNetDb()
 {
 	ClearEx();
+	if(is_init_regobj){
+		is_init_regobj = false;
+		regfree(&regobj_checkport);
+	}
 }
 
 bool ChmNetDb::InitializeLocalHostInfo(void)
@@ -840,7 +1169,7 @@ bool ChmNetDb::SearchCache(const char* target, CHMNDBCACHE& data)
 	}
 	if(cachemap.end() != iter){
 		if(0 != timeout && time(NULL) < (iter->second.cached_time + timeout)){
-			MSG_CHMPRN("find cache but it is old, do removing cache.");
+			//MSG_CHMPRN("find cache but it is old, do removing cache.");
 			cachemap.erase(iter);
 		}else{
 			AddUniqueStringListToList(iter->second.ipaddresses, data.ipaddresses, true);
@@ -900,7 +1229,6 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 	struct addrinfo*	tmpaddrinfo;
 	char				hostname[NI_MAXHOST];
 	char				ipaddr[NI_MAXHOST];
-	int					result;
 
 	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -927,14 +1255,14 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 	// addrinfo(list) -> hostname
 	for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
 		memset(&hostname, 0, sizeof(hostname));
-		if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
-			MSG_CHMPRN("Could not get hostname %s, errno=%d.", target, result);
+		if(0 != getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV)){
+			//MSG_CHMPRN("Could not get hostname %s, errno=%d.", target, result);
 		}else{
 			// add hostname
 			AddUniqueStringToList(string(hostname), data.hostnames, false);
 
 			// add cache
-			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
+			if(0 != getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV)){
 				HostnammeAddCache(string(hostname), string(ipaddr));
 			}
 		}
@@ -942,7 +1270,9 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 
 	// addrinfo -> normalized ipaddress
 	for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
+		int	result;
 		memset(&ipaddr, 0, sizeof(ipaddr));
+
 		if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
 			MSG_CHMPRN("Could not convert normalized ipaddress  %s, errno=%d.", target, result);
 		}else{
