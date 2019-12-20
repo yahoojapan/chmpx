@@ -1,3 +1,9 @@
+chmpx (1.0.72) unstable; urgency=low
+
+  * Fixed a bug and updated version of dependency packages - #36
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 20 Dec 2019 10:53:09 +0900
+
 chmpx (1.0.71) unstable; urgency=low
 
   * Enhanced feature about IPv6 and NAT support - #34
