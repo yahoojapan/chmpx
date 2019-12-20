@@ -49,6 +49,8 @@ TESTS = test.sh
 
 EXTRA_DIST =	test.sh \
 				chmpxnssutil.sh \
+				test_server.ini \
+				test_slave.ini \
 				cfg_test_server.ini \
 				cfg_test_server.json \
 				cfg_test_server.result \
