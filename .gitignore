@@ -145,6 +145,9 @@ tests/chmpxstreamtest
 tests/chmpxstatus
 tests/chmpxbench
 tests/chmpxlinetool
+tests/test-suite.log
+tests/test.sh.log
+tests/test.sh.trs
 
 #
 # VIM modelines
