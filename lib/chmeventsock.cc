@@ -5845,12 +5845,14 @@ bool ChmEventSock::MergeDone(void)
 	// send status change
 	chmpxid_t	to_chmpxid = GetNextRingChmpxId();
 	CHMPXSVR	selfchmpxsvr;
+	bool		need_complete = false;
 	if(!pImData->GetSelfChmpxSvr(&selfchmpxsvr)){
 		WAN_CHMPRN("Could not get self chmpx information, but continue...");
 	}else{
 		if(CHM_INVALID_CHMPXID == to_chmpxid){
 			// no server found, finish doing so pending hash updated self.
 			WAN_CHMPRN("Could not get to chmpxid, probably there is no server without self chmpx on RING. So only sending status update to slaves.");
+			need_complete = true;
 
 			if(!PxComSendSlavesStatusChange(&selfchmpxsvr)){
 				WAN_CHMPRN("Failed to send self status change to slaves, but continue...");
@@ -5877,7 +5879,14 @@ bool ChmEventSock::MergeDone(void)
 
 	// if the mode is automatically merging, set flag here.
 	if(IsAutoMerge()){
-		is_merge_done_processing = true;
+		if(need_complete){
+			MSG_CHMPRN("Start to merge complete automatically.");
+			if(!RequestMergeComplete()){
+				ERR_CHMPRN("Could not change status merge \"COMPLETE\", probably another server does not change status yet, hope to recover automatic or DO COMPMERGE BY MANUAL!");
+			}
+		}else{
+			is_merge_done_processing = true;
+		}
 	}
 	return true;
 }
