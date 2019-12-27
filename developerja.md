@@ -705,9 +705,9 @@ CHMPXオブジェクトのクラスです。
 操作が完了したら、メッセージハンドルのクローズを行い、本オブジェクトを破棄します。
 
 #### メソッド
-- bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT)
-- bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT)
-- bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT)
+- bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
+- bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
+- bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
 <br /><br />
 - bool Receive(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
 - bool Send(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
@@ -736,7 +736,7 @@ CHMPXオブジェクトのクラスです。
   CHMPXオブジェクトをサーバノード上のクライアントプロセス用に初期化します。CHMPXプロセスを起動したときと同じコンフィグレーションと同じものを指定してください。これは、コンフィグレーションファイル（.ini/.yaml/.json）もしくは、JSON文字列を指定します。 コンフィグレーションのパラメータが、NULLもしくは、空文字列を指定した場合には、環境変数 CHMCONFFILE もしくは CHMJSONCONF が参照され、適切に設定値が読み込まれます。
   C++インターフェースの場合には、ctlport引数（chmpx起動時の-ctlportと同じ仕様）があります。
 - ChmCntrl::InitializeOnSlave  
-  CHMPXオブジェクトをスレーブノード上のクライアントプロセス用に初期化します。CHMPXプロセスを起動したときと同じコンフィグレーションと同じものを指定してください。これは、コンフィグレーションファイル（.ini/.yaml/.json）もしくは、JSON文字列を指定します。 コンフィグレーションのパラメータが、NULLもしくは、空文字列を指定した場合には、環境変数 CHMCONFFILE もしくは CHMJSONCONF が参照され、適切に設定値が読み込まれます。C++インターフェースの場合には、ctlport引数（chmpx起動時の-ctlportと同じ仕様）があります。
+  CHMPXオブジェクトをスレーブノード上のクライアントプロセス用に初期化します。CHMPXプロセスを起動したときと同じコンフィグレーションと同じものを指定してください。これは、コンフィグレーションファイル（.ini/.yaml/.json）もしくは、JSON文字列を指定します。 コンフィグレーションのパラメータが、NULLもしくは、空文字列を指定した場合には、環境変数 CHMCONFFILE もしくは CHMJSONCONF が参照され、適切に設定値が読み込まれます。C++インターフェースの場合には、ctlport引数（chmpx起動時の-ctlportと同じ仕様）、cuk引数（chmpx起動時の-cukと同じ仕様）があります。
 - ChmCntrl::OnlyAttachInitialize  
   指定されたコンフィグレーション（ファイル指定、JSON文字列指定、環境変数指定のいずれか）および制御ポートに応じて、CHMPXオブジェクトを初期化します。初期化は、CHMSHM（chmpxの管理SHM）にアタッチすることで行われます。 初期化されたCHMPXオブジェクトは、chmpxの状態（ステータス）を取得するメソッド（DupAllChmInfo、DupSelfChmpxInfo）でのみ利用できます。
 - ChmCntrl::Receive  

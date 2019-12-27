@@ -30,6 +30,11 @@ Specify the control port number to clarify which setting value of the configurat
 When starting multiple CHMPX programs with the same host name in the configuration, there are cases where the CHMPX program is ambiguous as to which setting value the confidence reads.  
 In order to resolve such ambiguity of the configuration, it is necessary to specify the control port number.  
 (The control port number is a setting value that should be unique within the same host in the cluster.)
+- -cuk <cuk string>  
+Specify CUK(Custom Unique Key) to clarify which setting value of the configuration is used by the starting CHMPX.  
+When multiple CHMPX programs are started with the same host name(IP address) or control port in the configuration, there is a case where the CHMPX program is ambiguous as to which setting value it reads.  
+When specifying such a configuration, CUK may be specified to clarify the settings.  
+CUK is a setting that must be unique within a cluster.
 - -d <param>  
 Specify the level of output message. The level value is silent, err, wan, info or dump.
 - -dfile <path>  
@@ -42,7 +47,7 @@ _If there is not any option and environment for configuration, you can not run C
 ## Start CHMPX program
 To start the CHMPX program, do as follows.
 ```
-chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
+chmpx [-conf <file> | -json <json>] [-ctlport <port>] [-cuk <cuk>] [-d [silent|err|wan|msg|dump]] [-dfile <debug file path>]
 ```
 
 The following is an example.
@@ -69,6 +74,13 @@ If the control port number (such as the -ctlport option) is specified when start
 If this item is omitted, the same server/slave node as the specified control port number is detected from the list and the type of the node is determined.
 - DELIVERMODE  
 Specify random(=RANDOM) or hash(=HASH) in the specification item of cluster type.
+- CHMPXIDTYPE  
+This item is specified in the global section and can be omitted.  
+This is a value that specifies the SEED used to generate the CHMPXID.  
+For the value, specify NAME (default), CUK, CTLENDPOINTS, or CUSTOM.  
+For NAME, use the node's HOSTNAME and control port number. This is the same generation method as before.  
+For CUK, use the value of CUK, and for CTLENDPOINTS, use the value of CTLENDPOINTS.  
+CUSTOM uses the value of CUSTOM_ID_SEED.
 - MAXCHMPX  
 Specify the maximum number of server nodes and slave nodes. As default 1024.
 - REPLICA  
@@ -99,6 +111,10 @@ If this item is omitted, each node in the SVRNODE/SLVNODE section must always sp
 When starting the CHMPX program of multiple server nodes on the same host, specify the control port number to specify the entry to be started.  
 This item can be omitted unless multiple server nodes start on the same host.  
 In addition, if control port number (-ctlport option etc.) is specified when CHMPX program is started and when CHMPX library is initialized, this item can be omitted.
+- SELFCUK  
+This item is specified in the global section and can be omitted.  
+When building a cluster with CUK, specify the value of your own CUK.  
+Same use as SELFCTLPORT.
 - RWTIMEOUT  
 Specify the timeout value(us) per read/write of TCP/IP(Socket) communication. As default 200us.
 - RETRYCNT  
@@ -188,6 +204,24 @@ To omit this item, it is necessary to set the default value in the GLOBAL sectio
 - CTLPORT  
 Specify the control port number.  
 To omit this item, it is necessary to set the default value in the GLOBAL section.
+- CUK  
+When specifying CUK, set the value.
+- ENDPOINTS  
+When providing services through NAT, enumerate HOSTANME (IP address) and ports at the NAT entrance to access the ports from the outside.  
+Up to four can be set.
+- CTLENDPOINTS  
+When providing services through NAT, enumerate HOSTANME (IP address) and ports at the NAT entrance to access the control port from the outside.  
+Up to four can be set.
+- FORWARD_PEERS  
+When passing through NAT or Gateway, list HOSTANME (IP address) of Peer connected to other nodes.  
+Up to four can be set.
+- REVERSE_PEERS  
+When passing through NAT or Gateway, list HOSTANME (IP address) of Peer connected from other nodes.  
+Up to four can be set.
+- CUSTOM_ID_SEED  
+This value is an arbitrary character string.  
+This item must be set to all nodes when CUSTOM is specified for CHMPXIDTYPE.  
+Otherwise it must not be specified.
 - SSL  
 Specify whether to perform SSL communication (on / off) in TCP / IP (Socket) communication.  
 If this item is omitted and the setting does not exist in the GLOBAL section, As default off.
@@ -215,6 +249,24 @@ Describe the server name of the slave node. Specify the description with FQDN, I
 - CTLPORT  
 Specify the control port number.  
 To omit this item, it is necessary to set the default value in the GLOBAL section.
+- CUK  
+When specifying CUK, set the value.
+- ENDPOINTS  
+When providing services through NAT, enumerate HOSTANME (IP address) and ports at the NAT entrance to access the ports from the outside.  
+Up to four can be set.
+- CTLENDPOINTS  
+When providing services through NAT, enumerate HOSTANME (IP address) and ports at the NAT entrance to access the control port from the outside.  
+Up to four can be set.
+- FORWARD_PEERS  
+When passing through NAT or Gateway, list HOSTANME (IP address) of Peer connected to other nodes.  
+Up to four can be set.
+- REVERSE_PEERS  
+When passing through NAT or Gateway, list HOSTANME (IP address) of Peer connected from other nodes.  
+Up to four can be set.
+- CUSTOM_ID_SEED  
+This value is an arbitrary character string.  
+This item must be set to all nodes when CUSTOM is specified for CHMPXIDTYPE.  
+Otherwise it must not be specified.
 - CAPATH  
 For SSL communication, specify the file path or directory path of the CA certificate. If this item is omitted and the setting does not exist in the GLOBAL section, As default empty.
 - SLAVE_CERT  

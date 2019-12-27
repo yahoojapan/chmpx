@@ -708,9 +708,9 @@ In the case of a slave node, it creates an instance of this class, opens a messa
 When the operation is completed, close the message handle and destroy this object.  
 
 #### Method
-- bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT)
-- bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT)
-- bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT)
+- bool InitializeOnServer(const char* cfgfile, bool is_auto_rejoin = false, chm_merge_get_cb getfp = NULL, chm_merge_set_cb setfp = NULL, chm_merge_lastts_cb lastupdatefp = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
+- bool InitializeOnSlave(const char* cfgfile, bool is_auto_rejoin = false, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
+- bool OnlyAttachInitialize(const char* cfgfile, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL)
 <br /><br />
 - bool Receive(PCOMPKT* ppComPkt, unsigned char** ppbody = NULL, size_t* plength = NULL, int timeout_ms = ChmCntrl::EVENT_NOWAIT, bool no_giveup_rejoin = false)
 - bool Send(const unsigned char* pbody, size_t blength, chmhash_t hash, bool without_self)
@@ -738,12 +738,12 @@ When the operation is completed, close the message handle and destroy this objec
 - ChmCntrl::InitializeOnServer  
   Initialize the CHMPX object for the client process on the server node. Specify the same configuration as when starting CHMPX process. This specifies the configuration file (.ini /. Yaml /. Json) or JSON string. If the configuration parameter is NULL or an empty string is specified, the environment variable (CHMCONFFILE or CHMJSONCONF) is referenced and the set value is loaded appropriately. In the case of C ++ interface, there is a ctlport argument (the same specification as -ctlport when starting chmpx).
 - ChmCntrl::InitializeOnSlave  
-Initialize the CHMPX object for the client process on the slave node. Specify the same configuration as when starting CHMPX process. This specifies the configuration file (.ini /. Yaml /. Json) or JSON string. If the configuration parameter is NULL or an empty string is specified, the environment variable (CHMCONFFILE or CHMJSONCONF) is referenced and the set value is loaded appropriately. In the case of C ++ interface, there is a ctlport argument (the same specification as -ctlport when starting chmpx).
+  Initialize the CHMPX object for the client process on the slave node. Specify the same configuration as when starting CHMPX process. This specifies the configuration file (.ini /. Yaml /. Json) or JSON string. If the configuration parameter is NULL or an empty string is specified, the environment variable (CHMCONFFILE or CHMJSONCONF) is referenced and the set value is loaded appropriately. In the case of C ++ interface, there are a ctlport argument (the same specification as -ctlport when starting chmpx) and a cuk argument (the same specification as -cuk when starting chmpx).
 - ChmCntrl::OnlyAttachInitialize  
-Initializes the CHMPX object according to the specified configuration (file specification, JSON string specification, environment variable specification) and control port. 
-Initialization is done by attaching to CHMSHM (management SHM of chmpx). The initialized CHMPX object can only be used with the method (DupAllChmInfo, DupSelfChmpxInfo) which obtains the status (status) of chmpx.
+  Initializes the CHMPX object according to the specified configuration (file specification, JSON string specification, environment variable specification) and control port.  
+  Initialization is done by attaching to CHMSHM (management SHM of chmpx). The initialized CHMPX object can only be used with the method (DupAllChmInfo, DupSelfChmpxInfo) which obtains the status (status) of chmpx.
 - ChmCntrl::Receive  
-Receive method for client process on server node. It receives a COMPKT pointer, a pointer to binary data, and a binary data length. You can specify a timeout. You can also specify whether to wait for a reboot if the CHMPX process has stopped. Release the received ppComPkt pointer and body data with CHM_Free () etc.
+  Receive method for client process on server node. It receives a COMPKT pointer, a pointer to binary data, and a binary data length. You can specify a timeout. You can also specify whether to wait for a reboot if the CHMPX process has stopped. Release the received ppComPkt pointer and body data with CHM_Free () etc.
 - ChmCntrl::Send  
   The sending method for the client process on the server node. Specify binary data string, length, HASH value.
 - ChmCntrl::Broadcast  
@@ -757,8 +757,8 @@ Receive method for client process on server node. It receives a COMPKT pointer, 
 - ChmCntrl::Receive  
   Receive method for client process on slave node. It receives a COMPKT pointer, a pointer to binary data, and a binary data length. You can specify a timeout. Release the received ppComPkt pointer and body data with CHM_Free () etc.
 - ChmCntrl::Send  
-  The sending method for the client process on the slave node.
-Specify binary data string, length, HASH value. If preceivercnt is specified, it is also possible to obtain the number of CHMPX of the destination.
+  The sending method for the client process on the slave node.  
+  Specify binary data string, length, HASH value. If preceivercnt is specified, it is also possible to obtain the number of CHMPX of the destination.  
   When the cluster of CHMPX is HASH type and multiplexed configuration (number of replicas is 1 or more), you can specify whether or not to send to multiple destinations.
 - ChmCntrl::Broadcast  
   Broadcast send method for client process on slave node. Specify binary data string, length, HASH value. If preceivercnt is specified, it is also possible to obtain the number of CHMPX of the destination.

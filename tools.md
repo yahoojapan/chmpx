@@ -40,6 +40,8 @@ Please specify the configuration of the JSON string specified when starting CHMP
 This option is an exclusive option to the **-conf** option.
 #### -ctlport
 Specify the control port specified when starting CHMPX process.
+#### -cuk
+Specify the CUK string specified when starting CHMPX process.
 #### -self
 Only the status (status) of the CHMPX process itself is displayed.  
 If this option is not specified, the status of all CHMPX processes connected by the CHMPX process including itself is displayed.
@@ -137,6 +139,8 @@ Please specify the configuration file (.ini .yaml. Json) to be inspected.
 #### -json [json string]
 Please specify the configuration of the JSON string to be inspected.  
 This option is an exclusive option to the **-conf** option.
+#### -no_check_update
+This option is specified when the configuration file update check is not performed.
 #### -print_default
 The default value set by the CHMPX program for items not specified in the configuration is displayed.
 #### -d [level]
@@ -173,8 +177,8 @@ Specify the configuration file or JSON string as the startup option.
 This specification method is the same as when starting the chmpx process.
 This startup method can be used only on the host that is running the CHMPX process.
 
-#### Host name and control port
-Specify the host name(IP address) and control port on which the CHMPX process is running as startup options.  
+#### Host name and control port(CUK, control endpoints, custom seed)
+Specify the host name(IP address) and control port, CUK, control endpoints, custom seed on which the CHMPX process is running as startup options.  
 With this activation method, the CHMPX process can be started on any host that allows access to the control port.
 In this method, it is unknown whether the CHMPX process to be connected is a server node or a slave node.
 For this reason, we start it by designating the node type (server/slave) as a temporary(initial value).
@@ -196,6 +200,12 @@ This option is exclusive with the **-conf** and **-json** options.
 #### -ctlport
 Specify the control port specified when starting CHMPX process.  
 This option is mandatory if you specify the **-host** option.
+#### -cuk
+Specify chmpx node cuk, if host option is specified, this option can be specified.
+#### -ctlendpoints
+Specify chmpx node ctlendpoints(<host:port,...>), if host option is specified, this option can be specified.
+#### -custom_seed
+Specify chmpx node custom_seed, if host option is specified, this option can be specified.
 #### -server
 This option specifies the temporary(initial value) node type of the CHMPX process to be connected as a server node when the **-host** option is specified.
 #### -save
@@ -253,7 +263,7 @@ If the noupdate parameter is specified, the dynamic CHMPX node list is not updat
 If you do not specify the noupdate parameter, the dynamic CHMPX node list is updated immediately before this command is executed.  
 When the server(or slave) parameter is specified, only the server node(or slave node) is displayed.  
 If you do not specify the server/slave parameter, a list of all CHMPX nodes will be displayed.
-#### status [self | all] [host(:port)]
+#### status [self | all] [host(*1)]
 Information on the target CHMPX node is displayed.  
 This information is the result of CHMPX control command(**SELFSTATUS** or **ALLSTATUS**).  
 When the self parameter is specified, the result of the **SELFSTATUS** control command of the target CHMPX node is displayed.  
@@ -261,23 +271,23 @@ When the all parameter is specified, the result of the **ALLSTATUS** control com
 When this tool is started with the **-host** option specified, the CHMPX process specified by that host and control port becomes the target CHMPX node.  
 When this tool is activated by configuration, it is necessary to specify the target CHMPX node with the parameter(host: port) of this command.  
 The specified **host:port** parameter must be a CHMPX node registered in this tool.
-#### check [noupdate] [all | host(:port)]
+#### check [noupdate] [all | host(*1)]
 Check the integrity of the state of all CHMPX nodes in the dynamic CHMPX node list.  
 The information to be checked is the status of the CHMPX node, the number of communication sockets(IN/OUT), and the HASH value of the server node.  
 The check result is displayed with coloring(when **-nocolor** is not specified), and if there is a problem with consistency, ERR is displayed.  
 If the **host:port** parameter is not specified, check results of all CHMPX nodes are displayed in a simplified manner.  
 When the **host:port** parameter is specified, the detailed check result of only that CHMPX node is displayed.  
 The specified **host:port** parameter must be a CHMPX node registered in this tool.
-#### statusupdate [noupdate] [all | host(:port)]
+#### statusupdate [noupdate] [all | host(*1)]
 It forcibly reflects the state of the CHMPX node to other CHMPX nodes for all CHMPX nodes or one of the dynamic CHMPX node lists.  
 This command corresponds to the **UPDATESTATUS** control command.  
 If all and **host:port** parameters are omitted, all CHMPX nodes are targeted.
-#### servicein [noupdate] [host(:port)]
+#### servicein [noupdate] [host(*1)]
 It instructs to service the target CHMPX node (**SERVICEIN** control command).  
 When **host:port** is specified, the target CHMPX node becomes the specified CHMPX node.  
 When this tool is started with the host option, **host:port** can be omitted.  
 If omitted, the CHMPX node specified at startup is targeted.
-#### serviceout [noupdate] [host(:port)]
+#### serviceout [noupdate] [host(*1)]
 It instructs to halt the service of the target CHMPX node (**SERVICEOUT** control command).  
 When **host:port** is specified, the target CHMPX node becomes the specified CHMPX node.  
 When this tool is started with the host option, **host:port** can be omitted. If omitted, the CHMPX node specified at startup is targeted.
@@ -289,7 +299,7 @@ When the **complete** parameter is specified, instruct the completion of merge p
 Instruct all CHMPX server nodes in the dynamic CHMPX node list to ignore **AUTOMERGE** setting (**SUSPEND** control command).
 #### nosuspend [noupdate]
 Instructs all CHMPX server nodes in the dynamic CHMPX node list to enable **AUTOMERGE** setting (**NOSUSPEND** control command).
-#### dump [noupdate] [host(:port)]
+#### dump [noupdate] [host(*1)]
 Displays the result of the **DUMP** control command of the target CHMPX node.  
 If this tool is started with the **-host** option specified and the **host:port** parameter is omitted, the CHMPX process specified at startup becomes the target CHMPX node.  
 When this tool is activated by configuration, it is necessary to specify the target CHMPX node with the parameter(**host:port**) of this command.  
@@ -335,4 +345,8 @@ Please exit the shell to return to this tool.
 Display an arbitrary character string.
 #### sleep [second]
 Stop execution for the specified number of seconds.
-
+#### [Note] How to specify target host
+When specifying the target host, specify it in the following format.  
+```
+"hostname(IP address)":"control port"[:"cuk"[:"custom_seed"[:"control endpoints..."]]]
+```
