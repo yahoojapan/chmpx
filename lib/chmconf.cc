@@ -715,7 +715,7 @@ bool CHMConf::GetConfiguration(CHMCFGINFO& config, bool is_check_update)
 // And if pnodeinfos is not null, returns a list of all config information that may contain hostname(IP address).
 // If both pctlport(and pcuk) is not NULL, do a strict check.
 //
-bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, bool with_reverse, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update)
+bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -748,7 +748,7 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 	chmnode_cfginfos_t*	pcfgnodelist = is_server ? &(pchmcfginfo->servers) : &(pchmcfginfo->slaves);
 	for(chmnode_cfginfos_t::const_iterator iter = pcfgnodelist->begin(); pcfgnodelist->end() != iter; ++iter){
 		// check
-		if(RawCheckContainsNodeInfo(hostname, (*iter), normalizedname, is_server, with_forward, with_reverse)){
+		if(RawCheckContainsNodeInfo(hostname, (*iter), normalizedname, is_server, with_forward)){
 			// matched
 			if(!is_strict){
 				if(pnodeinfos){
@@ -795,14 +795,18 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 
 bool CHMConf::CheckContainsServerInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
 {
-	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, false, pnodeinfos, pnormnames, true, is_check_update);	// check forward peers
+	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, pnodeinfos, pnormnames, true, is_check_update);		// check forward peers
 }
 
 bool CHMConf::CheckContainsSlaveInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
 {
-	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, false, pnodeinfos, pnormnames, false, is_check_update);	// check forward peers
+	return RawCheckContainsNodeInfoList(hostname, NULL, NULL, true, pnodeinfos, pnormnames, false, is_check_update);	// check forward peers
 }
 
+// [NOTE]
+// In this method, PORT, CUK, etc. are not checked, only HOST(hostname, IP address) is checked.
+// For now, this method is only called from ChmIMData::IsAllowHost().
+//
 bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update)
 {
 	CHMNODE_CFGINFO	tmpinfo;
@@ -811,7 +815,7 @@ bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t
 	// self server
 	if(GetSelfServerInfo(tmpinfo, normalizedname, is_check_update)){
 		// check
-		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, true, false, true)){		// check reverse peers
+		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, true, false)){
 			// found
 			if(pnodeinfos){
 				pnodeinfos->push_back(tmpinfo);
@@ -829,7 +833,7 @@ bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t
 	// self slave
 	if(GetSelfSlaveInfo(tmpinfo, normalizedname, false)){										// already update
 		// check
-		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, false, false, true)){	// check reverse peers
+		if(RawCheckContainsNodeInfo(hostname, tmpinfo, normalizedname, false, false)){
 			// found
 			if(pnodeinfos){
 				pnodeinfos->push_back(tmpinfo);
@@ -875,7 +879,7 @@ bool CHMConf::GetServerInfo(const char* hostname, short ctlport, const char* cuk
 {
 	chmnode_cfginfos_t	nodeinfos;
 	strlst_t			normnames;
-	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, true, is_check_update) || nodeinfos.empty()){
+	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, &nodeinfos, &normnames, true, is_check_update) || nodeinfos.empty()){
 		return false;
 	}
 	svrnodeinfo		= nodeinfos.front();
@@ -892,7 +896,7 @@ bool CHMConf::GetSlaveInfo(const char* hostname, short ctlport, const char* cuk,
 {
 	chmnode_cfginfos_t	nodeinfos;
 	strlst_t			normnames;
-	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, false, is_check_update) || nodeinfos.empty()){
+	if(!RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, &nodeinfos, &normnames, false, is_check_update) || nodeinfos.empty()){
 		return false;
 	}
 	slvnodeinfo		= nodeinfos.front();
@@ -917,7 +921,7 @@ bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, const char* cuk, 
 
 	chmnode_cfginfos_t	nodeinfos;
 	strlst_t			normnames;
-	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, true, false) && !nodeinfos.empty()){	// already checked update
+	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, &nodeinfos, &normnames, true, false) && !nodeinfos.empty()){		// already checked update
 		nodeinfo		= nodeinfos.front();
 		normalizedname	= normnames.front();
 		return true;
@@ -927,7 +931,7 @@ bool CHMConf::GetNodeInfo(const char* hostname, short ctlport, const char* cuk, 
 	}
 
 	// if not only server, next check slave nodes.
-	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, false, &nodeinfos, &normnames, false, false) && !nodeinfos.empty()){	// already checked update
+	if(RawCheckContainsNodeInfoList(hostname, &ctlport, cuk, true, &nodeinfos, &normnames, false, false) && !nodeinfos.empty()){	// already checked update
 		nodeinfo		= nodeinfos.front();
 		normalizedname	= normnames.front();
 		return true;
@@ -943,7 +947,7 @@ bool CHMConf::GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, string& normalizedname,
 //
 // Check to exist in hostname(IP address) in node information.
 //
-bool CHMConf::RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, string& normalizedname, bool is_server, bool with_forward, bool with_reverse)
+bool CHMConf::RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, string& normalizedname, bool is_server, bool with_forward)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -983,25 +987,113 @@ bool CHMConf::RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGIN
 			}
 		}
 	}
+	return false;
+}
 
-	// check reverse peers
-	if(with_reverse && !nodeinfos.reverse_peers.empty()){
-		node_list.clear();
-		normalizedname.clear();
-		for(hostport_list_t::const_iterator hpiter = nodeinfos.reverse_peers.begin(); nodeinfos.reverse_peers.end() != hpiter; ++hpiter){
-			node_list.push_back(hpiter->host);
-		}
-		// check
-		if(is_server){
-			if(IsInHostnameList(hostname, node_list, normalizedname, true)){
-				return true;
-			}
-		}else{
-			if(IsMatchHostname(hostname, node_list, normalizedname)){
-				return true;
-			}
+bool CHMConf::GetSelfReversePeer(hostport_list_t& reverse_peers, bool& is_server)
+{
+	CHMNODE_CFGINFO	selfinfo;
+	string			normalizedname;		// not used
+
+	// check in server nodes first
+	if(GetSelfServerInfo(selfinfo, normalizedname, false)){		// not update
+		if(!selfinfo.reverse_peers.empty()){
+			MSG_CHMPRN("Self server node has reverse peers.");
+			reverse_peers	= selfinfo.reverse_peers;
+			is_server		= true;
+			return true;
 		}
 	}
+	// check in slave nodes second
+	if(GetSelfSlaveInfo(selfinfo, normalizedname, false)){		// not update
+		if(!selfinfo.reverse_peers.empty()){
+			MSG_CHMPRN("Self slave node has reverse peers.");
+			reverse_peers	= selfinfo.reverse_peers;
+			is_server		= false;
+			return true;
+		}
+	}
+	MSG_CHMPRN("Self server/slave node does not have reverse peers, or not found self both node.");
+	return false;
+}
+
+bool CHMConf::IsSelfReversePeer(const char* hostname)
+{
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+
+	// get self reverse peers
+	hostport_list_t	self_reverse_peers;
+	bool			is_server = false;
+	if(!GetSelfReversePeer(self_reverse_peers, is_server)){
+		MSG_CHMPRN("There is no self reverse peers.");
+		return false;
+	}
+
+	// check hostname in self reverse peers
+	string		normalizedname;			// not used
+	strlst_t	node_list;
+	for(hostport_list_t::const_iterator riter = self_reverse_peers.begin(); self_reverse_peers.end() != riter; ++riter){
+		node_list.push_back(riter->host);
+	}
+
+	// check hostname in reverse peers.
+	if(is_server){
+		if(IsInHostnameList(hostname, node_list, normalizedname, true)){
+			MSG_CHMPRN("%s is in self server node reverse peers.", hostname);
+			return true;
+		}
+	}else{
+		if(IsMatchHostname(hostname, node_list, normalizedname)){
+			MSG_CHMPRN("%s is in self slave node reverse peers.", hostname);
+			return true;
+		}
+	}
+	MSG_CHMPRN("%s is not in self %s node reverse peers.", hostname, (is_server ? "server" : "slave"));
+	return false;
+}
+
+bool CHMConf::SearchContainsNodeInfoList(short ctlport, const char* cuk, CHMNODE_CFGINFO& nodeinfo, string& normalizedname, bool is_server, bool is_check_update)
+{
+	if(CHM_INVALID_PORT == ctlport && CHMEMPTYSTR(cuk)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	if(IsFileType() && !CheckConfFile()){
+		return false;
+	}
+
+	// Load & Check	configuration file.
+	if(is_check_update || !pchmcfginfo){
+		CheckUpdate();
+	}
+
+	// cuk
+	string	strcuk;
+	if(!CHMEMPTYSTR(cuk)){
+		strcuk = cuk;
+	}
+
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));			// LOCK
+
+	chmnode_cfginfos_t*	pcfgnodelist = is_server ? &(pchmcfginfo->servers) : &(pchmcfginfo->slaves);
+	for(chmnode_cfginfos_t::const_iterator iter = pcfgnodelist->begin(); pcfgnodelist->end() != iter; ++iter){
+		// compare ctlport and cuk, hostname must not be (simple) regex.
+		if(!IsSimpleRegexHostname(iter->name.c_str()) && (CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport) && strcuk == iter->cuk){
+			// found node
+			nodeinfo		= *iter;
+			normalizedname	= iter->name;
+			fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
+
+			MSG_CHMPRN("Found host(%s) in %s node list by ctlport(%d) and cuk(%s).", iter->name.c_str(), (is_server ? "server" : "slave"), ctlport, strcuk.c_str());
+			return true;
+		}
+	}
+	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);						// UNLOCK
+
+	MSG_CHMPRN("Not found host in %s node list by ctlport(%d) and cuk(%s).", (is_server ? "server" : "slave"), ctlport, strcuk.c_str());
 	return false;
 }
 

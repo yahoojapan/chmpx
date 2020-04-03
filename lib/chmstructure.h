@@ -635,7 +635,7 @@ typedef struct chm_sock_list{
 typedef struct chmpx_host_port_raw_pair{
 	char			name[NI_MAXHOST];					// = 1025 for getnameinfo()
 	short			port;
-}CHMPXHP_RAWPAIR, *PCHMPXHP_RAWPAIR;
+}CHMPX_ATTR_PACKED CHMPXHP_RAWPAIR, *PCHMPXHP_RAWPAIR;
 
 //---------------------------------
 // Chmpx
@@ -1005,16 +1005,16 @@ typedef struct chmpx_server_v1{
 			{ \
 				int	_hton_hostport_pair_cnt; \
 				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
-					(pdata)->endpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
+					(pdata)->endpoints[_hton_hostport_pair_cnt].port = be16toh((pdata)->endpoints[_hton_hostport_pair_cnt].port); \
 				} \
 				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < EXTERNAL_EP_MAX; ++_hton_hostport_pair_cnt){ \
-					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = be64toh((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
+					(pdata)->ctlendpoints[_hton_hostport_pair_cnt].port = be16toh((pdata)->ctlendpoints[_hton_hostport_pair_cnt].port); \
 				} \
 				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < FORWARD_PEER_MAX; ++_hton_hostport_pair_cnt){ \
-					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
+					(pdata)->forward_peers[_hton_hostport_pair_cnt].port = be16toh((pdata)->forward_peers[_hton_hostport_pair_cnt].port); \
 				} \
 				for(_hton_hostport_pair_cnt = 0; _hton_hostport_pair_cnt < REVERSE_PEER_MAX; ++_hton_hostport_pair_cnt){ \
-					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = be64toh((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
+					(pdata)->reverse_peers[_hton_hostport_pair_cnt].port = be16toh((pdata)->reverse_peers[_hton_hostport_pair_cnt].port); \
 				} \
 			} \
 		}
