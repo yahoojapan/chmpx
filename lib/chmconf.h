@@ -589,14 +589,15 @@ class CHMConf : public ChmEventBase
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const = 0;
 
 		const CHMCFGINFO* GetConfiguration(bool is_check_update = false);		// thread unsafe
-		bool RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, bool with_reverse, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update = false);
+		bool RawCheckContainsNodeInfoList(const char* hostname, const short* pctlport, const char* cuk, bool with_forward, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_server, bool is_check_update = false);
 		bool CheckContainsServerInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
 		bool CheckContainsSlaveInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
-		bool RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, std::string& normalizedname, bool is_server, bool with_forward, bool with_reverse);
+		bool RawCheckContainsNodeInfo(const char* hostname, const CHMNODE_CFGINFO& nodeinfos, std::string& normalizedname, bool is_server, bool with_forward);
 		bool GetServerInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& svrnodeinfo, std::string& normalizedname, bool is_check_update = false);
 		bool GetSelfServerInfo(CHMNODE_CFGINFO& svrnodeinfo, std::string& normalizedname, bool is_check_update = false);
 		bool GetSlaveInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& slvnodeinfo, std::string& normalizedname, bool is_check_update = false);
 		bool GetSelfSlaveInfo(CHMNODE_CFGINFO& slvnodeinfo, std::string& normalizedname, bool is_check_update = false);
+		bool GetSelfReversePeer(hostport_list_t& reverse_peers, bool& is_server);
 
 		bool IsWatching(void) const { return (CHM_INVALID_HANDLE != watchfd); }
 		uint CheckNotifyEvent(void);
@@ -631,6 +632,8 @@ class CHMConf : public ChmEventBase
 		bool CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t* pnodeinfos, strlst_t* pnormnames, bool is_check_update = false);
 		bool GetNodeInfo(const char* hostname, short ctlport, const char* cuk, CHMNODE_CFGINFO& nodeinfo, std::string& normalizedname, bool is_only_server, bool is_check_update = false);
 		bool GetSelfNodeInfo(CHMNODE_CFGINFO& nodeinfo, std::string& normalizedname, bool is_check_update = false);
+		bool IsSelfReversePeer(const char* hostname);
+		bool SearchContainsNodeInfoList(short ctlport, const char* cuk, CHMNODE_CFGINFO& nodeinfo, std::string& normalizedname, bool is_server, bool is_check_update = false);
 
 		bool GetServerList(strlst_t& server_list);
 		bool IsServerList(const char* hostname, std::string& fqdn);
