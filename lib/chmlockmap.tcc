@@ -39,7 +39,7 @@ class chm_lock_map
 		typedef typename std::vector<key_type>			st_key_list;
 		typedef typename st_type::iterator				iterator;
 		typedef typename st_type::const_iterator		const_iterator;
-		typedef bool (*chm_lock_map_erase_cb)(iterator&, void*);
+		typedef bool (*chm_lock_map_erase_cb)(const iterator&, void*);
 
 	public:											// public for using directly.
 		st_type					basemap;

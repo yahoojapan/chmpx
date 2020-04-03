@@ -310,7 +310,7 @@ bool ChmEventMq::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 //---------------------------------------------------------
 // Class Methods - Lock map
 //---------------------------------------------------------
-bool ChmEventMq::RcvfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* pparam)
+bool ChmEventMq::RcvfdIdMapCallback(const mq_msgid_map_t::iterator& iter, void* pparam)
 {
 	ChmEventMq*	pMqObj = reinterpret_cast<ChmEventMq*>(pparam);
 	if(!pMqObj){
@@ -331,7 +331,7 @@ bool ChmEventMq::RcvfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* pparam
 	return true;
 }
 
-bool ChmEventMq::DestfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* pparam)
+bool ChmEventMq::DestfdIdMapCallback(const mq_msgid_map_t::iterator& iter, void* pparam)
 {
 	ChmEventMq*	pMqObj = reinterpret_cast<ChmEventMq*>(pparam);
 	if(!pMqObj){
@@ -358,7 +358,7 @@ bool ChmEventMq::DestfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* ppara
 ChmEventMq::ChmEventMq(int eventqfd, ChmCntrl* pcntrl, chm_merge_get_cb mgetfp, chm_merge_set_cb msetfp, chm_merge_lastts_cb mlastfp) :
 	ChmEventBase(eventqfd, pcntrl),
 	recv_idfd_map(CHM_INVALID_HANDLE),
-	recv_fdid_map(CHM_INVALID_MSGID,ChmEventMq::RcvfdIdMapCallback, this),
+	recv_fdid_map(CHM_INVALID_MSGID, ChmEventMq::RcvfdIdMapCallback, this),
 	reserve_idfd_map(CHM_INVALID_HANDLE),
 	dest_idfd_map(CHM_INVALID_HANDLE),
 	dest_fdid_map(CHM_INVALID_MSGID, ChmEventMq::DestfdIdMapCallback, this),
@@ -2701,10 +2701,11 @@ bool ChmEventMq::PxCltReceiveAbortUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltA
 
 	// remove all stacked parameters.
 	while(!fullock::flck_trylock_noshared_mutex(&mparam_list_lockval));	// LOCK
-	for(mqmparamlist_t::iterator iter = merge_param_list.begin(); iter != merge_param_list.end(); iter = merge_param_list.erase(iter)){
+	for(mqmparamlist_t::iterator iter = merge_param_list.begin(); iter != merge_param_list.end(); ++iter){
 		PCHM_UPDATA_PARAM	pUpdateDataParam = *iter;
 		CHM_Delete(pUpdateDataParam);
 	}
+	merge_param_list.clear();
 	fullock::flck_unlock_noshared_mutex(&mparam_list_lockval);			// UNLOCK
 
 	// break merge loop in thread
@@ -2847,7 +2848,7 @@ bool ChmEventMq::PxCltSendJoinNotify(pid_t pid)
 	}
 
 	// departure msgid
-	msgid_t	dept_msgid = CHM_INVALID_MSGID;
+	msgid_t	dept_msgid;
 	if(pChmCntrl->IsClientOnSlvType()){
 		dept_msgid = ActivatedMsgId();
 	}else{
