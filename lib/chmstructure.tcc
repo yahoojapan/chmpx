@@ -3540,7 +3540,7 @@ bool mqmsghead_lap<T>::SetMqFlagStatus(bool is_assigned, bool is_activated)
 		}
 		basic_type::pAbsPtr->pid = CHM_INVALID_PID;
 
-	}else if(is_assigned && !is_activated){
+	}else if(!is_activated){	// is_assigned
 		if(IS_MQFLAG_ASSIGNED(basic_type::pAbsPtr->flag) && IS_MQFLAG_DISACTIVATED(basic_type::pAbsPtr->flag)){
 			MSG_CHMPRN("MQ flag=%s is already assigned & disactivated.", STR_MQFLAG_FULL(basic_type::pAbsPtr->flag).c_str());
 		}else{
@@ -3548,7 +3548,7 @@ bool mqmsghead_lap<T>::SetMqFlagStatus(bool is_assigned, bool is_activated)
 		}
 		basic_type::pAbsPtr->pid = getpid();
 
-	}else if(is_assigned && is_activated){
+	}else{						// is_assigned && is_activated
 		if(IS_MQFLAG_ASSIGNED(basic_type::pAbsPtr->flag) && IS_MQFLAG_ACTIVATED(basic_type::pAbsPtr->flag)){
 			MSG_CHMPRN("MQ flag=%s is already assigned & activated.", STR_MQFLAG_FULL(basic_type::pAbsPtr->flag).c_str());
 		}else{
@@ -6144,7 +6144,7 @@ bool chmpxman_lap<T>::RawCheckContainsChmpxSvrs(const char* hostname, const shor
 				MSG_CHMPRN("Hostname(%s) is matched(not strictly) name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
 				return true;
 			}
-			if((CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
+			if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
 				// strictly matched
 				if(pnormalizedname){
 					*pnormalizedname = globalname;
@@ -6265,7 +6265,7 @@ chmpxid_t chmpxman_lap<T>::GetChmpxIdByToServerName(CHMPXID_SEED_TYPE type, cons
 		return CHM_INVALID_CHMPXID;
 	}
 
-	chmpxid_t	chmpxid = CHM_INVALID_CHMPXID;
+	chmpxid_t	chmpxid;
 	if(CHMEMPTYSTR(hostname) || CHM_INVALID_CHMPXID == (chmpxid = MakeChmpxId(basic_type::pAbsPtr->group, type, hostname, ctlport, cuk, ctlendpoints, custom_seed))){
 		ERR_CHMPRN("Parameter are wrong.");
 		return CHM_INVALID_CHMPXID;
@@ -7425,7 +7425,6 @@ bool chmpxman_lap<T>::RemoveSlave(chmpxid_t chmpxid, int eqfd)
 
 	// If has opened socket, close it.
 	chmpxlistlap	retrivechmpxlist(retrivelist, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, true);	// From Abs
-	chmpxlap		retrivechmpx(retrivechmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);						// Get CHMPX from Absolute
 	retrivechmpxlist.Clear(eqfd);
 
 	// Add free list
@@ -8345,7 +8344,7 @@ msgid_t chminfo_lap<T>::GetRandomMsgId(bool is_chmpx, bool is_activated)
 	}
 
 	// first: lastest msgid
-	msgid_t	msgid = CHM_INVALID_MSGID;
+	msgid_t	msgid;
 	if(is_chmpx){
 		msgid = basic_type::pAbsPtr->last_msgid_chmpx;
 	}else{	// !is_chmpx

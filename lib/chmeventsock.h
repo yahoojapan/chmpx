@@ -164,12 +164,12 @@ class ChmEventSock : public ChmEventBase
 		static bool MergeWorkerFunc(void* common_param, chmthparam_t wp_param);
 
 		// callback functions for locked map class
-		static bool ServerSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj);
-		static bool SlaveSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj);
-		static bool AcceptMapCallback(sock_pending_map_t::iterator& iter, void* psockobj);
-		static bool ControlSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj);
-		static bool SslSockMapCallback(sock_ssl_map_t::iterator& iter, void* psockobj);
-		static bool SendLockMapCallback(sendlockmap_t::iterator& iter, void* psockobj);
+		static bool ServerSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj);
+		static bool SlaveSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj);
+		static bool AcceptMapCallback(const sock_pending_map_t::iterator& iter, void* psockobj);
+		static bool ControlSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj);
+		static bool SslSockMapCallback(const sock_ssl_map_t::iterator& iter, void* psockobj);
+		static bool SendLockMapCallback(const sendlockmap_t::iterator& iter, void* psockobj);
 
 		// close connection
 		bool CloseSelfSocks(void);

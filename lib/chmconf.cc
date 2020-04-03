@@ -765,7 +765,7 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 				}
 
 			}else{
-				if((CHM_INVALID_PORT == *pctlport || *pctlport == iter->ctlport) && strcuk == iter->cuk){
+				if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == iter->ctlport) && strcuk == iter->cuk){
 					// strictly matched
 					if(pnodeinfos){
 						pnodeinfos->push_back(*iter);
@@ -3557,7 +3557,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 	return result;
 }
 
-static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, CHMCONF_CCV& ccvals)
+static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINFO& chmcfginfo, const CHMCONF_CCV& ccvals)
 {
 	// Must start yaml sequence(for mapping array) -> mapping event.
 	yaml_event_t	yevent;

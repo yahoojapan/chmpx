@@ -60,13 +60,9 @@ bool ChmEventShm::CheckProcessRunning(void* common_param, chmthparam_t wp_param)
 		ERR_CHMPRN("Parameter is wrong.");
 		return false;
 	}
-	ChmEventShm*	pThis = reinterpret_cast<ChmEventShm*>(common_param);
-	if(!pThis){
-		ERR_CHMPRN("Internal error: pThis is NULL.");
-		return false;
-	}
-	ChmIMData*	pImData	= pThis->pChmCntrl->GetImDataObj();
-	ChmEventMq*	pMqObj	= pThis->pChmCntrl->GetEventMqObj();
+	ChmEventShm*	pThis	= reinterpret_cast<ChmEventShm*>(common_param);
+	ChmIMData*		pImData	= pThis->pChmCntrl->GetImDataObj();
+	ChmEventMq*		pMqObj	= pThis->pChmCntrl->GetEventMqObj();
 	if(!pImData || !pMqObj){
 		ERR_CHMPRN("Internal error: ChmImData or ChmEventMQ is NULL.");
 		return false;
