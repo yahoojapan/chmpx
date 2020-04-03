@@ -1568,7 +1568,8 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	chmhash_t	tmp_max_hashval	= static_cast<chmhash_t>(-1);
 	merge_param.chmpxid			= pImData->GetSelfChmpxId();
 	merge_param.replica_count	= pImData->GetReplicaCount() + 1;	// ImData::Replica count means copy count
-	merge_param.is_expire_check	= true;								// always check expire time
+	merge_param.is_expire_check	= false;							// always not check expire time
+																	// [TODO] If necessary in the future, read this value from Configuration.
 
 	if(!pImData->GetSelfPendingHash(tmp_hashval) || !pImData->GetMaxPendingHashCount(tmp_max_hashval)){
 		ERR_CHMPRN("Could not get own hash and pending hash values.");
