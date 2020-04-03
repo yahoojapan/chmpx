@@ -281,6 +281,23 @@ static bool expand_simple_regexes(const string& simple_regexes, strlst_t& expand
 	return true;
 }
 
+// [NOTE]
+// This is a simple host name check function.
+//
+bool IsSimpleRegexHostname(const char* hostname)
+{
+	for(; !CHMEMPTYSTR(hostname); ++hostname){
+		// [NOTE]
+		// Returns true if hostanme may be other than FQDN and IP address.
+		// That is, if it contains characters other than alphabets, numbers, '-', '.', and ':'.
+		//
+		if(0 == isalnum(*hostname) && '.' != *hostname && ':' != *hostname && '-' != *hostname){
+			return true;
+		}
+	}
+	return false;
+}
+
 //---------------------------------------------------------
 // Utilities
 //---------------------------------------------------------
