@@ -250,7 +250,7 @@ bool ChmBinData::Duplicate(const ChmBinData& other)
 	return Set(const_cast<unsigned char*>(other.byptr), other.length, true);
 }
 
-bool ChmBinData::Copy(ChmBinData& other)
+bool ChmBinData::Copy(const ChmBinData& other)
 {
 	return Set(other.byptr, other.length, false);
 }
@@ -319,7 +319,7 @@ bool ChmKVPair::Set(unsigned char* bydata, size_t bylength, bool is_key, bool is
 	return pSetObj->Set(bydata, bylength, is_duplicate);
 }
 
-bool ChmKVPair::Set(ChmBinData& Data, bool is_key, bool is_duplicate)
+bool ChmKVPair::Set(const ChmBinData& Data, bool is_key, bool is_duplicate)
 {
 	ChmBinData*	pSetObj = (is_key ? &Key : &Value);
 
@@ -353,7 +353,7 @@ bool ChmKVPair::Overwrite(unsigned char* bydata, size_t bylength, bool is_key, o
 	return pSetObj->Overwrite(bydata, bylength, offset);
 }
 
-bool ChmKVPair::Overwrite(ChmBinData& Data, bool is_key, off_t offset)
+bool ChmKVPair::Overwrite(const ChmBinData& Data, bool is_key, off_t offset)
 {
 	ChmBinData*	pSetObj = (is_key ? &Key : &Value);
 

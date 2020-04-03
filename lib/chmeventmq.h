@@ -150,8 +150,8 @@ class ChmEventMq : public ChmEventBase
 		static bool ReceiveWorkerProc(void* common_param, chmthparam_t wp_param);
 
 		// callback for mapping
-		static bool RcvfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* pparam);
-		static bool DestfdIdMapCallback(mq_msgid_map_t::iterator& iter, void* pparam);
+		static bool RcvfdIdMapCallback(const mq_msgid_map_t::iterator& iter, void* pparam);
+		static bool DestfdIdMapCallback(const mq_msgid_map_t::iterator& iter, void* pparam);
 
 		bool RawReceive(mqd_t mqfd, const COMPOSEDMSGID& composed);
 

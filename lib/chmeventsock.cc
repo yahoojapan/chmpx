@@ -1681,7 +1681,7 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 //---------------------------------------------------------
 // Class Methods - Lock map
 //---------------------------------------------------------
-bool ChmEventSock::ServerSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj)
+bool ChmEventSock::ServerSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -1712,7 +1712,7 @@ bool ChmEventSock::ServerSockMapCallback(sock_ids_map_t::iterator& iter, void* p
 	return true;
 }
 
-bool ChmEventSock::SlaveSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj)
+bool ChmEventSock::SlaveSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -1743,7 +1743,7 @@ bool ChmEventSock::SlaveSockMapCallback(sock_ids_map_t::iterator& iter, void* ps
 	return true;
 }
 
-bool ChmEventSock::AcceptMapCallback(sock_pending_map_t::iterator& iter, void* psockobj)
+bool ChmEventSock::AcceptMapCallback(const sock_pending_map_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -1772,7 +1772,7 @@ bool ChmEventSock::AcceptMapCallback(sock_pending_map_t::iterator& iter, void* p
 	return true;
 }
 
-bool ChmEventSock::ControlSockMapCallback(sock_ids_map_t::iterator& iter, void* psockobj)
+bool ChmEventSock::ControlSockMapCallback(const sock_ids_map_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -1801,7 +1801,7 @@ bool ChmEventSock::ControlSockMapCallback(sock_ids_map_t::iterator& iter, void* 
 	return true;
 }
 
-bool ChmEventSock::SslSockMapCallback(sock_ssl_map_t::iterator& iter, void* psockobj)
+bool ChmEventSock::SslSockMapCallback(const sock_ssl_map_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -1820,7 +1820,7 @@ bool ChmEventSock::SslSockMapCallback(sock_ssl_map_t::iterator& iter, void* psoc
 	return true;
 }
 
-bool ChmEventSock::SendLockMapCallback(sendlockmap_t::iterator& iter, void* psockobj)
+bool ChmEventSock::SendLockMapCallback(const sendlockmap_t::iterator& iter, void* psockobj)
 {
 	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
 	if(!pSockObj){
@@ -2746,15 +2746,12 @@ bool ChmEventSock::Receive(int fd)
 		//
 		int			rtcode		= 0;
 		chmpxid_t	tgchmpxid	= GetAssociateChmpxid(fd);
-		chmpxid_t	chmpxid		= tgchmpxid;
 		string		tgachname	= GetAssociateAcceptHostName(fd);
-		string		achname		= tgachname;
 		suseconds_t	waittime	= sock_wait_time;
 		do{
-			bool	is_closed;
-
-			chmpxid = GetAssociateChmpxid(fd);
-			achname	= GetAssociateAcceptHostName(fd);
+			bool		is_closed;
+			chmpxid_t	chmpxid = GetAssociateChmpxid(fd);
+			string		achname	= GetAssociateAcceptHostName(fd);
 			if(tgchmpxid != chmpxid || tgachname != achname){
 				MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", fd, tgchmpxid, tgachname.c_str(), chmpxid, achname.c_str());
 				result = true;
@@ -2773,8 +2770,8 @@ bool ChmEventSock::Receive(int fd)
 		}while(0 == (rtcode = ChmEventSock::WaitForReady(fd, WAIT_READ_FD, 0, false, waittime)));		// check rest data & return assap
 
 		if(0 != rtcode && ETIMEDOUT != rtcode){
-			chmpxid = GetAssociateChmpxid(fd);
-			achname	= GetAssociateAcceptHostName(fd);
+			chmpxid_t	chmpxid = GetAssociateChmpxid(fd);
+			string		achname	= GetAssociateAcceptHostName(fd);
 			if(tgchmpxid != chmpxid || tgachname != achname){
 				MSG_CHMPRN("Associate chmpxid of target fd(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", fd, tgchmpxid, tgachname.c_str(), chmpxid, achname.c_str());
 			}else{
@@ -5544,6 +5541,8 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			if(cmdarray.empty()){
 				MSG_CHMPRN("%s command does not have parameter, so use default value(dir=all, dev=all, count=all trace count).", strCommand.c_str());
 			}else{
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress knownConditionTrueFalse
 				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
@@ -10381,8 +10380,8 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 				}
 
 				// compkt(copy)
-				PPXCOM_ALL				pComAll			= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
-				PPXCOM_REQ_UPDATEDATA	pResUpdateData	= CVT_COMPTR_REQ_UPDATEDATA(pComAll);
+				PPXCOM_ALL				pComAllSub		= CVT_COM_ALL_PTR_PXCOMPKT(pResComPkt);
+				PPXCOM_REQ_UPDATEDATA	pResUpdateData	= CVT_COMPTR_REQ_UPDATEDATA(pComAllSub);
 
 				SET_PXCOMPKT(pResComPkt, COM_VERSION_2, CHMPX_COM_REQ_UPDATEDATA, pComHead->dept_ids.chmpxid, nextchmpxid, false, (sizeof(PXCOM_REQ_IDMAP) * pReqUpdateData->count));	// dept chmpxid is not changed.
 				COPY_TIMESPEC(&(pResComPkt->head.reqtime), &(pComHead->reqtime));	// not change

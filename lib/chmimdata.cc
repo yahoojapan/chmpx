@@ -2002,7 +2002,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 			WAN_CHMPRN("COM_C2C type(%s) should be COM_C2C_NORMAL, so continue as COM_C2C_NORMAL.", STRCOMC2CTYPE(c2ctype));
 		}
 
-		chmpxid_t	tmpchmpxid = CHM_INVALID_CHMPXID;
+		chmpxid_t	tmpchmpxid;
 		if(IsRandomDeliver()){
 			// Random --> terminal chmpxid is one
 			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true))){		// only up server, not suspend server
