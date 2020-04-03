@@ -2767,10 +2767,17 @@ bool ChmIMData::IsAllowHost(const char* hostname)
 		return true;
 	}
 
+	// check self reverse peer first
+	if(pConfObj->IsSelfReversePeer(hostname)){
+		// allowed
+		MSG_CHMPRN("Hostname(%s) is found in self reverse peers from configuration.", hostname);
+		return true;
+	}
+
 	// check name in configuration server/slave list.(from configuration)
 	if(pConfObj->CheckContainsNodeInfoList(hostname, NULL, NULL, true)){		// with update configuration
 		// allowed
-		MSG_CHMPRN("Hostname(%s) is found in server/slave list from configuration..", hostname);
+		MSG_CHMPRN("Hostname(%s) is found in server/slave list from configuration.", hostname);
 		return true;
 	}
 	return false;
@@ -2794,12 +2801,25 @@ bool ChmIMData::IsAllowHostStrictly(const char* hostname, short ctlport, const c
 		return true;
 	}
 
+	CHMNODE_CFGINFO	nodeinfo;
+
+	// check self reverse peer first
+	if(pConfObj->IsSelfReversePeer(hostname)){
+		// found hostname in reverse peers, thus search node by ctlport and cuk
+		if(pConfObj->SearchContainsNodeInfoList(ctlport, cuk, nodeinfo, normalizedname, true, true) || pConfObj->SearchContainsNodeInfoList(ctlport, cuk, nodeinfo, normalizedname, false, true)){
+			// found
+			if(pssl){
+				CVT_SSL_STRUCTURE(*pssl, nodeinfo);
+			}
+			return true;
+		}
+	}
+
 	// check name in configuration server/slave list.
 	//
 	// [NOTE]
 	// At first using hostname in list(means using cache), next check DNS for server name if the first checking failed.
 	//
-	CHMNODE_CFGINFO	nodeinfo;
 	if(pConfObj->GetNodeInfo(hostname, ctlport, cuk, nodeinfo, normalizedname, false, false) || pConfObj->GetNodeInfo(hostname, ctlport, cuk, nodeinfo, normalizedname, false, true)){
 		// found
 		if(pssl){

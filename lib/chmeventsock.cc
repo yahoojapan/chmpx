@@ -7605,9 +7605,11 @@ bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, 
 		pStatusRes->count				= count;
 		pStatusRes->pchmpxsvr_offset	= sizeof(PXCOM_N2_STATUS_RES);
 
-		unsigned char*	pbyres			= CHM_OFFSET(pStatusRes, sizeof(PXCOM_N2_STATUS_RES), unsigned char*);
-		if(pchmpxsvrs && 0 < count){
-			memcpy(pbyres, pchmpxsvrs, sizeof(CHMPXSVR) * count);
+		PCHMPXSVR	pchmpxsvrsv2		= CHM_OFFSET(pStatusRes, sizeof(PXCOM_N2_STATUS_RES), PCHMPXSVR);
+		if(pchmpxsvrs && pchmpxsvrsv2 && 0 < count){
+			for(long pos = 0; pos < count; ++pos){
+				COPY_PCHMPXSVR(&pchmpxsvrsv2[pos], &pchmpxsvrs[pos]);
+			}
 		}
 	}else{
 		// old version
