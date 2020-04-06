@@ -1,3 +1,11 @@
+chmpx (1.0.74) unstable; urgency=low
+
+  * Fixed bugs about reverse peer and etc - #43
+  * Changed to not check expiration date in merge process - #42
+  * Fixed code for cppcheck 1.90 - #41
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 03 Apr 2020 17:54:26 +0900
+
 chmpx (1.0.73) unstable; urgency=low
 
   * Fixed a bug about complete auto merging - #38
