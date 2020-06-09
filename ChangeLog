@@ -1,3 +1,9 @@
+chmpx (1.0.75) unstable; urgency=low
+
+  * Added checking resolv for hostname - #45
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 09 Jun 2020 12:47:04 +0900
+
 chmpx (1.0.74) unstable; urgency=low
 
   * Fixed bugs about reverse peer and etc - #43
