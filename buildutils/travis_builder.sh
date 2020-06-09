@@ -316,7 +316,8 @@ fi
 # For packagecloud.io CLI tool(package_cloud)
 #
 if [ ${IS_CENTOS} -ne 1 ]; then
-	run_cmd ${GEM_BIN} install rake rubocop package_cloud
+	run_cmd ${GEM_BIN} install rubocop -v 0.81.0
+	run_cmd ${GEM_BIN} install rake package_cloud
 else
 	#
 	# Using RHSCL because centos has older ruby
@@ -324,7 +325,8 @@ else
 	run_cmd ${INSTALLER_BIN} install -y -qq centos-release-scl
 	run_cmd ${INSTALLER_BIN} install -y -qq rh-ruby23 rh-ruby23-ruby-devel rh-ruby23-rubygem-rake
 	source /opt/rh/rh-ruby23/enable
-	run_cmd ${GEM_BIN} install rubocop package_cloud
+	run_cmd ${GEM_BIN} install rubocop -v 0.81.0
+	run_cmd ${GEM_BIN} install package_cloud
 fi
 
 #
