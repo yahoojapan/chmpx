@@ -105,7 +105,7 @@ nodist_pkginclude_HEADERS	= chmssgnutls.h
 endif
 
 libchmpx_la_LDFLAGS	= -version-info $(LIB_VERSION_INFO)
-libchmpx_la_LIBADD	= $(k2hash_LIBS) $(fullock_LIBS) $(SSL_TLS_LIBS) -lyaml -lrt -lpthread
+libchmpx_la_LIBADD	= $(k2hash_LIBS) $(fullock_LIBS) $(SSL_TLS_LIBS) -lyaml -lrt -lresolv -lpthread
 
 ACLOCAL_AMFLAGS		= -I m4
 AM_CFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS)
