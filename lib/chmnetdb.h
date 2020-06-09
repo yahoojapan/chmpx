@@ -63,6 +63,8 @@ class ChmNetDb
 		bool				is_init_regobj;		//
 
 	protected:
+		static bool CheckHostnameInResolv(const char* hostname, bool is_default_domain = false);
+
 		ChmNetDb();
 		virtual ~ChmNetDb();
 

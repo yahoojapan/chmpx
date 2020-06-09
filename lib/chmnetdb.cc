@@ -33,6 +33,8 @@
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
 #include <string>
 
 #include "chmcommon.h"
@@ -756,6 +758,35 @@ bool ChmNetDb::ParseHostPortString(const string& target, short default_port, str
 	return false;
 }
 
+bool ChmNetDb::CheckHostnameInResolv(const char* hostname, bool is_default_domain)
+{
+	if(CHMEMPTYSTR(hostname)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	if(0 != res_init()){
+		ERR_CHMPRN("Could not initialize for resolv loading.");
+		return false;
+	}
+	unsigned char	answer[NS_PACKETSZ];	// this value is not use in this function.
+	int				reslen;
+	if(is_default_domain){
+		// Search with using default domain name with hostname.
+		// (RES_DEFNAMES and RES_DNSRCH)
+		//
+		reslen = res_search(hostname, ns_c_any, ns_t_a, answer, NS_PACKETSZ);
+	}else{
+		// Search strictly
+		reslen = res_query(hostname, ns_c_any, ns_t_a, answer, NS_PACKETSZ);
+	}
+	if(-1 == reslen){
+		MSG_CHMPRN("Could not find hostname(%s) %s in resolv(DNS).", hostname, is_default_domain ? "with default domain" : "strictly");
+		return false;
+	}
+	MSG_CHMPRN("Found hostname(%s) %s in resolv(DNS).", hostname, is_default_domain ? "with default domain" : "strictly");
+	return true;
+}
+
 //---------------------------------------------------------
 // Methods
 //---------------------------------------------------------
@@ -879,10 +910,18 @@ bool ChmNetDb::InitializeLocalHostnames()
 		ERR_CHMPRN("Got own host(node) name, but it is empty.");
 		return false;
 	}
-	fulllocalname = buf.nodename;
 
-	// add cache without ip addresses
-	HostnammeAddCache(fulllocalname, string(""), true);
+	if(ChmNetDb::CheckHostnameInResolv(buf.nodename, false)){
+		MSG_CHMPRN("Allowed hostname(%s) is full local hostname", buf.nodename);
+		fulllocalname = buf.nodename;
+
+		// add cache without ip addresses
+		HostnammeAddCache(fulllocalname, string(""), true);
+	}else{
+		// clear full local hostname.
+		MSG_CHMPRN("hostname(%s) is not registered in DNS as FQDN, so it is processed as if local hostname does not exist.", buf.nodename);
+		fulllocalname.erase();
+	}
 
 	// local hostname -> addrinfo
 	memset(&hints, 0, sizeof(hints));
@@ -899,7 +938,7 @@ bool ChmNetDb::InitializeLocalHostnames()
 	}
 
 	// addrinfo(list) -> hostname
-	bool	is_fulllocalname;
+	bool	is_same_nodename;
 	for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
 		memset(hostname, 0, sizeof(hostname));
 		if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
@@ -907,22 +946,28 @@ bool ChmNetDb::InitializeLocalHostnames()
 				// When local hostname without domain name is set in /etc/hosts, "hostname" is short name.
 				// (if other server name is set, this class do not care it.)
 				//
-				MSG_CHMPRN("Found another local hostname : %s", hostname);
-
-				if(0 != strcmp(fulllocalname.c_str(), hostname)){
-					is_fulllocalname = false;
+				if(0 != strcmp(buf.nodename, hostname)){
+					is_same_nodename = false;
 				}else{
-					is_fulllocalname = true;
+					is_same_nodename = true;
 				}
-				AddUniqueStringToList(string(hostname), localnames, false);
+
+				if(is_same_nodename && fulllocalname.empty()){
+					MSG_CHMPRN("Found another local hostname : %s -> But not add to localnames array", hostname);
+				}else{
+					MSG_CHMPRN("Found another local hostname : %s -> Add to localnames array.", hostname);
+					AddUniqueStringToList(string(hostname), localnames, false);
+				}
 
 				// add cache
-				memset(&ipaddr, 0, sizeof(ipaddr));
-				if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST))){
-					HostnammeAddCache(string(hostname), string(ipaddr), true);
+				if(!is_same_nodename || !fulllocalname.empty()){
+					memset(&ipaddr, 0, sizeof(ipaddr));
+					if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST))){
+						HostnammeAddCache(string(hostname), string(ipaddr), true);
 
-					if(!is_fulllocalname){
-						HostnammeAddCache(fulllocalname, string(ipaddr), true);
+						if(is_same_nodename && !fulllocalname.empty()){
+							HostnammeAddCache(fulllocalname, string(ipaddr), true);
+						}
 					}
 				}
 			}else{
@@ -1203,12 +1248,14 @@ bool ChmNetDb::Search(const char* target, CHMNDBCACHE& data, bool is_cvt_localho
 	if(is_cvt_localhost){
 		// check localhost(or 127.0.0.1 or ::1) and remove it.
 		if(RemoveLocalhostInCache(data)){
-			// found, then get address info by full local hostname
-			if(!GetHostAddressInfo(fulllocalname.c_str(), data)){
-				MSG_CHMPRN("Could not find full local hostname or IP address by %s.", fulllocalname.c_str());
-			}else{
-				// remove (only) localhost
-				RemoveLocalhostInCache(data);
+			if(!fulllocalname.empty()){
+				// found, then get address info by full local hostname
+				if(!GetHostAddressInfo(fulllocalname.c_str(), data)){
+					MSG_CHMPRN("Could not find full local hostname or IP address by %s.", fulllocalname.c_str());
+				}else{
+					// remove (only) localhost
+					RemoveLocalhostInCache(data);
+				}
 			}
 		}
 	}
@@ -1302,27 +1349,29 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 	freeaddrinfo(res_info);
 
 	// if short local hostname, adds fully hostname.
-	bool	found = false;
-	for(strlst_t::const_iterator iter1 = data.hostnames.begin(); data.hostnames.end() != iter1; ++iter1){
-		if((*iter1) == fulllocalname){
-			// already has full local hostname
-			found = true;
-			break;
+	if(!fulllocalname.empty()){
+		bool	found = false;
+		for(strlst_t::const_iterator iter1 = data.hostnames.begin(); data.hostnames.end() != iter1; ++iter1){
+			if((*iter1) == fulllocalname){
+				// already has full local hostname
+				found = true;
+				break;
+			}
 		}
-	}
-	if(!found){
-		// if hostnames has one of localnames, add full local hostname.
-		for(strlst_t::const_iterator iter2 = data.hostnames.begin(); data.hostnames.end() != iter2; ++iter2){
-			found = false;
-			for(strlst_t::const_iterator iter3 = localnames.begin(); localnames.end() != iter3; ++iter3){
-				if((*iter2) == (*iter3)){
-					found = true;
-					AddUniqueStringToList(fulllocalname, data.hostnames, false);
+		if(!found){
+			// if hostnames has one of localnames, add full local hostname.
+			for(strlst_t::const_iterator iter2 = data.hostnames.begin(); data.hostnames.end() != iter2; ++iter2){
+				found = false;
+				for(strlst_t::const_iterator iter3 = localnames.begin(); localnames.end() != iter3; ++iter3){
+					if((*iter2) == (*iter3)){
+						found = true;
+						AddUniqueStringToList(fulllocalname, data.hostnames, false);
+						break;
+					}
+				}
+				if(found){
 					break;
 				}
-			}
-			if(found){
-				break;
 			}
 		}
 	}
@@ -1439,6 +1488,9 @@ bool ChmNetDb::GetHostnameList(const char* target, strlst_t& hostnames, bool is_
 //
 void ChmNetDb::AddFullLocalHostname(strlst_t& hostnames)
 {
+	if(fulllocalname.empty()){
+		return;
+	}
 	bool	found = false;
 	for(strlst_t::iterator iter = hostnames.begin(); hostnames.end() != iter; ){
 		if((*iter) == fulllocalname){
