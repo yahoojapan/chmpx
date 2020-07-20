@@ -2438,8 +2438,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 
 		if(iter->end() == iter->find(INICFG_CUSTOM_ID_SEED_STR)){
 			if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
-				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"custom seed\".", cfgfile.c_str(), INICFG_CUSTOM_ID_SEED_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
-				return false;
+				MSG_CHMPRN("configuration file(%s) does not have \"%s\" in %s server node in %s section, but chmpxid seed needs \"custom seed\". Then sets seed is empty string for slave node temporarily.", cfgfile.c_str(), INICFG_CUSTOM_ID_SEED_STR, slvnode.name.c_str(), INICFG_SLVNODE_SEC_STR);
 			}
 			slvnode.custom_seed.clear();
 		}else{
@@ -3741,8 +3740,7 @@ static bool ChmYamlLoadConfigurationSlvnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				}
 				if(CHMPXID_SEED_CUSTOM == chmcfginfo.chmpxid_type){
 					if(slvnode.custom_seed.empty()){
-						ERR_CHMPRN("Not found CUSTOM_SEED value in %s section, but chmpxid seed is from \"custom seed\".", CFG_SLVNODE_SEC_STR);
-						result = false;
+						WAN_CHMPRN("Not found CUSTOM_SEED value in %s section, but chmpxid seed is from \"custom seed\". Then sets seed is empty string for slave node temporarily.", CFG_SLVNODE_SEC_STR);
 					}
 				}else{
 					if(!slvnode.custom_seed.empty()){
