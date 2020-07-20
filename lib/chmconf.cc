@@ -765,7 +765,7 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 				}
 
 			}else{
-				if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == iter->ctlport) && strcuk == iter->cuk){
+				if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == iter->ctlport) && IsMatchCuk(strcuk, iter->cuk)){
 					// strictly matched
 					if(pnodeinfos){
 						pnodeinfos->push_back(*iter);
@@ -1081,7 +1081,7 @@ bool CHMConf::SearchContainsNodeInfoList(short ctlport, const char* cuk, CHMNODE
 	chmnode_cfginfos_t*	pcfgnodelist = is_server ? &(pchmcfginfo->servers) : &(pchmcfginfo->slaves);
 	for(chmnode_cfginfos_t::const_iterator iter = pcfgnodelist->begin(); pcfgnodelist->end() != iter; ++iter){
 		// compare ctlport and cuk, hostname must not be (simple) regex.
-		if(!IsSimpleRegexHostname(iter->name.c_str()) && (CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport) && strcuk == iter->cuk){
+		if(!IsSimpleRegexHostname(iter->name.c_str()) && (CHM_INVALID_PORT == ctlport || ctlport == iter->ctlport) && IsMatchCuk(strcuk, iter->cuk)){
 			// found node
 			nodeinfo		= *iter;
 			normalizedname	= iter->name;
