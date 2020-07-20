@@ -6144,7 +6144,7 @@ bool chmpxman_lap<T>::RawCheckContainsChmpxSvrs(const char* hostname, const shor
 				MSG_CHMPRN("Hostname(%s) is matched(not strictly) name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
 				return true;
 			}
-			if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
+			if(pctlport && (CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && IsMatchCuk(strcuk, cuk)){
 				// strictly matched
 				if(pnormalizedname){
 					*pnormalizedname = globalname;
@@ -6177,7 +6177,7 @@ bool chmpxman_lap<T>::RawCheckContainsChmpxSvrs(const char* hostname, const shor
 				MSG_CHMPRN("Hostname(%s) is matched(not strictly) forward peer in name(%s):chmpxid(0x%016" PRIx64 ") to globalname(%s).", hostname, name.c_str(), chmpxid, globalname.c_str());
 				return true;
 			}
-			if((CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && strcuk == cuk){
+			if((CHM_INVALID_PORT == *pctlport || *pctlport == ctlport) && IsMatchCuk(strcuk, cuk)){
 				// strictly matched
 				if(pnormalizedname){
 					*pnormalizedname = globalname;

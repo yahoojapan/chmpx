@@ -456,6 +456,32 @@ bool IsMatchHostname(const char* target, strlst_t& regex_lst, string& foundname)
 	return false;
 }
 
+// For CUK matching
+//
+// Regular expressions are allowed in the CUK specification of the slave node.
+// This function uses regular expressions when doing CUK matching.
+//
+bool IsMatchCuk(const string& cuk, const string& basecuk)
+{
+	if(cuk.empty() && basecuk.empty()){
+		return true;
+	}else if(basecuk.empty()){
+		return false;
+	}else if(cuk == basecuk){
+		return true;
+	}
+	regex_t	regex_obj;
+	int		result;
+	if(0 != (result = regcomp(&regex_obj, basecuk.c_str(), REG_EXTENDED | REG_NOSUB))){
+		MSG_CHMPRN("Failed to compile regex for %s with return code(%d).", basecuk.c_str(), result);
+		return false;
+	}
+	result = regexec(&regex_obj, cuk.c_str(), 0, NULL, 0);
+	regfree(&regex_obj);
+
+	return (0 == result);
+}
+
 /*
  * VIM modelines
  *
