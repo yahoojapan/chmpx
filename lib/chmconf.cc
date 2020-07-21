@@ -2272,7 +2272,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		//
 		strlst_t	expand_svrnodes;
 		expand_svrnodes.clear();
-		if(!ExpandSimpleRegxHostname(svrnode.name.c_str(), expand_svrnodes, true, true, false)){	// convert localhost to server name and query FQDN.
+		if(!ExpandSimpleRegexHostname(svrnode.name.c_str(), expand_svrnodes, true, true, false)){	// convert localhost to server name and query FQDN.
 			MSG_CHMPRN("Failed to expand server node name(%s).", svrnode.name.c_str());
 			return false;
 		}
@@ -3316,7 +3316,7 @@ static bool ChmYamlLoadConfigurationSvrnodeSec(yaml_parser_t& yparser, CHMCFGINF
 				// So that, we expand server node name here.
 				//
 				strlst_t	expand_svrnodes;
-				if(!ExpandSimpleRegxHostname(svrnode.name.c_str(), expand_svrnodes, true, true, false)){	// convert localhost to server name and query FQDN.
+				if(!ExpandSimpleRegexHostname(svrnode.name.c_str(), expand_svrnodes, true, true, false)){	// convert localhost to server name and query FQDN.
 					ERR_CHMPRN("Failed to expand server node name(%s).", svrnode.name.c_str());
 					result = false;
 

@@ -310,7 +310,7 @@ bool IsSimpleRegexHostname(const char* hostname)
 // If is_cvt_localhost is true, hostname which is "localhost"
 // or "127.0.0.1" or "::1" is changed FQDN.
 //
-bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool is_cvt_localhost, bool is_cvt_fqdn, bool is_strict)
+bool ExpandSimpleRegexHostname(const char* hostname, strlst_t& expand_lst, bool is_cvt_localhost, bool is_cvt_fqdn, bool is_strict)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is NULL.");
@@ -330,7 +330,7 @@ bool ExpandSimpleRegxHostname(const char* hostname, strlst_t& expand_lst, bool i
 //
 // This function is checking hostname in expanded hostname list
 // for server list. The hostname_list should be expanded by 
-// ExpandSimpleRegxHostname() with is_cvt_localhost = true and 
+// ExpandSimpleRegexHostname() with is_cvt_localhost = true and 
 // is_cvt_fqdn = true.
 // If the hostname matches in array, foundname is set as
 // matched hostname(FQDN or localhost or IP address).
@@ -354,7 +354,7 @@ bool IsInHostnameList(const char* target, strlst_t& hostname_list, string& found
 	for(strlst_t::const_iterator hostname_list_iter = hostname_list.begin(); hostname_list_iter != hostname_list.end(); ++hostname_list_iter){
 		strlst_t	tmp_hostname_list;
 		// check simple regex
-		if(!ExpandSimpleRegxHostname(hostname_list_iter->c_str(), tmp_hostname_list, is_cvt_localhost, true, false)){
+		if(!ExpandSimpleRegexHostname(hostname_list_iter->c_str(), tmp_hostname_list, is_cvt_localhost, true, false)){
 			// hostname_list_iter->c_str() is not simple regex
 			tmp_hostname_list.push_back(*hostname_list_iter);
 		}
