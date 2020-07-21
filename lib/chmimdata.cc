@@ -844,7 +844,7 @@ bool ChmIMData::ReloadConfiguration(void)
 	}
 	// reload
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	if(!tmpchminfo.ReloadConfiguration(&chmcfg)){
+	if(!tmpchminfo.ReloadConfiguration(&chmcfg, eqfd)){
 		ERR_CHMPRN("Failed to reload configuration file.");
 		return false;
 	}
