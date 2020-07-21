@@ -5028,7 +5028,8 @@ class chmpxman_lap : public structure_lap<T>
 
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
 		bool Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCHMSOCKLIST relchmsockarea, PCHMPX* rel_pchmpxarrbase, PCHMPX* rel_pchmpxarrpend);
-		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
+		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg, int eqfd);
+		bool UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd);
 
 		bool GetSelfChmpxSvr(PCHMPXSVR chmpxsvr) const;
 		bool GetChmpxSvr(chmpxid_t chmpxid, PCHMPXSVR chmpxsvr) const;
@@ -5448,10 +5449,10 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 				iter->ctlport	== pselfnode->ctlport	&&
 				cuk				== self_cuk				&&
 				custom_seed		== self_custom_seed		&&
-				compare_hostport_pairs(endpoints,		endpoints,		EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(ctlendpoints,	ctlendpoints,	EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(forward_peers,	forward_peers,	FORWARD_PEER_MAX)	&&
-				compare_hostport_pairs(reverse_peers,	reverse_peers,	REVERSE_PEER_MAX)	)
+				compare_hostport_pairs(endpoints,		self_endpoints,		EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(ctlendpoints,	self_ctlendpoints,	EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(forward_peers,	self_forward_peers,	FORWARD_PEER_MAX)	&&
+				compare_hostport_pairs(reverse_peers,	self_reverse_peers,	REVERSE_PEER_MAX)	)
 			{
 				continue;
 			}
@@ -5503,7 +5504,7 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 }
 
 template<typename T>
-bool chmpxman_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
+bool chmpxman_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg, int eqfd)
 {
 	if(!pchmcfg){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -5529,9 +5530,137 @@ bool chmpxman_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
 	basic_type::pAbsPtr->replica_count		= pchmcfg->replica_count;
 	basic_type::pAbsPtr->chmpx_count		= pchmcfg->max_chmpx_count;
 
-	// [NOTE]
-	// now server list is not update.
-	//
+	// update server chmpx(if there is not it in configuration, remove it in list)
+	return UpdateChmpxSvrs(pchmcfg, eqfd);
+}
+
+// [NOTE]
+// Delete the server nodes that are not included in the loaded Configuration,
+// just in case the Configuration is reloaded.
+// Remove only server nodes that have a SERVICEOUT/DOWN/NOACT status.
+//
+template<typename T>
+bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
+{
+	if(!pchmcfg){
+		ERR_CHMPRN("Parameters are wrong.");
+		return false;
+	}
+	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
+		ERR_CHMPRN("PCHMPXMAN does not set.");
+		return false;
+	}
+	if(MAX_GROUP_LENGTH <= pchmcfg->groupname.length() || MAX_CHMPX_COUNT < pchmcfg->max_chmpx_count){
+		ERR_CHMPRN("Configuration information are wrong.");
+		return false;
+	}
+
+	// get self chmpxid
+	chmpxid_t		selfchmpxid = CHM_INVALID_CHMPXID;
+	if(IsServerMode()){
+		selfchmpxid = GetSelfChmpxId();
+	}
+
+	// Loop in current server list
+	chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
+	for(bool result = svrchmpxlist.ToFirst(); result; ){
+		// target chmpx
+		chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
+
+		// check chmpxid
+		if(selfchmpxid == svrchmpx.GetChmpxId()){
+			// skip self chmpx
+			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			continue;
+		}
+
+		// check status
+		chmpxsts_t	status = svrchmpx.GetStatus();
+		if(!IS_CHMPXSTS_DOWN(status) || !IS_CHMPXSTS_SRVOUT(status) || !IS_CHMPXSTS_NOACT(status)){
+			// Status is not service out and down, skip this.
+			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			continue;
+		}
+
+		// get structure for target chmpx
+		CHMPXSVR	rawsvrchmpx;
+		if(!svrchmpx.GetChmpxSvr(&rawsvrchmpx)){
+			ERR_CHMPRN("Failed to get chmpxsvr structure.");
+			continue;
+		}
+
+		// search rawsvrchmpx from server list in configuration
+		bool	found = false;
+		for(chmnode_cfginfos_t::const_iterator iter = pchmcfg->servers.begin(); iter != pchmcfg->servers.end(); ++iter){
+			// get parameters wich checking by chmpxid seed type
+			std::string		cuk;
+			std::string		custom_seed;
+			CHMPXHP_RAWPAIR	endpoints[EXTERNAL_EP_MAX];
+			CHMPXHP_RAWPAIR	ctlendpoints[EXTERNAL_EP_MAX];
+			CHMPXHP_RAWPAIR	forward_peers[FORWARD_PEER_MAX];
+			CHMPXHP_RAWPAIR	reverse_peers[REVERSE_PEER_MAX];
+			if(!cvt_parameters_by_chmpxid_type(&(*iter), pchmcfg->chmpxid_type, cuk, custom_seed, endpoints, ctlendpoints, forward_peers, reverse_peers)){
+				WAN_CHMPRN("Failed to convert some parameters for chmpx information from configuration.");
+				continue;
+			}
+
+			// compare
+			if(	0 == strncmp(iter->name.c_str(), rawsvrchmpx.name, NI_MAXHOST)							&&
+				iter->ctlport == rawsvrchmpx.ctlport													&&
+				0 == strncmp(cuk.c_str(), rawsvrchmpx.cuk, CUK_MAX)										&&
+				0 == strncmp(custom_seed.c_str(), rawsvrchmpx.custom_seed, CUSTOM_ID_SEED_MAX)			&&
+				compare_hostport_pairs(endpoints,		rawsvrchmpx.endpoints,		EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(ctlendpoints,	rawsvrchmpx.ctlendpoints,	EXTERNAL_EP_MAX)	&&
+				compare_hostport_pairs(forward_peers,	rawsvrchmpx.forward_peers,	FORWARD_PEER_MAX)	&&
+				compare_hostport_pairs(reverse_peers,	rawsvrchmpx.reverse_peers,	REVERSE_PEER_MAX)	)
+			{
+				found = true;
+				break;
+			}
+		}
+		if(found){
+			// found target chmpx, do not remove it
+			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			continue;
+		}
+
+		// Not found svrchmpx -> remove it from chmpxlist
+		PCHMPXLIST	retrivelist;
+		if(NULL == (retrivelist = svrchmpxlist.Retrieve())){
+			// Failed to remove it, continue next.
+			WAN_CHMPRN("Failed to remove CHMPX(0x%016" PRIx64 ") from CHMPXSVR, but continue...", svrchmpx.GetChmpxId());
+			result	= svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			continue;
+		}
+
+		// [NOTICE]
+		// If Retrieve() is succeed, list current in list is set next point(or end of list)
+		result = true;
+
+		// For debug message
+		chmpxlistlap	retrivechmpxlist(retrivelist, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, true);	// From Abs
+		{
+			chmpxlap	retrivechmpx(retrivechmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);						// Get CHMPX from Absolute
+			MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") with status(0x%016" PRIx64 ":%s) is retrieved.", retrivechmpx.GetChmpxId(), retrivechmpx.GetStatus(), STR_CHMPXSTS_FULL(retrivechmpx.GetStatus()).c_str());
+		}
+		retrivechmpxlist.Clear(eqfd);
+
+		// Free chmpx list
+		chmpxlistlap	freechmpxlist(basic_type::pAbsPtr->chmpx_frees, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative(allow NULL)
+		if(!freechmpxlist.Push(retrivelist, true)){
+			WAN_CHMPRN("Failed to push back new free CHMPXLIST to freelist, but continue...");
+		}else{
+			basic_type::pAbsPtr->chmpx_free_count++;
+			basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
+		}
+		// [NOTICE]
+		// decrement here, but setting pointer is after this loop.
+		//
+		if(0L < basic_type::pAbsPtr->chmpx_server_count){
+			basic_type::pAbsPtr->chmpx_server_count--;
+		}
+	}
+
 	return true;
 }
 
@@ -7543,7 +7672,7 @@ class chminfo_lap : public structure_lap<T>
 		bool Close(int eqfd, int type = CLOSETG_BOTH);
 		bool Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_chmpxmsgarea, const CHMNODE_CFGINFO* pselfnode, const char* pselfname, PCHMPXLIST relchmpxlist, PCLTPROCLIST relcltproclist, PCHMSOCKLIST relchmsockarea, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend);
 		bool IsSafeCurrentVersion(void) const;
-		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg);
+		bool ReloadConfiguration(const CHMCFGINFO* pchmcfg, int eqfd);
 
 		CHMPXID_SEED_TYPE GetChmpxSeedType(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->chmpxid_type : CHMPXID_SEED_NAME); }
 		msgid_t GetBaseMsgId(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->base_msgid : 0L ); }
@@ -8061,7 +8190,7 @@ bool chminfo_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, PMQMSGHEADLIST rel_ch
 }
 
 template<typename T>
-bool chminfo_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
+bool chminfo_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg, int eqfd)
 {
 	if(!pchmcfg){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -8116,7 +8245,7 @@ bool chminfo_lap<T>::ReloadConfiguration(const CHMCFGINFO* pchmcfg)
 	basic_type::pAbsPtr->histlog_count			= pchmcfg->max_histlog_count;
 
 	chmpxmanlap	tmpchmpxman(&basic_type::pAbsPtr->chmpx_man, basic_type::pShmBase);
-	if(!tmpchmpxman.ReloadConfiguration(pchmcfg)){
+	if(!tmpchmpxman.ReloadConfiguration(pchmcfg, eqfd)){
 		ERR_CHMPRN("Failed to initialize CHMPXMAN.");
 		return false;
 	}
