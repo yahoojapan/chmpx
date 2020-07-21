@@ -1,3 +1,11 @@
+chmpx (1.0.76) unstable; urgency=low
+
+  * Delete server nodes when updating the configuration - #49
+  * Allowed unspecified CUSTOM_ID_SEED of slave node - #48
+  * Supported regular expression to CUK in slave setting - #47
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 21 Jul 2020 15:14:06 +0900
+
 chmpx (1.0.75) unstable; urgency=low
 
   * Added checking resolv for hostname - #45
