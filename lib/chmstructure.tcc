@@ -968,7 +968,7 @@ class chmpx_lap : public structure_lap<T>
 		const char* GetSlvPriKey(void) const { return ((basic_type::pAbsPtr && !CHMEMPTYSTR(basic_type::pAbsPtr->slave_prikey)) ? basic_type::pAbsPtr->slave_prikey : NULL); }
 		bool GetSslStructure(CHMPXSSL& ssl) const;
 
-		int compare_order(const chmpx_lap<T>& other) const;
+		int compare_order(const chmpx_lap<T>& other, CHMPXID_SEED_TYPE type) const;
 };
 
 template<typename T>
@@ -1914,19 +1914,32 @@ bool chmpx_lap<T>::GetSslStructure(CHMPXSSL& ssl) const
 // return > 0, means other is big
 //
 template<typename T>
-int chmpx_lap<T>::compare_order(const chmpx_lap<T>& other) const
+int chmpx_lap<T>::compare_order(const chmpx_lap<T>& other, CHMPXID_SEED_TYPE type) const
 {
 	int	result;
 
-	if(0 == (result = strcmp(other.pAbsPtr->name, basic_type::pAbsPtr->name))){
-		if(other.pAbsPtr->ctlport == basic_type::pAbsPtr->ctlport){
-			if(0 == (result = strcmp(other.pAbsPtr->cuk, basic_type::pAbsPtr->cuk))){
-				result = strcmp(other.pAbsPtr->custom_seed, basic_type::pAbsPtr->custom_seed);
-			}
-		}else if(other.pAbsPtr->ctlport < basic_type::pAbsPtr->ctlport){
-			result = -1;
-		}else{
-			result = 1;
+	// 1) At case of CHMPXID_SEED_CUSTOM, first checking seed.
+	if(CHMPXID_SEED_CUSTOM == type){
+		if(0 != (result = strcmp(other.pAbsPtr->custom_seed, basic_type::pAbsPtr->custom_seed))){
+			return result;
+		}
+	}
+	// 2) name
+	if(0 != (result = strcmp(other.pAbsPtr->name, basic_type::pAbsPtr->name))){
+		return result;
+	}
+	// 3) port
+	if(other.pAbsPtr->ctlport != basic_type::pAbsPtr->ctlport){
+		return ((other.pAbsPtr->ctlport < basic_type::pAbsPtr->ctlport) ? -1 : 1);
+	}
+	// 4) cuk
+	if(0 != (result = strcmp(other.pAbsPtr->cuk, basic_type::pAbsPtr->cuk))){
+		return result;
+	}
+	// 5) Not case of CHMPXID_SEED_CUSTOM, last checking seed.
+	if(CHMPXID_SEED_CUSTOM != type){
+		if(0 != (result = strcmp(other.pAbsPtr->custom_seed, basic_type::pAbsPtr->custom_seed))){
+			return result;
 		}
 	}
 	return result;
@@ -1995,7 +2008,7 @@ class chmpxlist_lap : public structure_lap<T>
 		st_ptr_type PopAny(void);
 		bool Push(st_ptr_type ptr, bool is_abs, bool is_to_first = false);
 		bool PushBack(st_ptr_type ptr, bool is_abs);
-		bool Insert(st_ptr_type ptr, bool is_abs);
+		bool Insert(st_ptr_type ptr, bool is_abs, CHMPXID_SEED_TYPE type);
 		bool Find(chmpxid_t chmpxid);
 		bool Find(int sock, bool is_to_first = false);
 		bool FindByHash(chmhash_t hash, bool is_base_hash = true, bool is_to_first = false);
@@ -2884,7 +2897,7 @@ bool chmpxlist_lap<T>::PushBack(st_ptr_type ptr, bool is_abs)
 }
 
 template<typename T>
-bool chmpxlist_lap<T>::Insert(st_ptr_type ptr, bool is_abs)
+bool chmpxlist_lap<T>::Insert(st_ptr_type ptr, bool is_abs, CHMPXID_SEED_TYPE type)
 {
 	if(!ptr){
 		ERR_CHMPRN("ptr is null.");
@@ -2905,7 +2918,7 @@ bool chmpxlist_lap<T>::Insert(st_ptr_type ptr, bool is_abs)
 	st_ptr_type	last;
 	for(cur = basic_type::pAbsPtr, last = NULL; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type), last = cur){
 		curchmpx.Reset(&cur->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
-		if(0 > curchmpx.compare_order(target)){
+		if(0 > curchmpx.compare_order(target, type)){
 			st_ptr_type	prev= CHM_ABS(basic_type::pShmBase, cur->prev, st_ptr_type);
 			newptr->prev	= CHM_REL(basic_type::pShmBase, prev, st_ptr_type);
 			newptr->next	= CHM_REL(basic_type::pShmBase, cur, st_ptr_type);
@@ -5468,7 +5481,7 @@ bool chmpxman_lap<T>::Initialize(const CHMCFGINFO* pchmcfg, const CHMNODE_CFGINF
 		// inter CHMPX into servers list
 		if(basic_type::pAbsPtr->chmpx_servers){
 			chmpxlistlap	svrchmpxlist(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-			svrchmpxlist.Insert(cursvrlist.GetAbsPtr(), true);							// From abs
+			svrchmpxlist.Insert(cursvrlist.GetAbsPtr(), true, pchmcfg->chmpxid_type);	// From abs
 
 			basic_type::pAbsPtr->chmpx_server_count++;
 			basic_type::pAbsPtr->chmpx_servers		= svrchmpxlist.GetFirstPtr(false);
@@ -5883,7 +5896,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, CHMPXID_SEED_TYPE typ
 
 			if(svrchmpxlist.GetAbsPtr()){
 				// insert
-				svrchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true);						// From abs
+				svrchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true, type);					// From abs
 				basic_type::pAbsPtr->chmpx_server_count++;
 				basic_type::pAbsPtr->chmpx_servers = svrchmpxlist.GetFirstPtr(false);
 			}else{
@@ -7442,7 +7455,7 @@ bool chmpxman_lap<T>::SetSlaveBase(CHMPXID_SEED_TYPE type, chmpxid_t chmpxid, co
 		// Add
 		newchmpx.InitializeSlave(type, hostname, basic_type::pAbsPtr->group, ctlport, cuk, custom_seed, tmp_endpoints, tmp_ctlendpoints, tmp_forward_peers, tmp_reverse_peers, *pssl);
 		if(basic_type::pAbsPtr->chmpx_slaves){
-			slvchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true);							// From abs
+			slvchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true, type);						// From abs
 			basic_type::pAbsPtr->chmpx_slave_count++;
 			basic_type::pAbsPtr->chmpx_slaves = slvchmpxlist.GetFirstPtr(false);
 		}else{
