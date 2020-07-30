@@ -1,3 +1,9 @@
+chmpx (1.0.77) unstable; urgency=low
+
+  * Order of server is by CUSTOM_ID_SEED when CHMPXIDTYPE=CUSTOM - #51
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 30 Jul 2020 14:39:42 +0900
+
 chmpx (1.0.76) unstable; urgency=low
 
   * Delete server nodes when updating the configuration - #49
