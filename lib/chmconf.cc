@@ -648,8 +648,15 @@ bool CHMConf::CheckUpdate(void)
 
 	// Load configuration file.
 	if(!LoadConfiguration(*pnewinfo)){
-		ERR_CHMPRN("Failed to load configuration from %s.", cfgfile.c_str());
+		ERR_CHMPRN("Failed to load configuration from %s, thus this is fatal error.", cfgfile.c_str());
 		CHM_Delete(pnewinfo);
+
+		// [NOTE]
+		// If there is something wrong with the configuration
+		// (for example, if it does not have self setting),
+		// then terminate the process.
+		ChmCntrl::LoopBreakHandler(SIGHUP);
+
 		return false;
 	}
 
