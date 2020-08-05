@@ -3852,6 +3852,7 @@ bool ChmEventSock::ConnectServers(void)
 		return false;
 	}
 
+	bool	need_reload_conf = false;
 	for(chmpxpos_t pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, CHM_INVALID_CHMPXLISTPOS, false, false); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, pos, false, false)){
 		// get base information
 		string		name;
@@ -3866,6 +3867,10 @@ bool ChmEventSock::ConnectServers(void)
 		chmpxsts_t	old_status	= status;
 		if(!IS_CHMPXSTS_SERVER(status) || !IS_CHMPXSTS_UP(status)){
 			WAN_CHMPRN("%s:chmpxid(0x%016" PRIx64 ")  which is pos(%" PRIu64 ") is status(0x%016" PRIx64 ":%s), not enough status to connecting.", name.c_str(), chmpxid, pos, status, STR_CHMPXSTS_FULL(status).c_str());
+			if(CHMPXSTS_SRVOUT_DOWN_NORMAL == status){
+				// need to recheck all configuration
+				need_reload_conf = true;
+			}
 			continue;
 		}
 
@@ -3886,6 +3891,17 @@ bool ChmEventSock::ConnectServers(void)
 			}
 		}
 	}
+
+	if(need_reload_conf){
+		// [NOTE]
+		// If there is a server in SERVICEOUT / DOWN state, it is necessary to
+		// check if the server is set in Configuration. If it does not exist,
+		// it will delete the entry.
+		if(!pImData->ReloadConfiguration()){
+			WAN_CHMPRN("Failed to reload configuration connecting servers because one server is SERVICEOUT / DOWN, but continue...");
+		}
+	}
+
 	return true;
 }
 
@@ -6049,8 +6065,8 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 					break;
 				}
 			}else if(IS_CHMPXSTS_DOWN(pchmpxsvrs[cnt].status)){
-				if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)){
-					MSG_CHMPRN("Found SERVICEIN / DOWN / DELETE / !DONE server, then could not complete merging.");
+				if(IS_CHMPXSTS_DELETE(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_PENDING(pchmpxsvrs[cnt].status) && !IS_CHMPXSTS_DONE(pchmpxsvrs[cnt].status)){
+					MSG_CHMPRN("Found SERVICEIN / DOWN / DELETE / !(PENDING or DONE) server, then could not complete merging.");
 					result = false;
 					break;
 				}
@@ -6857,6 +6873,14 @@ bool ChmEventSock::MergeComplete(void)
 		ERR_CHMPRN("Could not update own updating status time, but continue...");
 	}
 
+	// [NOTE]
+	// If the server node deleted from Configuration has SERVICEOUT/DOWN status, 
+	// call this method to delete it from the internal data.
+	//
+	if(!pImData->ReloadConfiguration()){
+		WAN_CHMPRN("Failed to reload configuration after merging, but continue...");
+	}
+
 	// send status change
 	CHMPXSVR	chmpxsvr;
 	if(!pImData->GetSelfChmpxSvr(&chmpxsvr)){
@@ -6877,6 +6901,7 @@ bool ChmEventSock::MergeComplete(void)
 			return false;
 		}
 	}
+
 	return true;
 }
 
@@ -9518,6 +9543,7 @@ bool ChmEventSock::PxComReceiveMergeComplete(PCOMHEAD pComHead, PPXCOM_ALL pComA
 			if(CHM_INVALID_CHMPXID == nextchmpxid){
 				MSG_CHMPRN("Could not get next chmpxid, probably there is no server without self chmpx on RING.");
 			}
+
 			chmpxid_t	downchmpxid;
 			while(CHM_INVALID_CHMPXID != (downchmpxid = pImData->GetChmpxIdByStatus(CHMPXSTS_SRVIN_DOWN_DELETED, false))){
 				// change down server status

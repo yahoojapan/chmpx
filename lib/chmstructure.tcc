@@ -5880,30 +5880,35 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, CHMPXID_SEED_TYPE typ
 				is_error = true;
 				continue;
 			}
-			// make new chmpx(list) from free chmpx list
-			chmpxlistlap	freechmpxlist(basic_type::pAbsPtr->chmpx_frees, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative
-			chmpxlistlap	newchmpxlist(freechmpxlist.PopAny(), basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get one CHMPXLIST from Absolute
-			chmpxlap		newchmpx(newchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);								// Get CHMPX from Absolute
+			if(CHMPXSTS_SRVOUT_DOWN_NORMAL == pchmpxsvrs[cnt].status){
+				WAN_CHMPRN("CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR is SERVICEOUT / DOWN status, thus it is not added server list.", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
 
-			basic_type::pAbsPtr->chmpx_free_count--;
-			basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
-
-			newchmpxlist.Clear();
-
-			if(!newchmpx.InitializeServer(&pchmpxsvrs[cnt], basic_type::pAbsPtr->group, type)){
-				WAN_CHMPRN("Failed to initialize CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR, but continue...", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
-			}
-
-			if(svrchmpxlist.GetAbsPtr()){
-				// insert
-				svrchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true, type);					// From abs
-				basic_type::pAbsPtr->chmpx_server_count++;
-				basic_type::pAbsPtr->chmpx_servers = svrchmpxlist.GetFirstPtr(false);
 			}else{
-				// insert new
-				newchmpxlist.SaveChmpxIdMap();												// Set chmpxid map
-				basic_type::pAbsPtr->chmpx_slave_count	= 1;
-				basic_type::pAbsPtr->chmpx_servers		= newchmpxlist.GetRelPtr();
+				// make new chmpx(list) from free chmpx list
+				chmpxlistlap	freechmpxlist(basic_type::pAbsPtr->chmpx_frees, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From Relative
+				chmpxlistlap	newchmpxlist(freechmpxlist.PopAny(), basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get one CHMPXLIST from Absolute
+				chmpxlap		newchmpx(newchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);								// Get CHMPX from Absolute
+
+				basic_type::pAbsPtr->chmpx_free_count--;
+				basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
+
+				newchmpxlist.Clear();
+
+				if(!newchmpx.InitializeServer(&pchmpxsvrs[cnt], basic_type::pAbsPtr->group, type)){
+					WAN_CHMPRN("Failed to initialize CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR, but continue...", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
+				}
+
+				if(svrchmpxlist.GetAbsPtr()){
+					// insert
+					svrchmpxlist.Insert(newchmpxlist.GetAbsPtr(), true, type);					// From abs
+					basic_type::pAbsPtr->chmpx_server_count++;
+					basic_type::pAbsPtr->chmpx_servers = svrchmpxlist.GetFirstPtr(false);
+				}else{
+					// insert new
+					newchmpxlist.SaveChmpxIdMap();												// Set chmpxid map
+					basic_type::pAbsPtr->chmpx_server_count	= 1;
+					basic_type::pAbsPtr->chmpx_servers		= newchmpxlist.GetRelPtr();
+				}
 			}
 		}
 	}
