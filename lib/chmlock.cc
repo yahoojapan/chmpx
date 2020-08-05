@@ -27,6 +27,7 @@
 #include "chmcommon.h"
 #include "chmutil.h"
 #include "chmlock.h"
+#include "chmstructure.h"
 #include "chmdbg.h"
 
 using namespace	std;
@@ -34,20 +35,47 @@ using namespace	std;
 //---------------------------------------------------------
 // Utility Macros
 //---------------------------------------------------------
-#define	CHMLOCK_NO_FD_LOCKTYPE(LockType)		FLCK_RWLOCK_NO_FD( \
-													LockType == CHMLT_IMDATA	? (getpid() | 0x20000000) : \
-													LockType == CHMLT_SOCKET	? (getpid() | 0x40000000) : \
-													LockType == CHMLT_MQOBJ		? (getpid() | 0x60000000) : \
-													0 )
+// [NOTE]
+// The lock target is the file descriptor of ChmShm.
+// Locks other than CHMLT_MQ lock and share the first 3 bytes
+// of ChmShm.
+// This area is a buffer for the version number and does not
+// affect operations other than this lock. Therefore, these 3
+// bytes are used.
+//
+#define	CHMLOCK_OFFSET_LOCKTYPE(LockType)		(	(CHMLT_IMDATA	== LockType) ? 0L : \
+													(CHMLT_SOCKET	== LockType) ? 1L : \
+													(CHMLT_MQOBJ	== LockType) ? 2L : \
+													0L )
+
+//---------------------------------------------------------
+// Class Variables
+//---------------------------------------------------------
+int	ChmLock::chmshmfd = CHM_INVALID_HANDLE;
+
+//---------------------------------------------------------
+// Class Methods
+//---------------------------------------------------------
+int ChmLock::SetChmShmFd(int fd)
+{
+	int	oldfd			= ChmLock::chmshmfd;
+	ChmLock::chmshmfd	= fd;
+	return oldfd;
+}
+
+int ChmLock::UnsetChmShmFd(void)
+{
+	return ChmLock::SetChmShmFd(CHM_INVALID_HANDLE);
+}
 
 //---------------------------------------------------------
 // Methods
 //---------------------------------------------------------
-ChmLock::ChmLock(void) : FLRwlRcsv(FLCK_INVALID_HANDLE, 0L, 1L), kind(CHMLT_IMDATA)
+ChmLock::ChmLock(void) : FLRwlRcsv(ChmLock::chmshmfd, CHMLOCK_OFFSET_LOCKTYPE(CHMLT_IMDATA), 1L), kind(CHMLT_IMDATA)
 {
 }
 
-ChmLock::ChmLock(CHMLOCKKIND LockKind, CHMLOCKTYPE LockType) : FLRwlRcsv(CHMLOCK_NO_FD_LOCKTYPE(LockKind), 0L, 1L, (CHMLT_READ == LockType)), kind(LockKind)
+ChmLock::ChmLock(CHMLOCKKIND LockKind, CHMLOCKTYPE LockType) : FLRwlRcsv(ChmLock::chmshmfd, CHMLOCK_OFFSET_LOCKTYPE(LockKind), 1L, (CHMLT_READ == LockType)), kind(LockKind)
 {
 	assert(CHMLT_MQ != LockKind);
 }
