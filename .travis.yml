@@ -21,17 +21,15 @@
 #
 
 language: cpp
-
-sudo: required
-
 dist: trusty
+os: linux
 
 env:
   global:
     - PCUSER=antpickax
     - PCREPO=current
     - PCDLREPO=stable
-  matrix:
+  jobs:
     - OS=centos 
       TAG=centos7 
       DISTTAG=el/7 
