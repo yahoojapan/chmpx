@@ -1,3 +1,12 @@
+chmpx (1.0.78) unstable; urgency=low
+
+  * Fixed some warning in travis.yml - #56
+  * Fixed a parameter and display host format - #55
+  * Fixed the process in adding/removing nodes to/from a running cluster - #54
+  * Changed the file descriptor etc. used in the shared lock - #53
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 06 Aug 2020 10:42:23 +0900
+
 chmpx (1.0.77) unstable; urgency=low
 
   * Order of server is by CUSTOM_ID_SEED when CHMPXIDTYPE=CUSTOM - #51
