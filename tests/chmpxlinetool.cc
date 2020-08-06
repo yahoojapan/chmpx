@@ -2785,9 +2785,12 @@ static bool CreateDynaTargetChmpx(void)
 //
 // utility for key
 //
+// Format
+// 		"hostname(IP address)":"control port":"cuk":"custom_seed":"control endpoints..."
+//
 static string MakeMapKeyFromAll(const string& hostname, short ctrlport, const string& cuk, const string& ctlendpoints, const string& custom_seed)
 {
-	string	hostall	= hostname + string(":") + to_string(ctrlport) + string(":") + ctlendpoints + string(":") + custom_seed;
+	string	hostall	= hostname + string(":") + to_string(ctrlport) + string(":") + cuk + string(":") + custom_seed + string(":") + ctlendpoints ;
 	return hostall;
 }
 
