@@ -207,7 +207,6 @@ class ChmEventSock : public ChmEventBase
 		// connect/accept
 		bool ConnectServer(chmpxid_t chmpxid, int& sock, bool without_set_imdata);
 		bool RawConnectServer(chmpxid_t chmpxid, int& sock, bool without_set_imdata, bool is_lock);
-		bool ConnectRing(void);
 		bool CloseRechainRing(chmpxid_t nowchmpxid);
 		bool RechainRing(chmpxid_t newchmpxid);
 		bool CheckRechainRing(chmpxid_t newchmpxid, bool& is_rechain);
@@ -314,6 +313,7 @@ class ChmEventSock : public ChmEventBase
 		virtual ~ChmEventSock();
 
 		bool InitialAllServerStatus(void);
+		bool ConnectRing(void);
 		bool ConnectServers(void);
 		bool DoSuspend(void);
 
