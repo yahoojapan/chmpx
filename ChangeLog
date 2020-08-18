@@ -1,3 +1,9 @@
+chmpx (1.0.81) unstable; urgency=low
+
+  * Fixed a bug of dynamic addition/deletion of server nodes - #62
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 18 Aug 2020 09:43:42 +0900
+
 chmpx (1.0.80) unstable; urgency=low
 
   * Fixed a bug of adding server node when updating conf - #60
