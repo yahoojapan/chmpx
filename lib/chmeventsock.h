@@ -103,9 +103,9 @@ class ChmEventSock : public ChmEventBase
 		static const int			DEFAULT_KEEPCOUNT			= 3;		// maximum count of sending keep alive
 		static const int			DEFAULT_LISTEN_BACKLOG		= 256;
 		static const int			DEFAULT_RETRYCNT			= 500;		// retry count for send and receive(total default wait = 200us * 500 = 100ms)
-		static const int			DEFAULT_RETRYCNT_CONNECT	= 2500;		// retry count for connect.( = (500 * 1000) / 200 )
+		static const int			DEFAULT_RETRYCNT_CONNECT	= 200;		// retry count for connect.( total = 5ms * 200 = 1s )
 		static const suseconds_t	DEFAULT_WAIT_SOCKET			= 200;		// timeout/count for send and receive.(200us)
-		static const suseconds_t	DEFAULT_WAIT_CONNECT		= 500 * 1000;	// total timeout for connect.(500ms)
+		static const suseconds_t	DEFAULT_WAIT_CONNECT		= 5 * 1000;	// timeout/count for connect.(5ms)
 
 	protected:
 		typedef enum chm_downsvr_merge_type{								// for ChangeDownSvrStatusBeforeMerge method
