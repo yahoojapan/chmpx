@@ -3196,8 +3196,6 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrieve(void)
 	}
 	st_ptr_type	current	= basic_type::pAbsPtr;
 
-	RetrieveChmpxIdMap(current, true);		// basic_type::pAbsPtr->same
-
 	if(basic_type::pAbsPtr->next){
 		basic_type::pAbsPtr = CHM_ABS(basic_type::pShmBase, basic_type::pAbsPtr->next, st_ptr_type);
 	}else if(basic_type::pAbsPtr->prev){
@@ -3216,6 +3214,26 @@ typename chmpxlist_lap<T>::st_ptr_type chmpxlist_lap<T>::Retrieve(void)
 	}
 	current->next = NULL;
 	current->prev = NULL;
+
+	// Following lines are as same as RetrieveChmpxIdMap method
+	chmpxlap	tmpchmpx(&current->chmpx, abs_base_arr, abs_pend_arr, abs_sock_free_cnt, abs_sock_frees, basic_type::pShmBase);
+	chmpxid_t	curchmpxid = tmpchmpx.GetChmpxId();
+	if(CHM_INVALID_CHMPXID != curchmpxid && pchmpxid_map){
+		st_ptr_type*	ppabsmap;
+		st_ptr_type		pabsmap;
+		for(ppabsmap = &pchmpxid_map[curchmpxid & CHMPXID_MAP_MASK], pabsmap = CHM_ABS(basic_type::pShmBase, pchmpxid_map[curchmpxid & CHMPXID_MAP_MASK], st_ptr_type);
+			pabsmap;
+			ppabsmap = &pabsmap->same, pabsmap = CHM_ABS(basic_type::pShmBase, pabsmap->same, st_ptr_type))
+		{
+			if(pabsmap == current){
+				*ppabsmap = current->same;
+				break;
+			}
+		}
+	}else{
+		WAN_CHMPRN("pchmpxid_map is NULL, or current chmpxid is invalid.");
+	}
+	current->same = NULL;
 
 	return current;
 }
@@ -5596,18 +5614,25 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 				continue;
 			}
 
-			// compare
-			if(	0 == strncmp(iter->name.c_str(), rawsvrchmpx.name, NI_MAXHOST)							&&
-				iter->ctlport == rawsvrchmpx.ctlport													&&
-				0 == strncmp(cuk.c_str(), rawsvrchmpx.cuk, CUK_MAX)										&&
-				0 == strncmp(custom_seed.c_str(), rawsvrchmpx.custom_seed, CUSTOM_ID_SEED_MAX)			&&
-				compare_hostport_pairs(endpoints,		rawsvrchmpx.endpoints,		EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(ctlendpoints,	rawsvrchmpx.ctlendpoints,	EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(forward_peers,	rawsvrchmpx.forward_peers,	FORWARD_PEER_MAX)	&&
-				compare_hostport_pairs(reverse_peers,	rawsvrchmpx.reverse_peers,	REVERSE_PEER_MAX)	)
-			{
-				found = true;
-				break;
+			// at first, check name because it will be converted some hostname and ip addresses
+			std::string	foundname;
+			strlst_t	node_list;
+			foundname.clear();
+			node_list.clear();
+			node_list.push_back(rawsvrchmpx.name);
+			if(IsInHostnameList(iter->name.c_str(), node_list, foundname, true)){
+				// the target matched by name, then do compare other parameters
+				if(	iter->ctlport == rawsvrchmpx.ctlport													&&
+					0 == strncmp(cuk.c_str(), rawsvrchmpx.cuk, CUK_MAX)										&&
+					0 == strncmp(custom_seed.c_str(), rawsvrchmpx.custom_seed, CUSTOM_ID_SEED_MAX)			&&
+					compare_hostport_pairs(endpoints,		rawsvrchmpx.endpoints,		EXTERNAL_EP_MAX)	&&
+					compare_hostport_pairs(ctlendpoints,	rawsvrchmpx.ctlendpoints,	EXTERNAL_EP_MAX)	&&
+					compare_hostport_pairs(forward_peers,	rawsvrchmpx.forward_peers,	FORWARD_PEER_MAX)	&&
+					compare_hostport_pairs(reverse_peers,	rawsvrchmpx.reverse_peers,	REVERSE_PEER_MAX)	)
+				{
+					found = true;
+					break;
+				}
 			}
 		}
 		if(found){
@@ -5653,14 +5678,15 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 
 	// Retrieve SERVICEOUT/DOWN server in current server list which is not existed in configuration.
 	svrchmpxlist.Reset(basic_type::pAbsPtr->chmpx_servers, basic_type::pAbsPtr->chmpxid_map, AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase, false);	// From rel
-	for(bool result = svrchmpxlist.ToFirst(); result; ){
+	for(bool result = svrchmpxlist.ToFirst(), topoflist = true; result; ){
 		// target chmpx
 		chmpxlap	svrchmpx(svrchmpxlist.GetAbsChmpxPtr(), AbsBaseArr(), AbsPendArr(), AbsSockFreeCnt(), AbsSockFrees(), basic_type::pShmBase);	// Get CHMPX from Absolute
 
 		// check chmpxid
 		if(selfchmpxid == svrchmpx.GetChmpxId()){
 			// skip self chmpx
-			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			result    = svrchmpxlist.ToNext(false, false, false, false);	// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			topoflist = false;
 			continue;
 		}
 
@@ -5668,7 +5694,8 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 		chmpxsts_t	status = svrchmpx.GetStatus();
 		if(!IS_CHMPXSTS_DOWN(status) || !IS_CHMPXSTS_SRVOUT(status) || !IS_CHMPXSTS_NOACT(status)){
 			// Status is not service out and down, skip this.
-			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			result    = svrchmpxlist.ToNext(false, false, false, false);	// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			topoflist = false;
 			continue;
 		}
 
@@ -5676,6 +5703,8 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 		CHMPXSVR	rawsvrchmpx;
 		if(!svrchmpx.GetChmpxSvr(&rawsvrchmpx)){
 			ERR_CHMPRN("Failed to get chmpxsvr structure.");
+			result    = svrchmpxlist.ToNext(false, false, false, false);	// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			topoflist = false;
 			continue;
 		}
 
@@ -5694,23 +5723,31 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 				continue;
 			}
 
-			// compare
-			if(	0 == strncmp(iter->name.c_str(), rawsvrchmpx.name, NI_MAXHOST)							&&
-				iter->ctlport == rawsvrchmpx.ctlport													&&
-				0 == strncmp(cuk.c_str(), rawsvrchmpx.cuk, CUK_MAX)										&&
-				0 == strncmp(custom_seed.c_str(), rawsvrchmpx.custom_seed, CUSTOM_ID_SEED_MAX)			&&
-				compare_hostport_pairs(endpoints,		rawsvrchmpx.endpoints,		EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(ctlendpoints,	rawsvrchmpx.ctlendpoints,	EXTERNAL_EP_MAX)	&&
-				compare_hostport_pairs(forward_peers,	rawsvrchmpx.forward_peers,	FORWARD_PEER_MAX)	&&
-				compare_hostport_pairs(reverse_peers,	rawsvrchmpx.reverse_peers,	REVERSE_PEER_MAX)	)
-			{
-				found = true;
-				break;
+			// at first, check name because it will be converted some hostname and ip addresses
+			std::string	foundname;
+			strlst_t	node_list;
+			foundname.clear();
+			node_list.clear();
+			node_list.push_back(rawsvrchmpx.name);
+			if(IsInHostnameList(iter->name.c_str(), node_list, foundname, true)){
+				// the target matched by name, then do compare other parameters
+				if(	iter->ctlport == rawsvrchmpx.ctlport													&&
+					0 == strncmp(cuk.c_str(), rawsvrchmpx.cuk, CUK_MAX)										&&
+					0 == strncmp(custom_seed.c_str(), rawsvrchmpx.custom_seed, CUSTOM_ID_SEED_MAX)			&&
+					compare_hostport_pairs(endpoints,		rawsvrchmpx.endpoints,		EXTERNAL_EP_MAX)	&&
+					compare_hostport_pairs(ctlendpoints,	rawsvrchmpx.ctlendpoints,	EXTERNAL_EP_MAX)	&&
+					compare_hostport_pairs(forward_peers,	rawsvrchmpx.forward_peers,	FORWARD_PEER_MAX)	&&
+					compare_hostport_pairs(reverse_peers,	rawsvrchmpx.reverse_peers,	REVERSE_PEER_MAX)	)
+				{
+					found = true;
+					break;
+				}
 			}
 		}
 		if(found){
 			// found target chmpx, do not remove it
-			result = svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			result    = svrchmpxlist.ToNext(false, false, false, false);	// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			topoflist = false;
 			continue;
 		}
 
@@ -5719,7 +5756,8 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 		if(NULL == (retrivelist = svrchmpxlist.Retrieve())){
 			// Failed to remove it, continue next.
 			WAN_CHMPRN("Failed to remove CHMPX(0x%016" PRIx64 ") from CHMPXSVR, but continue...", svrchmpx.GetChmpxId());
-			result	= svrchmpxlist.ToNext(false, false, false, false);		// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			result    = svrchmpxlist.ToNext(false, false, false, false);	// not cycle, all server(not only base hash servers, up/down servers), (not same server)
+			topoflist = false;
 			continue;
 		}
 
@@ -5743,9 +5781,11 @@ bool chmpxman_lap<T>::UpdateChmpxSvrs(const CHMCFGINFO* pchmcfg, int eqfd)
 			basic_type::pAbsPtr->chmpx_free_count++;
 			basic_type::pAbsPtr->chmpx_frees = freechmpxlist.GetFirstPtr(false);
 		}
-		// [NOTICE]
-		// decrement here, but setting pointer is after this loop.
-		//
+
+		// Check and reset top chmpxlist
+		if(topoflist){
+			basic_type::pAbsPtr->chmpx_servers = svrchmpxlist.GetRelPtr();
+		}
 		if(0L < basic_type::pAbsPtr->chmpx_server_count){
 			basic_type::pAbsPtr->chmpx_server_count--;
 		}

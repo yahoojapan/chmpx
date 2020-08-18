@@ -2033,7 +2033,7 @@ bool ChmEventSock::UpdateInternalData(void)
 	sock_retry_count	= (CHMEVENTSOCK_RETRY_DEFAULT == tmp_sock_retry_count ? ChmEventSock::DEFAULT_RETRYCNT : tmp_sock_retry_count);
 	sock_wait_time		= (CHMEVENTSOCK_TIMEOUT_DEFAULT == tmp_sock_wait_time ? ChmEventSock::DEFAULT_WAIT_SOCKET : tmp_sock_wait_time);
 	con_wait_time		= (CHMEVENTSOCK_TIMEOUT_DEFAULT == tmp_con_wait_time ? ChmEventSock::DEFAULT_WAIT_CONNECT : tmp_con_wait_time);
-	con_retry_count		= sock_retry_count;
+	con_retry_count		= (CHMEVENTSOCK_RETRY_DEFAULT == tmp_sock_retry_count ? ChmEventSock::DEFAULT_RETRYCNT_CONNECT : tmp_sock_retry_count);
 	is_server_mode		= pImData->IsServerMode();
 	max_sock_pool		= pImData->GetMaxSockPool();
 	sock_pool_timeout	= pImData->GetSockPoolTimeout();
@@ -4517,12 +4517,17 @@ bool ChmEventSock::InitialAllServerStatus(void)
 
 	// Connect to ONE of servers.
 	string		name;
-	int			sock	= CHM_INVALID_SOCK;
-	chmpxid_t	chmpxid	= CHM_INVALID_CHMPXID;
+	int			sock		= CHM_INVALID_SOCK;
+	chmpxid_t	chmpxid		= CHM_INVALID_CHMPXID;
+	chmpxid_t	selfchmpxid	= pImData->GetSelfChmpxId();
 	for(chmpxpos_t pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, CHM_INVALID_CHMPXLISTPOS, true, false); CHM_INVALID_CHMPXLISTPOS != pos; pos = pImData->GetNextServerPos(CHM_INVALID_CHMPXLISTPOS, pos, true, false), sock = CHM_INVALID_SOCK){
 		chmpxid	= CHM_INVALID_CHMPXID;
 		if(!pImData->GetServerBase(pos, &name, &chmpxid, NULL, NULL, NULL, NULL) || CHM_INVALID_CHMPXID == chmpxid){
 			WAN_CHMPRN("Could not get server name/chmpxid for pos(%" PRIu64 ").", pos);
+			continue;
+		}
+		if(selfchmpxid == chmpxid){
+			MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") for pos(%" PRIu64 ") is self chmpxid.", chmpxid, pos);
 			continue;
 		}
 		if(ConnectServer(chmpxid, sock, true)){		// connect & not set epoll & not chmshm

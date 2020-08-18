@@ -482,6 +482,7 @@ bool ChmCntrl::EventLoop(void)
 	int					max_events	= ChmCntrl::DEFAULT_MAX_EVENT_CNT;
 	int					timeout		= ChmCntrl::DEFAULT_EVENT_TIMEOUT;
 	bool				is_slave	= ImData.IsSlaveMode();
+	int					recon_cnt	= 0;
 	while(ChmCntrl::DoLoop){
 		// check all client closing.
 		if(is_close_notify && pEventSock){
@@ -522,18 +523,22 @@ bool ChmCntrl::EventLoop(void)
 				}
 			}else if(pEventSock){
 				// Server node
-				if(1L >= ImData.GetUpServerCount()){
-					// [NOTE]
-					// This case is that there are no other server node up.
-					if(pEventSock->InitialAllServerStatus()){
-						if(1L < ImData.GetUpServerCount()){
-							// Try to connect servers
-							//MSG_CHMPRN("Try to connect servers on RING(mode is SERVER).");
-							pEventSock->ConnectRing();		// not need to check result.
-						}else{
-							// sleep
-							struct timespec	sleeptime = {0, 100 * 1000 * 1000};		// 100ms
-							nanosleep(&sleeptime, NULL);
+				recon_cnt++;
+				if(0 == (recon_cnt % 100)){						// max over (100ms * 100 = 10s)
+					// re-check other server when this server node is stand alone.
+					if(1L >= ImData.GetUpServerCount()){
+						// [NOTE]
+						// This case is that there are no other server node up.
+						if(pEventSock->InitialAllServerStatus()){
+							if(1L < ImData.GetUpServerCount()){
+								// Try to connect servers
+								//MSG_CHMPRN("Try to connect servers on RING(mode is SERVER).");
+								pEventSock->ConnectRing();		// not need to check result.
+							}else{
+								// sleep
+								struct timespec	sleeptime = {0, 100 * 1000 * 1000};		// 100ms
+								nanosleep(&sleeptime, NULL);
+							}
 						}
 					}
 				}
