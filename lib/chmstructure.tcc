@@ -1747,8 +1747,14 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		ERR_CHMPRN("PCHMPX does not set.");
 		return false;
 	}
+
+	// for name checking
+	std::string	foundname;
+	strlst_t	node_list;
+	node_list.push_back(chmpxsvr->name);
+
 	if(is_force){
-		if(0 != strcmp(basic_type::pAbsPtr->name, chmpxsvr->name) || basic_type::pAbsPtr->chmpxid != chmpxsvr->chmpxid){
+		if(basic_type::pAbsPtr->chmpxid != chmpxsvr->chmpxid || !IsInHostnameList(basic_type::pAbsPtr->name, node_list, foundname, true)){
 			strcpy(basic_type::pAbsPtr->name, chmpxsvr->name);
 			basic_type::pAbsPtr->chmpxid = chmpxsvr->chmpxid;
 		}
@@ -1808,7 +1814,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 
 	}else{
-		if(0 != strcmp(basic_type::pAbsPtr->name, chmpxsvr->name) || basic_type::pAbsPtr->chmpxid != chmpxsvr->chmpxid){
+		if(basic_type::pAbsPtr->chmpxid != chmpxsvr->chmpxid || !IsInHostnameList(basic_type::pAbsPtr->name, node_list, foundname, true)){
 			ERR_CHMPRN("name(%s - %s) or chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ") is different.", basic_type::pAbsPtr->name, chmpxsvr->name, basic_type::pAbsPtr->chmpxid, chmpxsvr->chmpxid);
 			return false;
 		}
