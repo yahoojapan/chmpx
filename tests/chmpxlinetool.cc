@@ -46,6 +46,7 @@
 #include "chmcntrl.h"
 #include "chmregex.h"
 #include "chmnetdb.h"
+#include "chmutil.h"
 
 using namespace std;
 
@@ -87,6 +88,1041 @@ static bool is_chmpx_dbg = false;
 #define	MSG(...)		if(is_print_msg){ CHMPXCTRLTOOL_PRINT("[CCT-MSG]", __VA_ARGS__); }
 #define	WAN(...)		if(is_print_wan){ CHMPXCTRLTOOL_PRINT("[CCT-WAN]", __VA_ARGS__); }
 #define	ERR(...)		if(is_print_err){ CHMPXCTRLTOOL_PRINT("[CCT-ERR]", __VA_ARGS__); }
+
+//---------------------------------------------------------
+// Common Variables
+//---------------------------------------------------------
+// Input option & parameter value
+static bool					isColorDisplay		= true;
+static string				strInitialConfig("");
+static string				strInitialHostname("");
+static short				nInitialCtrlPort	= CHM_INVALID_PORT;
+static string				strInitialCuk("");
+static string				strInitialCtlEPS("");
+static string				strInitialCustomSeed("");
+static bool					isOneHostTarget		= false;
+static bool					isInitialServerMode	= false;
+static int					nThreadCount		= 0;
+
+//---------------------------------------------------------
+// Hostname and list information
+//---------------------------------------------------------
+typedef struct confirmed_hostinfo{
+	string	hostname;							// hostname
+	bool	confirmed;							// FQDN is true
+}CHOSTINFO, *PCHOSTINFO;
+
+typedef std::list<CHOSTINFO>					chostinfolist_t;
+typedef std::list<chostinfolist_t*>				hostlistptrs_t;
+typedef std::map<std::string, chostinfolist_t*>	hostlistmap_t;
+
+//
+// Utilities
+//
+static inline bool cvt_chostinfolist(const chostinfolist_t& baselist, strlst_t& hostnames, bool only_confirmed)
+{
+	hostnames.clear();
+	for(chostinfolist_t::const_iterator iter = baselist.begin(); iter != baselist.end(); ++iter){
+		if(!only_confirmed || iter->confirmed){
+			hostnames.push_back(iter->hostname);
+		}
+	}
+	return true;
+}
+
+//
+// Utilities
+//
+static inline bool merge_chostinfolist(chostinfolist_t& baselist, const chostinfolist_t& addlist)
+{
+	for(chostinfolist_t::const_iterator aiter = addlist.begin(); aiter != addlist.end(); ++aiter){
+		bool	found;
+		found = false;
+		for(chostinfolist_t::iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
+			if(biter->hostname == aiter->hostname){
+				found = true;
+				if(!biter->confirmed && aiter->confirmed){
+					biter->confirmed = true;
+				}
+				break;
+			}
+		}
+		if(!found){
+			baselist.push_back(*aiter);
+		}
+	}
+	return true;
+}
+
+//
+// Utilities
+//
+static inline bool add_chostinfolist(chostinfolist_t& baselist, const string& hostname, bool confirmed)
+{
+	bool	found = false;
+	for(chostinfolist_t::iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
+		if(biter->hostname == hostname){
+			found = true;
+			if(!biter->confirmed && confirmed){
+				biter->confirmed = true;
+			}
+			break;
+		}
+	}
+	if(!found){
+		CHOSTINFO	chostinfo;
+		chostinfo.hostname	= hostname;
+		chostinfo.confirmed	= confirmed;
+		baselist.push_back(chostinfo);
+	}
+	return true;
+}
+
+//
+// Utilities
+//
+static inline bool add_chostinfolist(chostinfolist_t& baselist, const CHOSTINFO& chostinfo)
+{
+	return add_chostinfolist(baselist, chostinfo.hostname, chostinfo.confirmed);
+}
+
+//
+// Utilities
+//
+static inline bool add_chostinfolist(chostinfolist_t& baselist, const strlst_t& hostnames, bool confirmed)
+{
+	for(strlst_t::const_iterator iter = hostnames.begin(); iter != hostnames.end(); ++iter){
+		add_chostinfolist(baselist, *iter, confirmed);
+	}
+	return true;
+}
+
+//---------------------------------------------------------
+// Hostname and list Utility Class (for cache)
+//---------------------------------------------------------
+class HostnameMap
+{
+	protected:
+		static hostlistptrs_t	listptrs;
+		static hostlistmap_t	listmaps;
+
+	protected:
+		static chostinfolist_t* FindHostnamesPtr(const char* target);
+		static bool MakeHostnamesMap(const strlst_t& hostnames, bool confirmed);
+
+		explicit HostnameMap(void);
+		virtual ~HostnameMap(void);
+
+	public:
+		static bool Initialize(void);
+		static bool Clear(void);
+
+		static bool GetHostnames(const char* target, chostinfolist_t& hostnames);
+		static bool GetHostnames(const char* target, strlst_t& hostnames, bool only_confirmed = false);
+		static std::string GetFirstHostname(const char* target);
+		static bool UpdateHostnameConfirm(const char* target);
+
+		static bool DumpMap(void);
+};
+
+hostlistptrs_t	HostnameMap::listptrs;
+hostlistmap_t	HostnameMap::listmaps;
+
+bool HostnameMap::Initialize(void)
+{
+	HostnameMap::listptrs.clear();
+	HostnameMap::listmaps.clear();
+	return true;
+}
+
+bool HostnameMap::Clear(void)
+{
+	HostnameMap::listmaps.clear();
+	for(hostlistptrs_t::iterator iter = HostnameMap::listptrs.begin(); iter != HostnameMap::listptrs.end(); ++iter){
+		delete (*iter);
+	}
+	HostnameMap::listptrs.clear();
+	return true;
+}
+
+chostinfolist_t* HostnameMap::FindHostnamesPtr(const char* target)
+{
+	if(CHMEMPTYSTR(target)){
+		return NULL;
+	}
+	hostlistmap_t::iterator	iter = HostnameMap::listmaps.find(string(target));
+	if(iter == HostnameMap::listmaps.end()){
+		return NULL;
+	}
+	if(!(iter->second)){
+		// Bad case, do recover
+		HostnameMap::listmaps.erase(iter);
+		return NULL;
+	}
+	return (iter->second);
+}
+
+bool HostnameMap::MakeHostnamesMap(const strlst_t& hostnames, bool confirmed)
+{
+	strlst_t::const_iterator	iter;
+	chostinfolist_t::iterator	chiter;
+	hostlistptrs_t::iterator	hpiter;
+	hostlistmap_t::iterator		miter;
+
+	//-----------------------------------------------------
+	// Check the mapping of each host in hostnames
+	//-----------------------------------------------------
+	// Check if the same hostname exists in the existing map.
+	// If it exists, collect the pointer of the associated hostname list.
+	//
+	hostlistptrs_t	existedhostlist;			// found hostname list pointers.
+	for(iter = hostnames.begin(); iter != hostnames.end(); ++iter){
+		string				onehost	= *iter;
+		chostinfolist_t*	plist	= HostnameMap::FindHostnamesPtr(onehost.c_str());
+		if(plist){
+			bool	found	= false;
+			for(hpiter = existedhostlist.begin(); hpiter != existedhostlist.end(); ++hpiter){
+				if(plist == (*hpiter)){
+					found	= true;
+					break;
+				}
+			}
+			if(!found){
+				existedhostlist.push_back(plist);
+			}
+		}
+	}
+
+	// make/remake mapping and hostname lists
+	if(1 < existedhostlist.size()){
+		//-----------------------------------------------------
+		// make(merge) new hostname list pointer and set it to all hostname in mapping
+		//-----------------------------------------------------
+		// When multiple hostname list pointers are detected.
+		// In this case, the hostname list pointer found is merged with the hostname
+		// list passed in the argument to create a new hostname list pointer.
+		// Then map this new hostname list pointer to each hostname in the merged
+		// hostname list.
+		// The detected hostname list pointer is no longer used and is discarded.
+		//
+
+		// 
+		// Create a unique host name list from the detected host name list pointers.
+		// It also merges the hostname list passed in as an argument.
+		//
+		chostinfolist_t*	pnewlist = new chostinfolist_t;				// new hostname list
+		for(hpiter = existedhostlist.begin(); hpiter != existedhostlist.end(); ++hpiter){
+			for(miter = HostnameMap::listmaps.begin(); miter != HostnameMap::listmaps.end(); ++miter){
+				if((*hpiter) == miter->second){
+					chostinfolist_t*	pchostlist = miter->second;
+					for(chiter = pchostlist->begin(); chiter != pchostlist->end(); ++chiter){
+						add_chostinfolist(*pnewlist, chiter->hostname, chiter->confirmed);
+					}
+				}
+			}
+		}
+		add_chostinfolist(*pnewlist, hostnames, confirmed);
+
+		//
+		// Map this new list to each hostname in the unique hostname list.
+		//
+		for(chiter = pnewlist->begin(); chiter != pnewlist->end(); ++chiter){
+			HostnameMap::listmaps[chiter->hostname] = pnewlist;
+		}
+
+		//
+		// remove old hostname list pointers
+		//
+		for(hpiter = existedhostlist.begin(); hpiter != existedhostlist.end(); ++hpiter){
+			for(hostlistptrs_t::iterator hpiter2 = HostnameMap::listptrs.begin(); hpiter2 != HostnameMap::listptrs.end(); ){
+				if((*hpiter2) == (*hpiter)){
+					hpiter2 = HostnameMap::listptrs.erase(hpiter2);
+				}else{
+					++hpiter2;
+				}
+			}
+			delete (*hpiter);
+		}
+
+	}else if(1 == existedhostlist.size()){
+		//-----------------------------------------------------
+		// found only one hostname list pointer
+		//-----------------------------------------------------
+		// add hostnames to existed pointer
+		hpiter = existedhostlist.begin();
+		add_chostinfolist(*(*hpiter), hostnames, confirmed);
+
+		// set existed pointer(over write if same existed hostname)
+		for(iter = hostnames.begin(); iter != hostnames.end(); ++iter){
+			HostnameMap::listmaps[(*iter)] = (*hpiter);
+		}
+
+	}else{	// 0 == existedhostlist.size()
+		//-----------------------------------------------------
+		// not found hostname list pointer
+		//-----------------------------------------------------
+		// make new hostname list pointer
+		chostinfolist_t*	pnewlist = new chostinfolist_t;
+		add_chostinfolist(*pnewlist, hostnames, confirmed);
+
+		// add mapping and list
+		HostnameMap::listptrs.push_back(pnewlist);
+		for(iter = hostnames.begin(); iter != hostnames.end(); ++iter){
+			HostnameMap::listmaps[(*iter)] = pnewlist;
+		}
+	}
+	return true;
+}
+
+bool HostnameMap::GetHostnames(const char* target, chostinfolist_t& chostinfolist)
+{
+	if(CHMEMPTYSTR(target)){
+		return false;
+	}
+	// search cache
+	chostinfolist_t*	pchostinfolist = HostnameMap::FindHostnamesPtr(target);
+	if(pchostinfolist){
+		chostinfolist = *pchostinfolist;
+	}else{
+		// get hostname list without cache
+		strlst_t	hostnames;
+		if(!ChmNetDb::Get()->GetHostnameList(target, hostnames, true) || hostnames.empty()){
+			return false;
+		}
+		// add cache(mapping)
+		HostnameMap::MakeHostnamesMap(hostnames, true);		// confirmed
+
+		// re-search cache(after merging)
+		pchostinfolist = HostnameMap::FindHostnamesPtr(target);
+		if(!pchostinfolist){
+			return false;
+		}
+		chostinfolist = *pchostinfolist;
+	}
+	return true;
+}
+
+bool HostnameMap::GetHostnames(const char* target, strlst_t& hostnames, bool only_confirmed)
+{
+	chostinfolist_t	chostinfolist;
+	if(!HostnameMap::GetHostnames(target, chostinfolist)){
+		return false;
+	}
+	return cvt_chostinfolist(chostinfolist, hostnames, only_confirmed);
+}
+
+std::string HostnameMap::GetFirstHostname(const char* target)
+{
+	strlst_t	hostnames;
+	string		hostname;
+	if(HostnameMap::GetHostnames(target, hostnames, true)){
+		hostname = hostnames.front();
+	}else{
+		hostname = target;
+	}
+	return hostname;
+}
+
+bool HostnameMap::UpdateHostnameConfirm(const char* target)
+{
+	if(CHMEMPTYSTR(target)){
+		return false;
+	}
+	// get hostname list without cache
+	strlst_t	hostnames;
+	if(!ChmNetDb::Get()->GetHostnameList(target, hostnames, true) || hostnames.empty()){
+		return false;
+	}
+	// add cache(mapping)
+	HostnameMap::MakeHostnamesMap(hostnames, true);		// confirmed
+	return true;
+}
+
+bool HostnameMap::DumpMap(void)
+{
+	PRN("DUMP : HostnameMap::listmaps {");
+
+	hostlistmap_t::iterator	miter;
+	int						count;
+	for(count = 0, miter = HostnameMap::listmaps.begin(); miter != HostnameMap::listmaps.end(); ++count, ++miter){
+		PRN("    [%d] %s = {", count, miter->first.c_str());
+
+		if(miter->second){
+			for(chostinfolist_t::iterator hpiter = miter->second->begin(); hpiter != miter->second->end(); ++hpiter){
+				PRN("               %s (%s)", hpiter->hostname.c_str(), hpiter->confirmed ? "comfirmed" : "not confirmed");
+			}
+		}else{
+			PRN("               NULL");
+		}
+		PRN("    }");
+	}
+	PRN("}");
+
+	return true;
+}
+
+HostnameMap::HostnameMap()
+{
+}
+
+HostnameMap::~HostnameMap()
+{
+}
+
+//---------------------------------------------------------
+// Chmpx Node information
+//---------------------------------------------------------
+class NodeCtrlInfo
+{
+	protected:
+		static CHMPXID_SEED_TYPE	chmpxidType;		// common seed type for creating chmpxid
+		static string				groupName;			// common chmpx group name
+
+		chmpxid_t					chmpxid;
+		string						hostname;			// The hostname specified when it was built
+		short						ctrlport;
+		string						cuk;
+		string						ctlendpoints;
+		string						custom_seed;
+		bool						is_server;
+
+	protected:
+		bool GetMaximumChmpxidList(chmpxidlist_t& chmpxidlist) const;
+
+	public:
+		static CHMPXID_SEED_TYPE GetType(void) { return chmpxidType; }
+		static string GetGroup(void) { return groupName; }
+		static bool SetType(const char* ptype);
+		static void SetType(CHMPXID_SEED_TYPE type);
+		static bool SetGroup(const char* group);
+
+		explicit NodeCtrlInfo(void);
+		explicit NodeCtrlInfo(const NodeCtrlInfo& other);
+		explicit NodeCtrlInfo(chmpxid_t set_chmpxid, const char* target = NULL, short port = 0, const char* pcuk = NULL, const char* pendpoints = NULL, const char* pseed = NULL, bool is_server_mode = false);
+		explicit NodeCtrlInfo(const char* target, short port, const char* pcuk = NULL, const char* pendpoints = NULL, const char* pseed = NULL, bool is_server_mode = false);
+		virtual ~NodeCtrlInfo(void);
+
+
+		bool Set(chmpxid_t set_chmpxid, const char* target = NULL, short port = 0, const char* pcuk = NULL, const char* pendpoints = NULL, const char* pseed = NULL, bool is_server_mode = false);
+		bool Set(const char* target, short port, const char* pcuk = NULL, const char* pendpoints = NULL, const char* pseed = NULL, bool is_server_mode = false);
+
+		chmpxid_t GetChmpxId(void) const { return chmpxid; }
+		string GetHostname(void) const { return hostname; }
+		short GetCtrlport(void) const { return ctrlport; }
+		string GetCuk(void) const { return cuk; }
+		string GetCtlendpoints(void) const { return ctlendpoints; }
+		string GetCusomSeed(void) const { return custom_seed; }
+		bool IsServerNode(void) const { return is_server; }
+		bool IsSlaveNode(void) const { return !is_server; }
+
+		int compare(const NodeCtrlInfo& other) const;
+		bool operator==(const NodeCtrlInfo& other) const
+		{
+			return (0 == compare(other));
+		}
+		bool operator!=(const NodeCtrlInfo& other) const
+		{
+			return (0 != compare(other));
+		}
+		NodeCtrlInfo& operator=(const NodeCtrlInfo& other)
+		{
+			chmpxid		= other.chmpxid;
+			hostname	= other.hostname;
+			ctrlport	= other.ctrlport;
+			cuk			= other.cuk;
+			ctlendpoints= other.ctlendpoints;
+			custom_seed	= other.custom_seed;
+			is_server	= other.is_server;
+			return *this;
+		}
+		bool IsConfirmHostname(void) const;
+		bool UpdateConfirmHostname(void);
+};
+
+//
+// Class variables
+//
+CHMPXID_SEED_TYPE	NodeCtrlInfo::chmpxidType = CHMPXID_SEED_NAME;
+string				NodeCtrlInfo::groupName("");
+
+//
+// Class methods
+//
+bool NodeCtrlInfo::SetType(const char* ptype)
+{
+	if(CHMEMPTYSTR(ptype)){
+		return false;
+	}
+	if(0 == strcasecmp(ptype, "name")){
+		NodeCtrlInfo::chmpxidType	= CHMPXID_SEED_NAME;
+	}else if(0 == strcasecmp(ptype, "cuk")){
+		NodeCtrlInfo::chmpxidType	= CHMPXID_SEED_CUK;
+	}else if(0 == strcasecmp(ptype, "endpoint")){
+		NodeCtrlInfo::chmpxidType	= CHMPXID_SEED_CTLENDPOINTS;
+	}else if(0 == strcasecmp(ptype, "seed")){
+		NodeCtrlInfo::chmpxidType	= CHMPXID_SEED_CUSTOM;
+	}else{
+		return false;
+	}
+	return true;
+}
+
+void NodeCtrlInfo::SetType(CHMPXID_SEED_TYPE type)
+{
+	NodeCtrlInfo::chmpxidType = type;
+}
+
+bool NodeCtrlInfo::SetGroup(const char* group)
+{
+	if(CHMEMPTYSTR(group)){
+		return false;
+	}
+	NodeCtrlInfo::groupName = group;
+	return true;
+}
+
+//
+// Methods
+//
+NodeCtrlInfo::NodeCtrlInfo(void) : chmpxid(CHM_INVALID_CHMPXID), hostname(""), ctrlport(0), cuk(""), ctlendpoints(""), custom_seed(""), is_server(false)
+{
+}
+
+NodeCtrlInfo::NodeCtrlInfo(const NodeCtrlInfo& other) : chmpxid(other.chmpxid), hostname(other.hostname), ctrlport(other.ctrlport), cuk(other.cuk), ctlendpoints(other.ctlendpoints), custom_seed(other.custom_seed), is_server(other.is_server)
+{
+}
+
+NodeCtrlInfo::NodeCtrlInfo(chmpxid_t set_chmpxid, const char* target, short port, const char* pcuk, const char* pendpoints, const char* pseed, bool is_server_mode)
+{
+	Set(set_chmpxid, target, port, pcuk, pendpoints, pseed, is_server_mode);
+}
+
+NodeCtrlInfo::NodeCtrlInfo(const char* target, short port, const char* pcuk, const char* pendpoints, const char* pseed, bool is_server_mode)
+{
+	Set(target, port, pcuk, pendpoints, pseed, is_server_mode);
+}
+
+NodeCtrlInfo::~NodeCtrlInfo(void)
+{
+}
+
+bool NodeCtrlInfo::Set(chmpxid_t set_chmpxid, const char* target, short port, const char* pcuk, const char* pendpoints, const char* pseed, bool is_server_mode)
+{
+	chmpxid		= set_chmpxid;
+	hostname	= CHMEMPTYSTR(target) ? "" : target;
+	ctrlport	= port;
+	cuk			= CHMEMPTYSTR(pcuk) ? "" : pcuk;
+	ctlendpoints= CHMEMPTYSTR(pendpoints) ? "" : pendpoints;
+	custom_seed	= CHMEMPTYSTR(pseed) ? "" : pseed;
+	is_server	= is_server_mode;
+
+	return true;
+}
+
+bool NodeCtrlInfo::Set(const char* target, short port, const char* pcuk, const char* pendpoints, const char* pseed, bool is_server_mode)
+{
+	if(CHMEMPTYSTR(target)){
+		chmpxid		= CHM_INVALID_CHMPXID;
+		ctrlport	= 0;
+		is_server	= false;
+		hostname.erase();
+		cuk.erase();
+		ctlendpoints.erase();
+		custom_seed.erase();
+	}else{
+		hostname	= target;
+		ctrlport	= port;
+		cuk			= CHMEMPTYSTR(pcuk) ? "" : pcuk;
+		ctlendpoints= CHMEMPTYSTR(pendpoints) ? "" : pendpoints;
+		custom_seed	= CHMEMPTYSTR(pseed) ? "" : pseed;
+		is_server	= is_server_mode;
+
+		// chmpxid with initial parameters.
+		chmpxid		= MakeChmpxId(NodeCtrlInfo::groupName.c_str(), NodeCtrlInfo::chmpxidType, hostname.c_str(), ctrlport, cuk.c_str(), ctlendpoints.c_str(), custom_seed.c_str());
+	}
+	return true;
+}
+
+bool NodeCtrlInfo::GetMaximumChmpxidList(chmpxidlist_t& chmpxidlist) const
+{
+	chmpxidlist.clear();
+	if(CHM_INVALID_CHMPXID != chmpxid){
+		chmpxidlist.push_back(chmpxid);
+	}
+
+	strlst_t::iterator	siter;
+	strlst_t			hostnames;
+	chmpxid_t			tmpchmpxid;
+	if(HostnameMap::GetHostnames(hostname.c_str(), hostnames) && !hostnames.empty()){
+		for(siter = hostnames.begin(); siter != hostnames.end(); ++siter){
+			tmpchmpxid = MakeChmpxId(NodeCtrlInfo::groupName.c_str(), NodeCtrlInfo::chmpxidType, siter->c_str(), ctrlport, cuk.c_str(), ctlendpoints.c_str(), custom_seed.c_str());
+			if(CHM_INVALID_CHMPXID != tmpchmpxid){
+				bool	found = false;
+				for(chmpxidlist_t::const_iterator iter = chmpxidlist.begin(); iter != chmpxidlist.end(); ++iter){
+					if(*iter == tmpchmpxid){
+						found = true;
+						break;
+					}
+				}
+				if(!found){
+					chmpxidlist.push_back(tmpchmpxid);
+				}
+			}
+		}
+	}
+	return true;
+}
+
+int NodeCtrlInfo::compare(const NodeCtrlInfo& other) const
+{
+	// [NOTE]
+	// Not care for server/slave mode
+	//
+	chmpxidlist_t	baselist;
+	chmpxidlist_t	otherlist;
+
+	// get both all chmpxid
+	GetMaximumChmpxidList(baselist);
+	other.GetMaximumChmpxidList(otherlist);
+
+	// compare chmpxid
+	for(chmpxidlist_t::const_iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
+		for(chmpxidlist_t::const_iterator oiter = otherlist.begin(); oiter != otherlist.end(); ++oiter){
+			if((*biter) == (*oiter)){
+				// found
+				return 0;
+			}
+		}
+	}
+	if(CHM_INVALID_CHMPXID != chmpxid && CHM_INVALID_CHMPXID != other.chmpxid){
+		return (chmpxid < other.chmpxid ? 1 : -1);
+	}else if(CHM_INVALID_CHMPXID != chmpxid){
+		return 1;
+	}else if(CHM_INVALID_CHMPXID != other.chmpxid){
+		return -1;
+	}
+
+	int result;
+	if(0 == (result = strcmp(hostname.c_str(), other.hostname.c_str()))){
+		if(ctrlport == other.ctrlport){
+			if(0 == (result = strcmp(cuk.c_str(), other.cuk.c_str()))){
+				if(0 == (result = strcmp(ctlendpoints.c_str(), other.ctlendpoints.c_str()))){
+					result = strcmp(custom_seed.c_str(), other.custom_seed.c_str());
+				}
+			}
+		}else if(ctrlport < other.ctrlport){
+			result = 1;
+		}else{	// ctrlport > other.ctrlport
+			result = -1;
+		}
+	}
+	return result;
+}
+
+bool NodeCtrlInfo::IsConfirmHostname(void) const
+{
+	strlst_t	hostnames;
+	if(!HostnameMap::GetHostnames(hostname.c_str(), hostnames, true) || hostnames.empty()){
+		return false;
+	}
+	for(strlst_t::iterator siter = hostnames.begin(); siter != hostnames.end(); ++siter){
+		if((*siter) == hostname){
+			// found hostname in confirm hostname list
+			return true;
+		}
+	}
+	return false;
+}
+
+bool NodeCtrlInfo::UpdateConfirmHostname(void)
+{
+	if(NodeCtrlInfo::IsConfirmHostname()){
+		// nothing to do
+		return true;
+	}
+	strlst_t	hostnames;
+	if(!HostnameMap::GetHostnames(hostname.c_str(), hostnames, true) || hostnames.empty()){
+		return false;
+	}
+	hostname = hostnames.front();
+	return true;
+}
+
+//---------------------------------------------------------
+// Chmpx Node List
+//---------------------------------------------------------
+typedef std::list<NodeCtrlInfo>		nodectrllist_t;
+
+struct node_ctrl_info_sort
+{
+	bool operator()(const NodeCtrlInfo& lnodectrlinfo, const NodeCtrlInfo& rnodectrlinfo) const
+    {
+		return (0 <= lnodectrlinfo.compare(rnodectrlinfo));
+    }
+};
+
+struct node_ctrl_info_same
+{
+	bool operator()(const NodeCtrlInfo& lnodectrlinfo, const NodeCtrlInfo& rnodectrlinfo) const
+    {
+		return (0 == lnodectrlinfo.compare(rnodectrlinfo));
+    }
+};
+
+static bool nodectrllist_uniqsort(nodectrllist_t& nodes)
+{
+	// sort
+	nodes.sort(node_ctrl_info_sort());
+
+	// uniq by chmpxid with confirmed_hostname
+	for(nodectrllist_t::iterator iter = nodes.begin(); iter != nodes.end(); ){
+		nodectrllist_t::iterator cur_iter = iter;
+		++iter;										// next iter
+		if(iter != nodes.end()){
+			if((*cur_iter) == (*iter)){
+				if(cur_iter->IsConfirmHostname()){
+					// leave cur_iter and remove iter
+					nodes.erase(iter);
+					iter = cur_iter;
+				}else if(iter->IsConfirmHostname()){
+					// leave iter and remove cur_iter
+					iter = nodes.erase(cur_iter);
+				}else{
+					// [RETRY]
+					// update hostname both
+					cur_iter->UpdateConfirmHostname();
+					iter->UpdateConfirmHostname();
+
+					if(cur_iter->IsConfirmHostname()){
+						// leave cur_iter and remove iter
+						nodes.erase(iter);
+						iter = cur_iter;
+					}else if(iter->IsConfirmHostname()){
+						// leave iter and remove cur_iter
+						iter = nodes.erase(cur_iter);
+					}else{
+						// leave cur_iter and remove iter
+						nodes.erase(iter);
+						iter = cur_iter;
+					}
+				}
+			}
+		}
+	}
+	return true;
+}
+
+static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strConfig, short port, const char* cuk)
+{
+	// Check configuration file(string) options without env
+	if(strConfig.empty()){
+		ERR("configuration file or string is empty.");
+		return false;
+	}
+	CHMCONFTYPE	conftype = check_chmconf_type(strConfig.c_str());
+	if(CHMCONF_TYPE_UNKNOWN == conftype || CHMCONF_TYPE_NULL == conftype){
+		ERR("configuration file or string is something wrong, you can check it by \"chmpxconftest\" tool.");
+		return false;
+	}
+
+	// clear node information
+	nodes.clear();
+
+	// Attach SHM
+	ChmCntrl		chmobj;
+	NodeCtrlInfo	newnode;
+	if(chmobj.OnlyAttachInitialize(strConfig.c_str(), port, cuk)){
+		MSG("Attached local chmpx shared memory, then loading all chmpx information from local SHM.");
+
+		// Get chmpx nodes information from SHM
+		PCHMINFOEX	pInfo = chmobj.DupAllChmInfo();
+		if(!pInfo){
+			ERR("Something error occurred in getting chmpx nodes information from SHM.");
+			return false;
+		}
+		if(!pInfo->pchminfo){
+			ERR("Something error occurred in getting chmpx nodes information from SHM.");
+			ChmCntrl::FreeDupAllChmInfo(pInfo);
+			return false;
+		}
+
+		// Backup for type/group
+		NodeCtrlInfo::SetType(pInfo->pchminfo->chmpxid_type);
+		NodeCtrlInfo::SetGroup(pInfo->pchminfo->chmpx_man.group);
+
+		//--------------------------------------
+		// extract node information from SHM
+		//--------------------------------------
+		int				counter;
+		PCHMPXLIST		pchmpxlist;
+		// first, get self node information.
+		// because if slave node is up without servers, we get node information only self structure.
+		//
+		if(pInfo->pchminfo->chmpx_man.chmpx_self){
+			HostnameMap::UpdateHostnameConfirm(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.name);
+
+			newnode.Set(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.chmpxid,
+						pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.name,
+						pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlport,
+						pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.cuk,
+						get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str(),
+						pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.custom_seed,
+						(CHMPX_SERVER == pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.mode));
+			nodes.push_back(newnode);
+		}
+		// loop to get all server nodes
+		for(counter = 0, pchmpxlist = pInfo->pchminfo->chmpx_man.chmpx_servers; pchmpxlist; pchmpxlist = pchmpxlist->next, ++counter){
+			HostnameMap::UpdateHostnameConfirm(pchmpxlist->chmpx.name);
+
+			newnode.Set(pchmpxlist->chmpx.chmpxid,
+						pchmpxlist->chmpx.name,
+						pchmpxlist->chmpx.ctlport,
+						pchmpxlist->chmpx.cuk,
+						get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str(),
+						pchmpxlist->chmpx.custom_seed,
+						true);
+			nodes.push_back(newnode);
+		}
+		// loop to get all slave nodes
+		for(counter = 0, pchmpxlist = pInfo->pchminfo->chmpx_man.chmpx_slaves; pchmpxlist; pchmpxlist = pchmpxlist->next, ++counter){
+			HostnameMap::UpdateHostnameConfirm(pchmpxlist->chmpx.name);
+
+			newnode.Set(pchmpxlist->chmpx.chmpxid,
+						pchmpxlist->chmpx.name,
+						pchmpxlist->chmpx.ctlport,
+						pchmpxlist->chmpx.cuk,
+						get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX).c_str(),
+						pchmpxlist->chmpx.custom_seed,
+						false);
+			nodes.push_back(newnode);
+		}
+
+		ChmCntrl::FreeDupAllChmInfo(pInfo);
+
+	}else{
+		MSG("Could not attach local chmpx shared memory, then loading all chmpx information from configuration.");
+
+		// Load configuration without env
+		CHMConf*	pConfObj;
+		if(NULL == (pConfObj = CHMConf::GetCHMConf(CHM_INVALID_HANDLE, NULL, strConfig.c_str(), port, cuk, false, NULL))){
+			ERR_CHMPRN("Failed to make configuration object from configuration(%s)", strConfig.c_str());
+			PRN("You can see detail about error, execute this program with \"-d\"(\"-g\") option.");
+			return false;
+		}
+		CHMCFGINFO	chmcfg;
+		if(!pConfObj->GetConfiguration(chmcfg, true)){
+			ERR("Something error occurred in getting chmpx nodes information from configuration(%s).", strConfig.c_str());
+			pConfObj->Clean();
+			CHM_Delete(pConfObj);
+			return false;
+		}
+
+		// Backup for type/group
+		NodeCtrlInfo::SetType(chmcfg.chmpxid_type);
+		NodeCtrlInfo::SetGroup(chmcfg.groupname.c_str());
+
+		//--------------------------------------
+		// extract node information from configuration
+		//--------------------------------------
+		chmnode_cfginfos_t::const_iterator	iter;
+
+		// [NOTE]
+		// At this point the hostname is still untrustworthy.
+		// (May not be registered in DNS)
+		//
+
+		// loop to get all server nodes
+		for(iter = chmcfg.servers.begin(); iter != chmcfg.servers.end(); ++iter){
+			HostnameMap::UpdateHostnameConfirm(iter->name.c_str());
+
+			newnode.Set(iter->name.c_str(),
+						iter->ctlport,
+						iter->cuk.c_str(),
+						get_hostports_string(iter->ctlendpoints).c_str(),
+						iter->custom_seed.c_str(),
+						true);
+			nodes.push_back(newnode);
+		}
+		// loop to get all slave nodes
+		for(iter = chmcfg.slaves.begin(); iter != chmcfg.slaves.end(); ++iter){
+			HostnameMap::UpdateHostnameConfirm(iter->name.c_str());
+
+			newnode.Set(iter->name.c_str(),
+						iter->ctlport,
+						iter->cuk.c_str(),
+						get_hostports_string(iter->ctlendpoints).c_str(),
+						iter->custom_seed.c_str(),
+						false);
+			nodes.push_back(newnode);
+		}
+		pConfObj->Clean();
+		CHM_Delete(pConfObj);
+	}
+
+	// uniq & sort(by chmpxid)
+	nodectrllist_uniqsort(nodes);
+
+	return true;
+}
+
+static bool add_chmpx_node(nodectrllist_t& nodes, chmpxid_t chmpxid, const string& host, short port, const string& cuk, const string& ctlendpoints, const string& custom_seed, bool is_server = false, bool is_clear = false)
+{
+	if(is_clear){
+		nodes.clear();
+	}
+	HostnameMap::UpdateHostnameConfirm(host.c_str());
+
+	size_t			nodes_count	= nodes.size();
+	NodeCtrlInfo	newnode;
+	if(CHM_INVALID_CHMPXID != chmpxid){
+		newnode.Set(chmpxid,
+					host.c_str(),
+					port,
+					cuk.c_str(),
+					ctlendpoints.c_str(),
+					custom_seed.c_str(),
+					is_server);
+	}else{
+		newnode.Set(host.c_str(),
+					port,
+					cuk.c_str(),
+					ctlendpoints.c_str(),
+					custom_seed.c_str(),
+					is_server);
+	}
+	nodes.push_back(newnode);
+
+	// uniq & sort(by chmpxid)
+	nodectrllist_uniqsort(nodes);
+
+	if(nodes_count == nodes.size()){
+		//MSG("%s:%d chmpx node is already in chmpx node list.", host.c_str(), port);
+		return true;								// result is success
+	}
+	return true;
+}
+
+static size_t get_chmpx_nodes_count(const nodectrllist_t& nodes, bool is_server)
+{
+	size_t	rescnt = 0;
+	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		if(is_server == iter->IsServerNode()){
+			++rescnt;
+		}
+	}
+	return rescnt;
+}
+
+static size_t get_chmpx_nodes(const nodectrllist_t& nodes, nodectrllist_t& tgnodes, bool is_server)
+{
+	tgnodes.clear();
+	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		if(is_server == iter->IsServerNode()){
+			add_chmpx_node(tgnodes, iter->GetChmpxId(), iter->GetHostname(), iter->GetCtrlport(), iter->GetCuk(), iter->GetCtlendpoints(), iter->GetCusomSeed(), is_server, false);
+		}
+	}
+	return tgnodes.size();
+}
+
+/*
+* [NOTE]
+* This function is not used now.
+*
+static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, chmpxid_t chmpxid, NodeCtrlInfo& node)
+{
+	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		if(chmpxid == iter->GetChmpxId()){
+			node = *iter;
+			return true;
+		}
+	}
+	return false;
+}
+*/
+
+/*
+* [NOTE]
+* This function is not used now.
+*
+static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, const char* strchmpxid, NodeCtrlInfo& node)
+{
+	if(CHMEMPTYSTR(strchmpxid)){
+		return false;
+	}
+	chmpxid_t	chmpxid = cvt_string_to_number(strchmpxid, false);
+
+	return find_chmpx_node_by_hostname(nodes, chmpxid, node);
+}
+*/
+
+static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, const string& hostname, short port, const string& cuk, const string& ctlendpoints, const string& custom_seed, NodeCtrlInfo& node)
+{
+	node.Set(hostname.c_str(),
+			port,
+			cuk.c_str(),
+			ctlendpoints.c_str(),
+			custom_seed.c_str(),
+			true);				// do not care this value, because compare does not look this.
+
+	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		if(0 == iter->compare(node)){
+			// found
+			node = *iter;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void print_chmpx_nodes_by_type(const nodectrllist_t& nodes, bool is_server)
+{
+	int	prncnt = 0;
+	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		if(is_server == iter->IsServerNode()){
+			PRN("    [%d] = {",										prncnt);
+			PRN("        Chmpxid                 : 0x%016" PRIx64,	iter->GetChmpxId());
+			PRN("        Hostname                : %s",				iter->GetHostname().c_str());
+			PRN("        Control Port            : %d",				iter->GetCtrlport());
+			PRN("        CUK                     : %s",				iter->GetCuk().c_str());
+			PRN("        Control Endpoints       : %s",				iter->GetCtlendpoints().c_str());
+			PRN("        Custom ID Seed          : %s",				iter->GetCusomSeed().c_str());
+			PRN("    }");
+			++prncnt;
+		}
+	}
+}
+
+static void print_chmpx_all_nodes(const nodectrllist_t& nodes)
+{
+	size_t	svrcnt = get_chmpx_nodes_count(nodes, true);
+	size_t	slvcnt = get_chmpx_nodes_count(nodes, false);
+
+	PRN(" Chmpx server nodes             : %zd", svrcnt);
+	if(0 < svrcnt){
+		PRN(" {");
+		print_chmpx_nodes_by_type(nodes, true);
+		PRN(" }");
+	}
+	PRN(" Chmpx slave nodes              : %zd", slvcnt);
+	if(0 < slvcnt){
+		PRN(" {");
+		print_chmpx_nodes_by_type(nodes, false);
+		PRN(" }");
+	}
+}
+
+//---------------------------------------------------------
+// Common Variables
+//---------------------------------------------------------
+// [NOTE]
+// These lists are listed with the server node first.
+// That is, they are pre-sorted by node_ctrl_info_sort.
+// Nodes with the same host name, control port, etc. do not exist as servers and
+// slaves from the command line, but even if there are duplicates, it is safe to
+// detect the server node first.
+//
+static nodectrllist_t		InitialAllNodes;			// all chmpx node information at initializing
+static nodectrllist_t		TargetNodes;				// target all chmpx nodes as dynamically
 
 //---------------------------------------------------------
 // Typedefs for Command option
@@ -630,7 +1666,9 @@ bool ConsoleInput::RemoveLastHistory(void)
 // -help(h)                         help display
 // -conf <filename>                 chmpx configuration file path(.ini .yaml .json) when run on chmpx node host
 // -json <string>                   chmpx configuration by json string when run on chmpx node host
+// -group <groupname>               group name for chmpx cluster, a required option if you do not specify a conf file
 // -host <hostname>                 hostname for chmpx node, if not specified, using localhost
+// -type <...>                      specify CHMPXIDTYPE: name(default), cuk, endpoint, seed
 // -ctrlport <port>                 chmpx node control port, if host option is specified, this option can be be specified.
 // -cuk <cuk>                       chmpx node cuk, if host option is specified, this option can be specified.
 // -ctlendpoints <host:port,...>    chmpx node ctlendpoints, if host option is specified, this option can be specified.
@@ -658,13 +1696,15 @@ static void Help(const char* progname)
 	PRN("Usage: specify json configuration string");
 	PRN("       %s -json <string> [-ctrlport <port>] [-cuk <cuk>] [-ctlendpoints <host:port,...>] [-custom_seed <seed>] [options...]", progname ? progname : "program");
 	PRN("Usage: specify hostname and port");
-	PRN("       %s [-host <hostname>] [-ctrlport <port>] [-cuk <cuk>] [-ctlendpoints <host:port,...>] [-custom_seed <seed>] {-server | -slave} [options...]", progname ? progname : "program");
+	PRN("       %s -group <groupname> -host <hostname> [-type <...>] [-ctrlport <port>] [-cuk <cuk>] [-ctlendpoints <host:port,...>] [-custom_seed <seed>] {-server | -slave} [options...]", progname ? progname : "program");
 	PRN(NULL);
 	PRN("Options:");
 	PRN("  -help(h)                      help display");
 	PRN("  -conf <filename>              chmpx configuration file path(.ini .yaml .json) when run on chmpx node host");
 	PRN("  -json <string>                chmpx configuration by json string when run on chmpx node host");
+	PRN("  -group <groupname>            group name for chmpx cluster, a required option if you do not specify a conf file.");
 	PRN("  -host <hostname>              hostname for chmpx node, if not specified, using localhost");
+	PRN("  -type <...>                   specify CHMPXIDTYPE: name(default), cuk, endpoint, seed");
 	PRN("  -ctrlport <port>              chmpx node control port, if host option is specified, this option can be be specified.");
 	PRN("  -cuk <cuk>                    chmpx node cuk, if host option is specified, this option can be specified.");
 	PRN("  -ctlendpoints <host:port,...> chmpx node ctlendpoints, if host option is specified, this option can be specified.");
@@ -864,7 +1904,9 @@ const OPTTYPE ExecOptionTypes[] = {
 	{"-h",				"-help",			0,	0},
 	{"-conf",			"-conf",			1,	1},
 	{"-json",			"-json",			1,	1},
+	{"-group",			"-group",			1,	1},
 	{"-host",			"-host",			1,	1},
+	{"-type",			"-type",			1,	1},
 	{"-hostname",		"-host",			1,	1},
 	{"-port",			"-ctrlport",		1,	1},
 	{"-ctlport",		"-ctrlport",		1,	1},
@@ -1171,585 +2213,6 @@ static bool LineOptionParser(const char* pCommand, option_t& opts)
 	}
 	return true;
 }
-
-//---------------------------------------------------------
-// Utilities for hostname/IP address/localhost from chmnetdb.cc
-//---------------------------------------------------------
-// [NOTE]
-// This function is copied from chmnetdb.cc: add_uniquestring_StringToList()
-//
-static void AddUniqueStringToList(const string& str, strlst_t& list)
-{
-	if(str.empty()){
-		return;
-	}
-	for(strlst_t::const_iterator iter = list.begin(); iter != list.end(); ++iter){
-		if((*iter) == str){
-			// already has same string.
-			return;
-		}
-	}
-	list.push_back(str);
-}
-
-// [NOTE]
-// This function is as same as ChmNetDb::GetNoZoneIndexIpAddress() in chmnetdb.cc
-// This function is copied from chmnetdb.cc: add_uniquestring_StringToList()
-//
-string GetNoZoneIndexIpAddress(const string& ipaddr)
-{
-	string::size_type	pos;
-	if(string::npos != (pos = ipaddr.find('%'))){
-		return ipaddr.substr(0, pos);
-	}
-	return ipaddr;
-}
-
-// [NOTE]
-// This function is as same as ChmNetDb::InitializeLocalHostIpAddresses() in chmnetdb.cc
-//
-bool GetLocalHostIpAddresses(strlst_t& ipaddresses)
-{
-	struct ifaddrs*	ifaddr;
-	char			ipaddr[NI_MAXHOST];
-
-	// get ip addresses on interface
-	memset(&ipaddr, 0, sizeof(ipaddr));
-	if(-1 == getifaddrs(&ifaddr)){
-		ERR("Could not get local interface addresses by getifaddrs : errno=%d", errno);
-		return false;
-	}
-
-	// get all ip addresses
-	for(struct ifaddrs* tmp_ifaddr = ifaddr; NULL != tmp_ifaddr; tmp_ifaddr = tmp_ifaddr->ifa_next){
-		if(NULL == tmp_ifaddr->ifa_addr){
-			continue;
-		}
-		if(AF_INET == tmp_ifaddr->ifa_addr->sa_family || AF_INET6 == tmp_ifaddr->ifa_addr->sa_family){
-			memset(ipaddr, 0, sizeof(ipaddr));
-			socklen_t	salen	= (AF_INET == tmp_ifaddr->ifa_addr->sa_family) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
-			int			result	= getnameinfo(tmp_ifaddr->ifa_addr, salen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
-			if(0 == result){
-				if(!CHMEMPTYSTR(ipaddr)){
-					MSG("Found local interface IP address : %s", ipaddr);
-					AddUniqueStringToList(string(ipaddr), ipaddresses);
-				}else{
-					WAN("Found local interface IP address, but it is empty.");
-				}
-			}else{
-				WAN("Failed to get local interface IP address by getnameinfo : %s", gai_strerror(result));
-			}
-		}
-	}
-	freeifaddrs(ifaddr);
-
-	return true;
-}
-
-// [NOTE]
-// This function is as same as ChmNetDb::InitializeLocalHostnames() in chmnetdb.cc
-//
-bool GetLocalHostnames(strlst_t& hostnames)
-{
-	struct addrinfo		hints;
-	struct addrinfo*	res_info = NULL;
-	struct addrinfo*	tmpaddrinfo;
-	struct utsname		buf;
-	string				localname;
-	int					result;
-
-	// Get local hostname by uname
-	if(-1 == uname(&buf) || CHMEMPTYSTR(buf.nodename)){
-		ERR("Failed to get own host(node) name.");
-		return false;
-	}
-	// got local hostame
-	localname = buf.nodename;
-	AddUniqueStringToList(localname, hostnames);
-
-	// local hostname -> addrinfo
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_flags		= AI_CANONNAME;
-	hints.ai_family		= AF_UNSPEC;
-	hints.ai_socktype	= SOCK_STREAM;
-	if(0 != (result = getaddrinfo(buf.nodename, NULL, &hints, &res_info)) || !res_info){				// port is NULL
-		MSG("Could not get addrinfo from %s, errno=%d.", buf.nodename, result);
-		if(res_info){
-			freeaddrinfo(res_info);
-		}
-	}else{
-		// addrinfo(list) -> hostname
-		char	hostname[NI_MAXHOST];
-		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
-			memset(hostname, 0, sizeof(hostname));
-			if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
-				if(!CHMEMPTYSTR(hostname)){
-					// When local hostname without domain name is set in /etc/hosts, "hostname" is short name.
-					// (if other server name is set, this class do not care it.)
-					//
-					if(0 != strcmp(localname.c_str(), hostname)){
-						MSG("Found another local hostname : %s", hostname);
-						AddUniqueStringToList(string(hostname), hostnames);
-					}
-				}else{
-					WAN("Found another local hostname, but it is empty.");
-				}
-			}else{
-				MSG("Failed to get another local hostname %s, errno=%d.", buf.nodename, result);
-			}
-		}
-		freeaddrinfo(res_info);
-	}
-	return true;
-}
-
-bool GetLocalHostInfo(strlst_t& hostnames, strlst_t& ipaddresses)
-{
-	if(!GetLocalHostIpAddresses(ipaddresses)){
-		WAN("Obtaining the IP address of the local interfaces may have failed, but continue...");
-	}
-	if(!GetLocalHostnames(hostnames)){
-		WAN("Obtaining the local hostnames may have failed, but continue...");
-	}
-	return true;
-}
-
-bool ExpandLocalHostInfo(const char* host, strlst_t& hostnames, strlst_t& ipaddresses)
-{
-	if(CHMEMPTYSTR(host)){
-		ERR("Parameter host is empty.");
-		return false;
-	}
-	if(	0 == strcmp(host, "localhost")	||
-		0 == strcmp(host, "127.0.0.1")	||
-		0 == strcmp(host, "::1")		||
-		0 == strncmp(host, "::1%", 4)	)
-	{
-		return GetLocalHostInfo(hostnames, ipaddresses);
-	}
-	return false;
-}
-
-// [NOTE]
-// This function is as same as ChmNetDb::GetHostAddressInfo() in chmnetdb.cc
-//
-static bool GetAllHostInfos(const char* host, strlst_t& hostnames, strlst_t& ipaddresses)
-{
-
-	if(CHMEMPTYSTR(host)){
-		ERR("Parameter host is empty.");
-		return false;
-	}
-
-	// if localhost, only expand for it
-	if(ExpandLocalHostInfo(host, hostnames, ipaddresses)){
-		MSG("host(%s) is localhost, expading all host information.");
-	}else{
-		struct addrinfo		hints;
-		struct addrinfo*	res_info = NULL;
-		struct addrinfo*	tmpaddrinfo;
-		char				hostname[NI_MAXHOST];
-		char				ipaddr[NI_MAXHOST];
-		int					result;
-
-		// host -> addrinfo
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_flags		= AI_CANONNAME;
-		hints.ai_family		= AF_UNSPEC;
-		hints.ai_socktype	= SOCK_STREAM;
-		if(0 != getaddrinfo(host, NULL, &hints, &res_info) || !res_info){				// port is NULL
-			ERR("Could not get address information for host(%s) : errno=%d", host, errno);
-			return false;
-		}
-
-		// addrinfo -> hostname
-		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
-			memset(&hostname, 0, sizeof(hostname));
-			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
-				MSG("Could not get hostname %s, errno=%d.", host, result);
-			}else{
-				AddUniqueStringToList(string(hostname), hostnames);
-			}
-		}
-
-		// addrinfo -> normalized ipaddress
-		for(tmpaddrinfo = res_info; tmpaddrinfo; tmpaddrinfo = tmpaddrinfo->ai_next){
-			memset(&ipaddr, 0, sizeof(ipaddr));
-			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST | NI_NUMERICSERV))){
-				MSG("Could not convert normalized ipaddress  %s, errno=%d.", host, result);
-			}else{
-				AddUniqueStringToList(string(ipaddr), ipaddresses);
-			}
-		}
-		freeaddrinfo(res_info);
-	}
-	return true;
-}
-
-//---------------------------------------------------------
-// Chmpx Node information
-//---------------------------------------------------------
-// Target host information
-typedef struct node_ctrl_info{
-	string		hostname;
-	short		ctrlport;
-	string		cuk;
-	string		ctlendpoints;
-	string		custom_seed;
-	bool		is_server;
-
-	node_ctrl_info() : hostname(""), ctrlport(0), cuk(""), ctlendpoints(""), custom_seed(""), is_server(false) {}
-
-	bool compare(const struct node_ctrl_info& other) const
-	{
-		// [NOTE]
-		// is_slave is not checked in this method.
-		//
-		if(	hostname	== other.hostname		&&
-			ctrlport	== other.ctrlport		&&
-			cuk			== other.cuk			&&
-			ctlendpoints== other.ctlendpoints	&&
-			custom_seed	== other.custom_seed	)
-		{
-			return true;
-		}
-		return false;
-	}
-	bool operator==(const struct node_ctrl_info& other) const
-	{
-		return compare(other);
-	}
-	bool operator!=(const struct node_ctrl_info& other) const
-	{
-		return !compare(other);
-	}
-}NODECTRLINFO, *PNODECTRLINFO;
-
-typedef std::list<NODECTRLINFO>	nodectrllist_t;
-
-struct node_ctrl_info_sort
-{
-	bool operator()(const NODECTRLINFO& lnodectrlinfo, const NODECTRLINFO& rnodectrlinfo) const
-    {
-		if(lnodectrlinfo.is_server == rnodectrlinfo.is_server){
-			if(lnodectrlinfo.hostname == rnodectrlinfo.hostname){
-				if(lnodectrlinfo.ctrlport == rnodectrlinfo.ctrlport){
-					if(lnodectrlinfo.cuk == rnodectrlinfo.cuk){
-						if(lnodectrlinfo.ctlendpoints == rnodectrlinfo.ctlendpoints){
-							return lnodectrlinfo.custom_seed < rnodectrlinfo.custom_seed;
-						}else{
-							return lnodectrlinfo.ctlendpoints < rnodectrlinfo.ctlendpoints;
-						}
-					}else{
-						return lnodectrlinfo.cuk < rnodectrlinfo.cuk;
-					}
-				}else{
-					return lnodectrlinfo.ctrlport < rnodectrlinfo.ctrlport;
-				}
-			}else{
-				return lnodectrlinfo.hostname < rnodectrlinfo.hostname;
-			}
-		}else{
-			return lnodectrlinfo.is_server;
-		}
-    }
-};
-
-struct node_ctrl_info_same
-{
-	bool operator()(const NODECTRLINFO& lnodectrlinfo, const NODECTRLINFO& rnodectrlinfo) const
-    {
-		return (lnodectrlinfo.is_server == rnodectrlinfo.is_server && lnodectrlinfo.hostname == rnodectrlinfo.hostname && lnodectrlinfo.ctrlport == rnodectrlinfo.ctrlport && lnodectrlinfo.cuk == rnodectrlinfo.cuk && lnodectrlinfo.ctlendpoints == rnodectrlinfo.ctlendpoints && lnodectrlinfo.custom_seed == rnodectrlinfo.custom_seed);
-    }
-};
-
-static bool load_initial_chmpx_nodes(nodectrllist_t& nodes, const string& strConfig, short port, const char* cuk)
-{
-	// Check configuration file(string) options without env
-	if(strConfig.empty()){
-		ERR("configuration file or string is empty.");
-		return false;
-	}
-	CHMCONFTYPE	conftype = check_chmconf_type(strConfig.c_str());
-	if(CHMCONF_TYPE_UNKNOWN == conftype || CHMCONF_TYPE_NULL == conftype){
-		ERR("configuration file or string is something wrong, you can check it by \"chmpxconftest\" tool.");
-		return false;
-	}
-
-	// clear node information
-	nodes.clear();
-
-	// Attach SHM
-	ChmCntrl		chmobj;
-	NODECTRLINFO	newnode;
-	if(chmobj.OnlyAttachInitialize(strConfig.c_str(), port, cuk)){
-		MSG("Attached local chmpx shared memory, then loading all chmpx information from local SHM.");
-
-		// Get chmpx nodes information from SHM
-		PCHMINFOEX	pInfo = chmobj.DupAllChmInfo();
-		if(!pInfo){
-			ERR("Something error occurred in getting chmpx nodes information from SHM.");
-			return false;
-		}
-		if(!pInfo->pchminfo){
-			ERR("Something error occurred in getting chmpx nodes information from SHM.");
-			ChmCntrl::FreeDupAllChmInfo(pInfo);
-			return false;
-		}
-
-		//--------------------------------------
-		// extract node information from SHM
-		//--------------------------------------
-		int				counter;
-		PCHMPXLIST		pchmpxlist;
-
-		// first, get self node information.
-		// because if slave node is up without servers, we get node information only self structure.
-		//
-		if(pInfo->pchminfo->chmpx_man.chmpx_self){
-			newnode.hostname	= pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.name;
-			newnode.ctrlport	= pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlport;
-			newnode.cuk			= pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.cuk;
-			newnode.ctlendpoints= get_hostport_pairs_string(pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.ctlendpoints, EXTERNAL_EP_MAX);
-			newnode.custom_seed	= pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.custom_seed;
-			newnode.is_server	= (CHMPX_SERVER == pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.mode);
-			nodes.push_back(newnode);
-		}
-		// loop to get all server nodes
-		for(counter = 0, pchmpxlist = pInfo->pchminfo->chmpx_man.chmpx_servers; pchmpxlist; pchmpxlist = pchmpxlist->next, ++counter){
-			newnode.hostname	= pchmpxlist->chmpx.name;
-			newnode.ctrlport	= pchmpxlist->chmpx.ctlport;
-			newnode.cuk			= pchmpxlist->chmpx.cuk;
-			newnode.ctlendpoints= get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX);
-			newnode.custom_seed	= pchmpxlist->chmpx.custom_seed;
-			newnode.is_server	= true;
-			nodes.push_back(newnode);
-		}
-		// loop to get all slave nodes
-		for(counter = 0, pchmpxlist = pInfo->pchminfo->chmpx_man.chmpx_slaves; pchmpxlist; pchmpxlist = pchmpxlist->next, ++counter){
-			newnode.hostname	= pchmpxlist->chmpx.name;
-			newnode.ctrlport	= pchmpxlist->chmpx.ctlport;
-			newnode.cuk			= pchmpxlist->chmpx.cuk;
-			newnode.ctlendpoints= get_hostport_pairs_string(pchmpxlist->chmpx.ctlendpoints, EXTERNAL_EP_MAX);
-			newnode.custom_seed	= pchmpxlist->chmpx.custom_seed;
-			newnode.is_server	= false;
-			nodes.push_back(newnode);
-		}
-		ChmCntrl::FreeDupAllChmInfo(pInfo);
-
-	}else{
-		MSG("Could not attach local chmpx shared memory, then loading all chmpx information from configuration.");
-
-		// Load configuration without env
-		CHMConf*	pConfObj;
-		if(NULL == (pConfObj = CHMConf::GetCHMConf(CHM_INVALID_HANDLE, NULL, strConfig.c_str(), port, cuk, false, NULL))){
-			ERR_CHMPRN("Failed to make configuration object from configuration(%s)", strConfig.c_str());
-			PRN("You can see detail about error, execute this program with \"-d\"(\"-g\") option.");
-			return false;
-		}
-		CHMCFGINFO	chmcfg;
-		if(!pConfObj->GetConfiguration(chmcfg, true)){
-			ERR("Something error occurred in getting chmpx nodes information from configuration(%s).", strConfig.c_str());
-			pConfObj->Clean();
-			CHM_Delete(pConfObj);
-			return false;
-		}
-
-		//--------------------------------------
-		// extract node information from configuration
-		//--------------------------------------
-		chmnode_cfginfos_t::const_iterator	iter;
-
-		// loop to get all server nodes
-		for(iter = chmcfg.servers.begin(); iter != chmcfg.servers.end(); ++iter){
-			newnode.hostname	= iter->name;
-			newnode.ctrlport	= iter->ctlport;
-			newnode.cuk			= iter->cuk;
-			newnode.ctlendpoints= get_hostports_string(iter->ctlendpoints);
-			newnode.custom_seed	= iter->custom_seed;
-			newnode.is_server	= true;
-			nodes.push_back(newnode);
-		}
-		// loop to get all slave nodes
-		for(iter = chmcfg.slaves.begin(); iter != chmcfg.slaves.end(); ++iter){
-			newnode.hostname	= iter->name;
-			newnode.ctrlport	= iter->ctlport;
-			newnode.cuk			= iter->cuk;
-			newnode.ctlendpoints= get_hostports_string(iter->ctlendpoints);
-			newnode.custom_seed	= iter->custom_seed;
-			newnode.is_server	= false;
-			nodes.push_back(newnode);
-		}
-		pConfObj->Clean();
-		CHM_Delete(pConfObj);
-	}
-
-	// uniq & sort(by hostname)
-	nodes.sort(node_ctrl_info_sort());
-	nodes.unique(node_ctrl_info_same());			// uniq about node must be hostname and ctrlport and cuk
-
-	return true;
-}
-
-static bool add_chmpx_node(nodectrllist_t& nodes, const string& host, short port, const string& cuk, const string& ctlendpoints, const string& custom_seed, bool is_server = false, bool is_clear = false)
-{
-	if(is_clear){
-		nodes.clear();
-	}
-	NODECTRLINFO	newnode;
-	size_t			nodes_count	= nodes.size();
-	newnode.hostname			= host;
-	newnode.ctrlport			= port;
-	newnode.cuk					= cuk;
-	newnode.ctlendpoints		= ctlendpoints;
-	newnode.custom_seed			= custom_seed;
-	newnode.is_server			= is_server;
-
-	nodes.push_back(newnode);
-	nodes.sort(node_ctrl_info_sort());
-	nodes.unique(node_ctrl_info_same());			// uniq about node must be hostname and ctrlport and cuk
-
-	if(nodes_count == nodes.size()){
-		//MSG("%s:%d chmpx node is already in chmpx node list.", host.c_str(), port);
-		return true;								// result is success
-	}
-	return true;
-}
-
-static size_t get_chmpx_nodes_count(const nodectrllist_t& nodes, bool is_server)
-{
-	size_t	rescnt = 0;
-	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
-		if(is_server == iter->is_server){
-			++rescnt;
-		}
-	}
-	return rescnt;
-}
-
-static size_t get_chmpx_nodes(const nodectrllist_t& nodes, nodectrllist_t& tgnodes, bool is_server)
-{
-	tgnodes.clear();
-	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
-		if(is_server == iter->is_server){
-			add_chmpx_node(tgnodes, iter->hostname, iter->ctrlport, iter->cuk, iter->ctlendpoints, iter->custom_seed, is_server, false);
-		}
-	}
-	return tgnodes.size();
-}
-
-static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, string& hostname, short& port, const string& cuk, const string& ctlendpoints, const string& custom_seed)
-{
-	strlst_t	hostnames;
-	strlst_t	ipaddresses;
-
-	// get all host information from hostname
-	GetAllHostInfos(hostname.c_str(), hostnames, ipaddresses);
-
-	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
-		// direct comparison
-		if(	hostname	== iter->hostname		&&
-			port		== iter->ctrlport		&&
-			cuk			== iter->cuk			&&
-			ctlendpoints== iter->ctlendpoints	&&
-			custom_seed	== iter->custom_seed	)
-		{
-			hostname	= iter->hostname;
-			port		= iter->ctrlport;
-			return true;
-		}
-		// search in hostname list
-		for(strlst_t::const_iterator hiter = hostnames.begin(); hiter != hostnames.end(); ++hiter){
-			if(	(*hiter)	== iter->hostname		&&
-				port		== iter->ctrlport		&&
-				cuk			== iter->cuk			&&
-				ctlendpoints== iter->ctlendpoints	&&
-				custom_seed	== iter->custom_seed	)
-			{
-				hostname	= iter->hostname;
-				port		= iter->ctrlport;
-				return true;
-			}
-		}
-		// search in ipaddress list
-		string	node_nozi = GetNoZoneIndexIpAddress(iter->hostname);
-		for(strlst_t::const_iterator ipiter = ipaddresses.begin(); ipiter != ipaddresses.end(); ++ipiter){
-			string	ipaddr_nozi = GetNoZoneIndexIpAddress(*ipiter);
-			if(	ipaddr_nozi	== node_nozi			&&
-				port		== iter->ctrlport		&&
-				cuk			== iter->cuk			&&
-				ctlendpoints== iter->ctlendpoints	&&
-				custom_seed	== iter->custom_seed	)
-			{
-				hostname	= node_nozi;
-				port		= iter->ctrlport;
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-static void print_chmpx_nodes_by_type(const nodectrllist_t& nodes, bool is_server)
-{
-	int	prncnt = 0;
-	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
-		if(is_server == iter->is_server){
-			PRN("    [%d] = {",							prncnt);
-			PRN("        Hostname                : %s",	iter->hostname.c_str());
-			PRN("        Control Port            : %d",	iter->ctrlport);
-			PRN("        CUK                     : %s",	iter->cuk.c_str());
-			PRN("        Control Endpoints       : %s",	iter->ctlendpoints.c_str());
-			PRN("        Custom ID Seed          : %s",	iter->custom_seed.c_str());
-			PRN("    }");
-			++prncnt;
-		}
-	}
-}
-
-static void print_chmpx_all_nodes(const nodectrllist_t& nodes)
-{
-	size_t	svrcnt = get_chmpx_nodes_count(nodes, true);
-	size_t	slvcnt = get_chmpx_nodes_count(nodes, false);
-
-	PRN(" Chmpx server nodes             : %zd", svrcnt);
-	if(0 < svrcnt){
-		PRN(" {");
-		print_chmpx_nodes_by_type(nodes, true);
-		PRN(" }");
-	}
-	PRN(" Chmpx slave nodes              : %zd", slvcnt);
-	if(0 < slvcnt){
-		PRN(" {");
-		print_chmpx_nodes_by_type(nodes, false);
-		PRN(" }");
-	}
-}
-
-//---------------------------------------------------------
-// Global
-//---------------------------------------------------------
-// Input option & parameter value
-static bool				isColorDisplay		= true;
-static string			strInitialConfig("");
-static string			strInitialHostname("");
-static short			nInitialCtrlPort	= CHM_INVALID_PORT;
-static string			strInitialCuk("");
-static string			strInitialCtlEPS("");
-static string			strInitialCustomSeed("");
-static bool				isOneHostTarget		= false;
-static bool				isInitialServerMode	= false;
-static int				nThreadCount		= 0;
-
-// [NOTE]
-// These lists are listed with the server node first.
-// That is, they are pre-sorted by node_ctrl_info_sort.
-// Nodes with the same host name, control port, etc. do not exist as servers and
-// slaves from the command line, but even if there are duplicates, it is safe to
-// detect the server node first.
-//
-static nodectrllist_t	InitialAllNodes;							// all chmpx node information at initializing
-static nodectrllist_t	TargetNodes;								// target all chmpx nodes as dynamically
 
 //---------------------------------------------------------
 // Utility for Color
@@ -2132,7 +2595,17 @@ static int ConnectControlPort(const char* hostname, short port, const char* ctle
 		}
 	}
 	// finally, direct access
-	return OneConnectControlPort(hostname, port);
+	strlst_t	hostnames;
+	if(!HostnameMap::GetHostnames(hostname, hostnames) || hostnames.empty()){
+		hostnames.push_back(string(hostname));
+	}
+	for(strlst_t::iterator iter = hostnames.begin(); iter != hostnames.end(); ++iter){
+		int sock;
+		if(CHM_INVALID_SOCK != (sock = OneConnectControlPort(iter->c_str(), port))){
+			return sock;
+		}
+	}
+	return CHM_INVALID_SOCK;
 }
 
 //
@@ -2207,6 +2680,7 @@ static bool SendCommandToControlPort(const char* hostname, short ctrlport, const
 #define	DUMP_KEY_ARRAY_START			"["
 #define	DUMP_KEY_ARRAY_END				"]={\n"
 #define	DUMP_KEY_CHMPX_START			"chmpx{\n"
+#define	DUMP_KEY_CHMPX_CHMPXID			"chmpxid="
 #define	DUMP_KEY_CHMPX_NAME				"name="
 #define	DUMP_KEY_CHMPX_CTLPORT			"ctlport="
 #define	DUMP_KEY_CHMPX_CUK				"cuk="
@@ -2276,6 +2750,7 @@ typedef struct _check_result_of_parts{
 //
 typedef struct _node_unit_data{
 	bool			is_down;
+	chmpxid_t		chmpxid;
 	string			hostname;
 	short			ctrlport;
 	string			cuk;
@@ -2289,11 +2764,12 @@ typedef struct _node_unit_data{
 	string			status;
 	CHKRESULT_PART	checkresult;
 
-	_node_unit_data() : is_down(false), hostname(""), ctrlport(CHM_INVALID_PORT), cuk(""), ctlendpoints(""), custom_seed(""), hash(""), pendinghash(""), tosockcnt(0), fromsockcnt(0), lastupdatetime(0), status(""), checkresult() {}
+	_node_unit_data() : is_down(false), chmpxid(CHM_INVALID_CHMPXID), hostname(""), ctrlport(CHM_INVALID_PORT), cuk(""), ctlendpoints(""), custom_seed(""), hash(""), pendinghash(""), tosockcnt(0), fromsockcnt(0), lastupdatetime(0), status(""), checkresult() {}
 
 	void clear(void)
 	{
 		is_down			= false;
+		chmpxid			= CHM_INVALID_CHMPXID;
 		hostname		= "";
 		ctrlport		= CHM_INVALID_PORT;
 		cuk				= "";
@@ -2335,7 +2811,6 @@ typedef struct _node_status_detail{
 //
 typedef map<string, NODESTATUSDETAIL>		statusdetails_t;
 
-
 //
 // one node's result with compared mark
 //
@@ -2364,6 +2839,7 @@ typedef map<string, NODECHECKRESULT>		nodechkresults_t;
 // dump raw result
 //
 typedef struct _dump_node_result{
+	chmpxid_t	chmpxid;
 	string		hostname;
 	short		ctrlport;
 	string		cuk;
@@ -2372,7 +2848,7 @@ typedef struct _dump_node_result{
 	bool		isError;
 	string		strResult;
 
-	_dump_node_result() : hostname(""), ctrlport(0), cuk(""), ctlendpoints(""), custom_seed(""), isError(false), strResult("") {}
+	_dump_node_result() : chmpxid(CHM_INVALID_CHMPXID), hostname(""), ctrlport(0), cuk(""), ctlendpoints(""), custom_seed(""), isError(false), strResult("") {}
 
 }DUMPNODERES, *PDUMPNODERES;
 
@@ -2543,12 +3019,14 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
-		string	name;
-		string	strctrlport;
-		short	ctrlport;
-		string	cuk;
-		string	ctlendpoints;
-		string	custom_seed;
+		string		strChmpxid;
+		chmpxid_t	chmpxid;
+		string		name;
+		string		strctrlport;
+		short		ctrlport;
+		string		cuk;
+		string		ctlendpoints;
+		string		custom_seed;
 
 		// "[XX]={\n"
 		// cppcheck-suppress unmatchedSuppression
@@ -2572,6 +3050,30 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 			return strInput;
 		}
 		strInput = strInput.substr(pos + strlen(DUMP_KEY_CHMPX_START));
+
+		// "chmpxid="
+		if(string::npos == (pos = strInput.find(DUMP_KEY_CHMPX_CHMPXID))){
+			ERR("Could not found \"chmpxid=\" key in DUMP result.");
+			is_error = true;
+			return strInput;
+		}
+		strInput = strInput.substr(pos + strlen(DUMP_KEY_CHMPX_CHMPXID));
+
+		// Get CHMPXID
+		if(string::npos == (pos = strInput.find(DUMP_KEY_CR))){
+			ERR("Could not found CR after \"chmpxid=\" key in DUMP result.");
+			is_error = true;
+			return strInput;
+		}
+		strChmpxid	= trim(strInput.substr(0, pos));
+		strInput	= strInput.substr(pos + strlen(DUMP_KEY_CR));
+		if(2 >= strChmpxid.size()){
+			ERR("\"chmpxid=\" value does not start \"0x\" in DUMP result.");
+			is_error = true;
+			return strInput;
+		}
+		strChmpxid	= trim(strChmpxid.substr(2));
+		chmpxid		= cvt_string_to_number(strChmpxid.c_str(), false);
 
 		// "name="
 		if(string::npos == (pos = strInput.find(DUMP_KEY_CHMPX_NAME))){
@@ -2665,7 +3167,7 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 		strInput = strInput.substr(pos + strlen(DUMP_KEY_CHMPX_END));
 
 		// Add nodes
-		if(!add_chmpx_node(nodes, name, ctrlport, cuk, ctlendpoints, custom_seed, is_server)){
+		if(!add_chmpx_node(nodes, chmpxid, name, ctrlport, cuk, ctlendpoints, custom_seed, is_server)){
 			ERR("Failed to add node(%s: %d)", name.c_str(), ctrlport);
 			is_error = true;
 			return strInput;
@@ -2745,11 +3247,12 @@ static bool CreateDynaTargetChmpx(void)
 	dumpnodereslist_t	nodes;
 	for(nodectrllist_t::const_iterator iter = InitialAllNodes.begin(); iter != InitialAllNodes.end(); ++iter){
 		DUMPNODERES	node;
-		node.hostname		= iter->hostname;
-		node.ctrlport		= iter->ctrlport;
-		node.cuk			= iter->cuk;
-		node.ctlendpoints	= iter->ctlendpoints;
-		node.custom_seed	= iter->custom_seed;
+		node.chmpxid		= iter->GetChmpxId();
+		node.hostname		= iter->GetHostname();
+		node.ctrlport		= iter->GetCtrlport();
+		node.cuk			= iter->GetCuk();
+		node.ctlendpoints	= iter->GetCtlendpoints();
+		node.custom_seed	= iter->GetCusomSeed();
 		nodes.push_back(node);
 	}
 
@@ -2790,7 +3293,28 @@ static bool CreateDynaTargetChmpx(void)
 //
 static string MakeMapKeyFromAll(const string& hostname, short ctrlport, const string& cuk, const string& ctlendpoints, const string& custom_seed)
 {
-	string	hostall	= hostname + string(":") + to_string(ctrlport) + string(":") + cuk + string(":") + custom_seed + string(":") + ctlendpoints ;
+	string			tghost;
+	short			tgport;
+	string			tgcuk;
+	string			tgctleps;
+	string			tgcs;
+	NodeCtrlInfo	node;
+	if(	find_chmpx_node_by_hostname(TargetNodes, hostname, ctrlport, cuk, ctlendpoints, custom_seed, node)		||
+		find_chmpx_node_by_hostname(InitialAllNodes, hostname, ctrlport, cuk, ctlendpoints, custom_seed, node)	)
+	{
+		tghost		= node.GetHostname();
+		tgport		= node.GetCtrlport();
+		tgcuk		= node.GetCuk();
+		tgctleps	= node.GetCtlendpoints();
+		tgcs		= node.GetCusomSeed();
+	}else{
+		tghost		= hostname;
+		tgport		= ctrlport;
+		tgcuk		= cuk;
+		tgctleps	= ctlendpoints;
+		tgcs		= custom_seed;
+	}
+	string	hostall	= tghost + string(":") + to_string(tgport) + string(":") + tgcuk + string(":") + tgcs + string(":") + tgctleps;
 	return hostall;
 }
 
@@ -2820,9 +3344,11 @@ static long GetCountFromSockString(const string& sockval)
 //
 // parse NODEUNITDATA from dump result
 //
-static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& excepthost, short exceptport, bool is_in_array, bool is_sock_from, bool& is_found_except, bool& is_error, const string& strDump)
+static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, chmpxid_t exceptchmpxid, bool is_in_array, bool is_sock_from, bool& is_found_except, bool& is_error, const string& strDump)
 {
 	string				strInput = strDump;
+	string				strChmpxid;
+	chmpxid_t			chmpxid;
 	string				name;
 	string				hash;
 	string				pendinghash;
@@ -2850,6 +3376,25 @@ static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& 
 		return strInput;
 	}
 	strInput = strInput.substr(pos + strlen(is_in_array ? DUMP_KEY_CHMPX_START : DUMP_KEY_START));
+
+	// Get "chmpxid="
+	if(string::npos == (pos = strInput.find(DUMP_KEY_CHMPX_CHMPXID))){
+		ERR("Could not found \"chmpxid=\" key in DUMP result.");
+		return strInput;
+	}
+	strInput = strInput.substr(pos + strlen(DUMP_KEY_CHMPX_CHMPXID));
+	if(string::npos == (pos = strInput.find(DUMP_KEY_CR))){
+		ERR("Could not found CR after \"chmpxid=\" key in DUMP result.");
+		return strInput;
+	}
+	strChmpxid	= trim(strInput.substr(0, pos));
+	strInput	= strInput.substr(pos + strlen(DUMP_KEY_CR));
+	if(2 >= strChmpxid.size()){
+		ERR("\"chmpxid=\" value does not start \"0x\" in DUMP result.");
+		return strInput;
+	}
+	strChmpxid	= trim(strChmpxid.substr(2));
+	chmpxid		= cvt_string_to_number(strChmpxid.c_str(), false);
 
 	// Get "name="
 	if(string::npos == (pos = strInput.find(DUMP_KEY_CHMPX_NAME))){
@@ -3010,12 +3555,13 @@ static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& 
 	is_error = false;
 
 	// check same host(only server mode)
-	if(name == excepthost && ctrlport == exceptport){
+	if(CHM_INVALID_CHMPXID != exceptchmpxid && chmpxid == exceptchmpxid){
 		is_found_except = true;
 	}else{
 		// set result
 		unitdata.is_down		= false;
-		unitdata.hostname		= name;
+		unitdata.chmpxid		= chmpxid;
+		unitdata.hostname		= HostnameMap::GetFirstHostname(name.c_str());
 		unitdata.ctrlport		= ctrlport;
 		unitdata.cuk			= cuk;
 		unitdata.ctlendpoints	= ctlendpoints;
@@ -3033,7 +3579,7 @@ static string ParseUnitDataFromDumpResult(NODEUNITDATA& unitdata, const string& 
 //
 // parse NODEUNITDATA map from dump result
 //
-static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& unitdatas, const string& excepthost, short exceptport, bool is_sock_from, const string& strDump)
+static string ParseUnitDatasFromDumpResult(nodesunits_t& unitdatas, chmpxid_t exceptchmpxid, bool is_sock_from, const string& strDump)
 {
 	string				strInput = strDump;
 	string::size_type	pos;
@@ -3067,7 +3613,7 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 		NODEUNITDATA	unitdata;
 		bool			is_found= false;
 		bool			is_error= false;
-		strInput				= ParseUnitDataFromDumpResult(unitdata, excepthost, exceptport, true, is_sock_from, is_found, is_error, strInput);
+		strInput				= ParseUnitDataFromDumpResult(unitdata, exceptchmpxid, true, is_sock_from, is_found, is_error, strInput);
 		if(is_error){
 			continue;
 		}
@@ -3092,7 +3638,7 @@ static string ParseUnitDatasFromDumpResult(NODEUNITDATA& self, nodesunits_t& uni
 //
 // parse NODESTATUSDETAIL from dump result
 //
-static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname, short ctrlport, const string& strDump)
+static bool CreateStatusDetails(NODESTATUSDETAIL& detail, chmpxid_t chmpxid, const string& strDump)
 {
 	string				strParsed;
 	string				strChmpxCount;
@@ -3127,14 +3673,19 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname
 
 	// get self chmpx information
 	//
-	// we call this function with no except host/port, then it is always not found.
+	// we call this function with no except chmpxid, then it is always not found.
 	// the is_sock_from parameter is true as temporary, "fromsockcnt" should be 0.
 	//
-	strParsed	= ParseUnitDataFromDumpResult(detail.self, string(""), 0, false, true, is_found_except, is_error, strParsed);
+	strParsed	= ParseUnitDataFromDumpResult(detail.self, CHM_INVALID_CHMPXID, false, true, is_found_except, is_error, strParsed);
 	if(is_error){
-		ERR("Could not parse self chmpx for %s:%d", hostname.c_str(), ctrlport);
+		ERR("Could not parse self chmpx by chmpxid(0x%016" PRIx64 ")", chmpxid);
 		return false;
 	}
+	if(chmpxid != detail.self.chmpxid){
+		ERR("Parsed self chmpx expected chmpxid(0x%016" PRIx64 "), but it has chmpxid(0x%016" PRIx64 ").", chmpxid, detail.self.chmpxid);
+		return false;
+	}
+	chmpxid_t	exceptchmpxid = detail.self.chmpxid;
 
 	// "chmpx_servers=0xXXXXX\n"
 	if(string::npos == (pos = strParsed.find(DUMP_KEY_CHMPX_SERVERS))){
@@ -3149,7 +3700,7 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname
 		strParsed		= strParsed.substr(pos + strlen(DUMP_KEY_CR));
 		if(strChmpxCount != "0"){
 			// Parse server chmpxs
-			strParsed = ParseUnitDatasFromDumpResult(detail.self, detail.servers, hostname, ctrlport, true, strParsed);
+			strParsed = ParseUnitDatasFromDumpResult(detail.servers, exceptchmpxid, true, strParsed);
 		}
 	}
 
@@ -3166,7 +3717,7 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, const string& hostname
 		strParsed		= strParsed.substr(pos + strlen(DUMP_KEY_CR));
 		if(strChmpxCount != "0"){
 			// Parse slave chmpxs
-			strParsed = ParseUnitDatasFromDumpResult(detail.self, detail.slaves, hostname, ctrlport, false, strParsed);
+			strParsed = ParseUnitDatasFromDumpResult(detail.slaves, exceptchmpxid, false, strParsed);
 		}
 	}
 
@@ -3198,11 +3749,12 @@ static size_t CreateAllStatusDetails(statusdetails_t& all)
 	dumpnodereslist_t	nodes;
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
 		DUMPNODERES	node;
-		node.hostname		= iter->hostname;
-		node.ctrlport		= iter->ctrlport;
-		node.cuk			= iter->cuk;
-		node.ctlendpoints	= iter->ctlendpoints;
-		node.custom_seed	= iter->custom_seed;
+		node.chmpxid		= iter->GetChmpxId();
+		node.hostname		= iter->GetHostname();
+		node.ctrlport		= iter->GetCtrlport();
+		node.cuk			= iter->GetCuk();
+		node.ctlendpoints	= iter->GetCtlendpoints();
+		node.custom_seed	= iter->GetCusomSeed();
 		nodes.push_back(node);
 	}
 
@@ -3220,7 +3772,7 @@ static size_t CreateAllStatusDetails(statusdetails_t& all)
 			detail.self.is_down	= true;
 		}else{
 			//MSG("Receive data : \n\n%s\n", res_iter->strResult.c_str());
-			if(!CreateStatusDetails(detail, res_iter->hostname.c_str(), res_iter->ctrlport, res_iter->strResult)){
+			if(!CreateStatusDetails(detail, res_iter->chmpxid, res_iter->strResult)){
 				ERR("Parse DUMP result from %s:%d", res_iter->hostname.c_str(), res_iter->ctrlport);
 				continue;
 			}
@@ -3454,7 +4006,8 @@ static size_t MakeCheckNodeStatus(nodechkresults_t& results, const statusdetails
 					}
 
 					// switch hostname and port
-					tg_child_node.hostname		= child_iter->second.self.hostname;
+					tg_child_node.chmpxid		= child_iter->second.self.chmpxid;
+					tg_child_node.hostname		= HostnameMap::GetFirstHostname(child_iter->second.self.hostname.c_str());
 					tg_child_node.ctrlport		= child_iter->second.self.ctrlport;
 					tg_child_node.cuk			= child_iter->second.self.cuk;
 					tg_child_node.ctlendpoints	= child_iter->second.self.ctlendpoints;
@@ -3463,7 +4016,8 @@ static size_t MakeCheckNodeStatus(nodechkresults_t& results, const statusdetails
 				}else{
 					// if not found node(B) in all.
 					tg_child_node.clear();
-					tg_child_node.hostname		= tg_svr->second.hostname;
+					tg_child_node.chmpxid		= tg_svr->second.chmpxid;
+					tg_child_node.hostname		= HostnameMap::GetFirstHostname(tg_svr->second.hostname.c_str());
 					tg_child_node.ctrlport		= tg_svr->second.ctrlport;
 					tg_child_node.cuk			= tg_svr->second.cuk;
 					tg_child_node.ctlendpoints	= tg_svr->second.ctlendpoints;
@@ -3523,7 +4077,8 @@ static size_t MakeCheckNodeStatus(nodechkresults_t& results, const statusdetails
 					}
 
 					// switch hostname and port
-					tg_child_node.hostname		= child_iter->second.self.hostname;
+					tg_child_node.chmpxid		= child_iter->second.self.chmpxid;
+					tg_child_node.hostname		= HostnameMap::GetFirstHostname(child_iter->second.self.hostname.c_str());
 					tg_child_node.ctrlport		= child_iter->second.self.ctrlport;
 					tg_child_node.cuk			= child_iter->second.self.cuk;
 					tg_child_node.ctlendpoints	= child_iter->second.self.ctlendpoints;
@@ -3532,7 +4087,8 @@ static size_t MakeCheckNodeStatus(nodechkresults_t& results, const statusdetails
 				}else{
 					// if not found node(C) in all.
 					tg_child_node.clear();
-					tg_child_node.hostname		= tg_slv->second.hostname;
+					tg_child_node.chmpxid		= tg_slv->second.chmpxid;
+					tg_child_node.hostname		= HostnameMap::GetFirstHostname(tg_slv->second.hostname.c_str());
 					tg_child_node.ctrlport		= tg_slv->second.ctrlport;
 					tg_child_node.cuk			= tg_slv->second.cuk;
 					tg_child_node.ctlendpoints	= tg_slv->second.ctlendpoints;
@@ -3742,25 +4298,25 @@ static void DumpNodeUnitData(const NODEUNITDATA& data, const string& prefix, con
 	if(!is_print_dmp){
 		return;
 	}
-
-	PRN("%s%s = {",					index.c_str(), prefix.empty() ? "NODEUNITDATA" : prefix.c_str());
-	PRN("%s  node is        = %s",	index.c_str(), data.is_down ? "down" : "up");
-	PRN("%s  hostname       = %s",	index.c_str(), data.hostname.c_str());
-	PRN("%s  ctlport        = %d",	index.c_str(), data.ctrlport);
-	PRN("%s  cuk            = %s",	index.c_str(), data.cuk.c_str());
-	PRN("%s  ctlendpoints   = %s",	index.c_str(), data.ctlendpoints.c_str());
-	PRN("%s  custom_seed    = %s",	index.c_str(), data.custom_seed.c_str());
-	PRN("%s  hash           = %s",	index.c_str(), data.hash.c_str());
-	PRN("%s  pendinghash    = %s",	index.c_str(), data.pendinghash.c_str());
-	PRN("%s  tosockcnt      = %ld",	index.c_str(), data.tosockcnt);
-	PRN("%s  fromsockcnt    = %ld",	index.c_str(), data.fromsockcnt);
-	PRN("%s  lastupdatetime = %zd",	index.c_str(), data.lastupdatetime);
-	PRN("%s  status         = %s",	index.c_str(), data.status.c_str());
+	PRN("%s%s = {",								index.c_str(), prefix.empty() ? "NODEUNITDATA" : prefix.c_str());
+	PRN("%s  node is        = %s",				index.c_str(), data.is_down ? "down" : "up");
+	PRN("%s  chmpxid        = 0x%016" PRIx64,	index.c_str(), data.chmpxid);
+	PRN("%s  hostname       = %s",				index.c_str(), data.hostname.c_str());
+	PRN("%s  ctlport        = %d",				index.c_str(), data.ctrlport);
+	PRN("%s  cuk            = %s",				index.c_str(), data.cuk.c_str());
+	PRN("%s  ctlendpoints   = %s",				index.c_str(), data.ctlendpoints.c_str());
+	PRN("%s  custom_seed    = %s",				index.c_str(), data.custom_seed.c_str());
+	PRN("%s  hash           = %s",				index.c_str(), data.hash.c_str());
+	PRN("%s  pendinghash    = %s",				index.c_str(), data.pendinghash.c_str());
+	PRN("%s  tosockcnt      = %ld",				index.c_str(), data.tosockcnt);
+	PRN("%s  fromsockcnt    = %ld",				index.c_str(), data.fromsockcnt);
+	PRN("%s  lastupdatetime = %zd",				index.c_str(), data.lastupdatetime);
+	PRN("%s  status         = %s",				index.c_str(), data.status.c_str());
 	if(is_result_part){
 		string	indexsub = index + string("  ");
 		DumpCheckResultPart(data.checkresult, string("checkresult"), indexsub);
 	}
-	PRN("%s}",						index.c_str());
+	PRN("%s}",									index.c_str());
 }
 
 //
@@ -4496,7 +5052,7 @@ static string CvtOneNodeStatusResults(nodechkresults_t& results)
 		strOutput += string("  }\n");
 	}
 
-	// servers
+	// slaves
 	for(iter_unit = iter->second.all.slaves.begin(); iter_unit != iter->second.all.slaves.end(); ++iter_unit){
 		// one node
 		strOutput += string("  ") + BOLD(iter_unit->first) + string(" = {\n");
@@ -4706,11 +5262,21 @@ static bool StatusCommand(params_t& params)
 			parse_host_parameter(params[pos], tghost, tgport, tgcuk, tgctleps, tgcs);
 
 			// check hostname(:port) exists in initialized host list(conf)
-			if(!find_chmpx_node_by_hostname(InitialAllNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
-				ERR("Not found %s in initial host list which is included from configuration file.", params[pos].c_str());
-				return true;
+			NodeCtrlInfo	node;
+			if(!find_chmpx_node_by_hostname(InitialAllNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
+				WAN("Not found %s in initial host list which is included from configuration file, try to check dynamic hostlist.", params[pos].c_str());
+				// retry in dynamic hostlist
+				if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
+					ERR("Not found %s in initial host list which is included from configuration file, try to check dynamic hostlist.", params[pos].c_str());
+					return true;
+				}
 			}
-			is_param = true;
+			tghost		= node.GetHostname();
+			tgport		= node.GetCtrlport();
+			tgcuk		= node.GetCuk();
+			tgctleps	= node.GetCtlendpoints();
+			tgcs		= node.GetCusomSeed();
+			is_param	= true;
 		}
 	}
 	if(is_all && is_self){
@@ -4804,10 +5370,16 @@ static bool CheckCommand(params_t& params)
 	// check host if host name is specified
 	if(!is_all){
 		// check hostname(:port) exists in dynamic host list(conf)
-		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
+		NodeCtrlInfo	node;
+		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
 			PRN("Not found %s(:%d(:%s)) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport, tgcuk.c_str());
 			return true;
 		}
+		tghost		= node.GetHostname();
+		tgport		= node.GetCtrlport();
+		tgcuk		= node.GetCuk();
+		tgctleps	= node.GetCtlendpoints();
+		tgcs		= node.GetCusomSeed();
 	}
 
 	// get all status detail of nodes
@@ -4872,18 +5444,27 @@ static bool StatusUpdateCommand(params_t& params)
 	// check host if host name is specified
 	if(!is_all){
 		// check hostname(:port) exists in dynamic host list(conf)
-		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
+		NodeCtrlInfo	node;
+		if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
 			PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 			return true;
 		}
+		tghost		= node.GetHostname();
+		tgport		= node.GetCtrlport();
+		//tgcuk		= node.GetCuk();			// not used
+		//tgctleps	= node.GetCtlendpoints();	// not used
+		//tgcs		= node.GetCusomSeed();		// not used
 	}
 
 	// send "UPDATESTATUS" command to host(s)
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
-		if(!is_all && (tghost != iter->hostname || tgport != iter->ctrlport)){
+		std::string	uniq_tgname = tghost;
+		std::string	uniq_itname = iter->GetHostname();
+		if(!is_all && (uniq_tgname != uniq_itname || tgport != iter->GetCtrlport())){
 			continue;
 		}
-		if(!iter->is_server){
+
+		if(!iter->IsServerNode()){
 			if(!is_all){
 				PRN("%s:%d host is slave node, thus could not send UPDATESTATUS.", tghost.c_str(), tgport);
 				return true;
@@ -4892,14 +5473,14 @@ static bool StatusUpdateCommand(params_t& params)
 		}
 
 		string	strResult;
-		if(!SendCommandToControlPort(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str(), "UPDATESTATUS", strResult)){
-			WAN("Failed to send UPDATESTATUS command to %s:%d, but retry to send another node.", iter->hostname.c_str(), iter->ctrlport);
+		if(!SendCommandToControlPort(uniq_itname.c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str(), "UPDATESTATUS", strResult)){
+			WAN("Failed to send UPDATESTATUS command to %s:%d, but retry to send another node.", iter->GetHostname().c_str(), iter->GetCtrlport());
 		}else{
 			//MSG("Receive data : \n\n%s\n", strResult.c_str());
 			if(string::npos != strResult.find("SUCCEED")){
-				PRN("Succeed to send UPDATESTATUS to %s:%d", iter->hostname.c_str(), iter->ctrlport);
+				PRN("Succeed to send UPDATESTATUS to %s:%d", iter->GetHostname().c_str(), iter->GetCtrlport());
 			}else{
-				PRN("Failed to send UPDATESTATUS to %s:%d by \"%s\".", iter->hostname.c_str(), iter->ctrlport, strResult.c_str());
+				PRN("Failed to send UPDATESTATUS to %s:%d by \"%s\".", iter->GetHostname().c_str(), iter->GetCtrlport(), strResult.c_str());
 			}
 		}
 	}
@@ -4933,21 +5514,21 @@ static bool ServiceInCommand(params_t& params)
 		}
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
-	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
+	NodeCtrlInfo	node;
+	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
 		PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 		return true;
 	}
-
 	// send "SERVICEIN" command
 	string	strResult;
-	if(!SendCommandToControlPort(tghost.c_str(), tgport, tgctleps.c_str(), "SERVICEIN", strResult)){
-		ERR("Failed to send SERVICEIN command to %s:%d", tghost.c_str(), tgport);
+	if(!SendCommandToControlPort(node.GetHostname().c_str(), node.GetCtrlport(), node.GetCtlendpoints().c_str(), "SERVICEIN", strResult)){
+		ERR("Failed to send SERVICEIN command to %s:%d", node.GetHostname().c_str(), node.GetCtrlport());
 	}else{
 		//MSG("Receive data : \n\n%s\n", strResult.c_str());
 		if(string::npos != strResult.find("SUCCEED")){
-			PRN("Succeed to send SERVICEIN to %s:%d", tghost.c_str(), tgport);
+			PRN("Succeed to send SERVICEIN to %s:%d", node.GetHostname().c_str(), node.GetCtrlport());
 		}else{
-			PRN("Failed to send SERVICEIN to %s:%d, error is %s.", tghost.c_str(), tgport, strResult.c_str());
+			PRN("Failed to send SERVICEIN to %s:%d, error is %s.", node.GetHostname().c_str(), node.GetCtrlport(), strResult.c_str());
 		}
 	}
 	return true;	// for continue.
@@ -5003,8 +5584,15 @@ static bool ServiceOutCommand(params_t& params)
 		return true;
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
-	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
+	NodeCtrlInfo	node;
+	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
 		MSG("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
+	}else{
+		tghost		= node.GetHostname();
+		tgport		= node.GetCtrlport();
+		tgcuk		= node.GetCuk();
+		tgctleps	= node.GetCtlendpoints();
+		tgcs		= node.GetCusomSeed();
 	}
 	if(CHM_INVALID_PORT == tgport){
 		PRN("Target control port is not specified, you need to specify this.");
@@ -5043,15 +5631,15 @@ static bool ServiceOutCommand(params_t& params)
 
 	// send "SERVICEOUT" command to all host
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
-		if(!SendCommandToControlPort(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str(), strCommand.c_str(), strResult)){
-			WAN("Failed to send SERVICEOUT command to %s:%d, but retry to send another node.", iter->hostname.c_str(), iter->ctrlport);
+		if(!SendCommandToControlPort(iter->GetHostname().c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str(), strCommand.c_str(), strResult)){
+			WAN("Failed to send SERVICEOUT command to %s:%d, but retry to send another node.", iter->GetHostname().c_str(), iter->GetCtrlport());
 		}else{
 			//MSG("Receive data : \n\n%s\n", strResult.c_str());
 			if(string::npos != strResult.find("SUCCEED")){
-				PRN("Succeed to send SERVICEOUT to %s:%d", iter->hostname.c_str(), iter->ctrlport);
+				PRN("Succeed to send SERVICEOUT to %s:%d", iter->GetHostname().c_str(), iter->GetCtrlport());
 				return true;
 			}else{
-				WAN("Failed to send SERVICEOUT to %s:%d by \"%s\", but retry to send another node.", iter->hostname.c_str(), iter->ctrlport, strResult.c_str());
+				WAN("Failed to send SERVICEOUT to %s:%d by \"%s\", but retry to send another node.", iter->GetHostname().c_str(), iter->GetCtrlport(), strResult.c_str());
 			}
 		}
 	}
@@ -5092,8 +5680,8 @@ static bool MergeCommand(params_t& params)
 	// send "MERGE" or "ABORTMERGE" or "COMPMERGE" command
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
 		string	strResult;
-		if(!SendCommandToControlPort(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str(), strCommand.c_str(), strResult)){
-			ERR("Failed to send %s command to %s:%d, but retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+		if(!SendCommandToControlPort(iter->GetHostname().c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str(), strCommand.c_str(), strResult)){
+			ERR("Failed to send %s command to %s:%d, but retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 		}else{
 			//MSG("Receive data : \n\n%s\n", strResult.c_str());
 
@@ -5102,14 +5690,14 @@ static bool MergeCommand(params_t& params)
 				//
 				// This mean that the command is sent to slave, thus retry to send another node.
 				//
-				MSG("Failed to send %s to %s:%d, because this node is slave. thus retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+				MSG("Failed to send %s to %s:%d, because this node is slave. thus retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 
 			}else if(string::npos != strResult.find("SUCCEED")){
-				PRN("Succeed to send %s to %s:%d", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+				PRN("Succeed to send %s to %s:%d", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 				return true;
 
 			}else{
-				WAN("Failed to send %s to %s:%d by %s, but retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport, strResult.c_str());
+				WAN("Failed to send %s to %s:%d by %s, but retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport(), strResult.c_str());
 			}
 		}
 	}
@@ -5145,8 +5733,8 @@ static bool SuspendCommand(params_t& params, bool is_suspend)
 	string	strCommand = is_suspend ? "SUSPENDMERGE" : "NOSUSPENDMERGE";
 	for(nodectrllist_t::const_iterator iter = TargetNodes.begin(); iter != TargetNodes.end(); ++iter){
 		string	strResult;
-		if(!SendCommandToControlPort(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str(), strCommand.c_str(), strResult)){
-			ERR("Failed to send %s command to %s:%d, but retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+		if(!SendCommandToControlPort(iter->GetHostname().c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str(), strCommand.c_str(), strResult)){
+			ERR("Failed to send %s command to %s:%d, but retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 		}else{
 			//MSG("Receive data : \n\n%s\n", strResult.c_str());
 
@@ -5155,14 +5743,14 @@ static bool SuspendCommand(params_t& params, bool is_suspend)
 				//
 				// This mean that the command is sent to slave, thus retry to send another node.
 				//
-				MSG("Failed to send %s to %s:%d, because this node is slave. thus retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+				MSG("Failed to send %s to %s:%d, because this node is slave. thus retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 
 			}else if(string::npos != strResult.find("SUCCEED")){
-				PRN("Succeed to send %s to %s:%d", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport);
+				PRN("Succeed to send %s to %s:%d", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport());
 				return true;
 
 			}else{
-				WAN("Failed to send %s to %s:%d by %s, but retry to send another node.", strCommand.c_str(), iter->hostname.c_str(), iter->ctrlport, strResult.c_str());
+				WAN("Failed to send %s to %s:%d by %s, but retry to send another node.", strCommand.c_str(), iter->GetHostname().c_str(), iter->GetCtrlport(), strResult.c_str());
 			}
 		}
 	}
@@ -5198,15 +5786,16 @@ static bool DumpCommand(params_t& params)
 		}
 	}
 	// check hostname(:port) exists in dynamic host list(conf)
-	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs)){
+	NodeCtrlInfo	node;
+	if(!find_chmpx_node_by_hostname(TargetNodes, tghost, tgport, tgcuk, tgctleps, tgcs, node)){
 		PRN("Not found %s(:%d) in dynamic host list which is included from configuration file.", tghost.c_str(), tgport);
 		return true;
 	}
 
 	// send "DUMP" command
 	string	strResult;
-	if(!SendCommandToControlPort(tghost.c_str(), tgport, tgctleps.c_str(), "DUMP", strResult)){
-		ERR("Failed to send DUMP command to %s:%d", tghost.c_str(), tgport);
+	if(!SendCommandToControlPort(node.GetHostname().c_str(), node.GetCtrlport(), node.GetCtlendpoints().c_str(), "DUMP", strResult)){
+		ERR("Failed to send DUMP command to %s:%d", node.GetHostname().c_str(), node.GetCtrlport());
 	}else{
 		//MSG("Receive data : \n\n%s\n", strResult.c_str());
 		PRN("%s", strResult.c_str());
@@ -5272,8 +5861,8 @@ static bool VersionCommand(params_t& params)
 	if(!svrnodes.empty()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = svrnodes.begin(); iter != svrnodes.end(); ++iter){
-			string	strVersion = VersionCommandSub(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str());
-			PRN("    %s:%d	= %s", iter->hostname.c_str(), iter->ctrlport, strVersion.c_str());
+			string	strVersion = VersionCommandSub(iter->GetHostname().c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str());
+			PRN("    %s:%d	= %s", iter->GetHostname().c_str(), iter->GetCtrlport(), strVersion.c_str());
 		}
 		PRN(" }");
 	}
@@ -5281,8 +5870,8 @@ static bool VersionCommand(params_t& params)
 	if(!slvnodes.empty()){
 		PRN(" {");
 		for(nodectrllist_t::const_iterator iter = slvnodes.begin(); iter != slvnodes.end(); ++iter){
-			string	strVersion = VersionCommandSub(iter->hostname.c_str(), iter->ctrlport, iter->ctlendpoints.c_str());
-			PRN("    %s:%d	= %s", iter->hostname.c_str(), iter->ctrlport, strVersion.c_str());
+			string	strVersion = VersionCommandSub(iter->GetHostname().c_str(), iter->GetCtrlport(), iter->GetCtlendpoints().c_str());
+			PRN("    %s:%d	= %s", iter->GetHostname().c_str(), iter->GetCtrlport(), strVersion.c_str());
 		}
 		PRN(" }");
 	}
@@ -6130,16 +6719,43 @@ int main(int argc, char** argv)
 	if(opts.end() != opts.find("-custom_seed")){
 		strInitialCustomSeed= opts["-custom_seed"][0];
 	}
+	// -group
+	if(opts.end() != opts.find("-group")){
+		NodeCtrlInfo::SetGroup(opts["-group"][0].c_str());
+	}
 	// -host
 	if(opts.end() != opts.find("-host")){
 		strInitialHostname	= opts["-host"][0];
+	}
+	// -type
+	if(opts.end() != opts.find("-type")){
+		if(!NodeCtrlInfo::SetType(opts["-type"][0].c_str())){
+			ERR("Unknown parameter(%s) value for \"-type\" option.", opts["-type"][0].c_str());
+			exit(EXIT_FAILURE);
+		}
+	}
 
+	// Confirm required options
+	if(!strInitialHostname.empty() && (opts.end() != opts.find("-conf") || opts.end() != opts.find("-json"))){
+		ERR("\"-host\" and \"-conf\"(or \"-json\") option cannot be specified at the same time.");
+		exit(EXIT_FAILURE);
+
+	}else if(!strInitialHostname.empty()){
+		// check group name
+		if(NodeCtrlInfo::GetGroup().empty()){
+			ERR("If you specify the \"-host\" option, also specify the \"-group\" option.");
+			exit(EXIT_FAILURE);
+		}
 		// check control port
 		if(CHM_INVALID_PORT == nInitialCtrlPort){
 			ERR("No control port(-ctrlport option) is specified.");
 			exit(EXIT_FAILURE);
 		}
+
 	}else if(opts.end() != opts.find("-conf") || opts.end() != opts.find("-json")){
+		if(!NodeCtrlInfo::GetGroup().empty()){
+			WAN("The \"-group\" option was specified, but it is ignored.");
+		}
 		// -conf or -json
 		if(opts.end() != opts.find("-conf")){
 			strInitialConfig	= opts["-conf"][0];
@@ -6151,31 +6767,25 @@ int main(int argc, char** argv)
 			}
 			strInitialConfig	= opts["-json"][0];
 		}
+
 	}else{
 		// any option is not specified, try to load environment
 		CHMCONFTYPE	conftype = check_chmconf_type_ex(NULL, CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME, &strInitialConfig);
 		if(CHMCONF_TYPE_UNKNOWN == conftype || CHMCONF_TYPE_NULL == conftype){
-			MSG("unknown configuration type loaded from environment.");
-		}else{
-			if(strInitialConfig.empty()){
-				ERR("configuration file or json is not specified.");
-				exit(EXIT_FAILURE);
-			}
-			MSG("option \"-host\" and \"-conf\" and \"-json\" are not specified, then using environments(%s or %s).", CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME);
-			is_load_from_env = true;
-		}
-	}
-	// any configuration and host is not found.
-	if(strInitialConfig.empty() && strInitialHostname.empty()){
-		// no option/environment is specified, then target is localhost
-		strInitialHostname = "localhost";
-
-		// check control port
-		if(CHM_INVALID_PORT == nInitialCtrlPort){
-			ERR("No control port(-ctrlport option) is specified.");
+			ERR("unknown configuration type loaded from environment.");
 			exit(EXIT_FAILURE);
 		}
+		if(strInitialConfig.empty()){
+			ERR("configuration file or json is not specified.");
+			exit(EXIT_FAILURE);
+		}
+		if(!NodeCtrlInfo::GetGroup().empty()){
+			WAN("The \"-group\" option was specified, but it is ignored.");
+		}
+		MSG("option \"-host\" and \"-conf\" and \"-json\" are not specified, then using environments(%s or %s).", CHM_CONFFILE_ENV_NAME, CHM_JSONCONF_ENV_NAME);
+		is_load_from_env = true;
 	}
+
 	// -server / -slave
 	if(opts.end() != opts.find("-server") && opts.end() != opts.find("-slave")){
 		ERR("both option \"-server\" and \"-slave\" could not be specified.");
@@ -6257,23 +6867,29 @@ int main(int argc, char** argv)
 	// cleanup for valgrind
 	CleanOptionMap(opts);
 
+	// Initialize map
+	HostnameMap::Initialize();
+
 	//----------------------
 	// initialize nodes information
 	//----------------------
 	if(!strInitialConfig.empty()){
 		if(!load_initial_chmpx_nodes(InitialAllNodes, strInitialConfig, nInitialCtrlPort, (strInitialCuk.empty() ? NULL : strInitialCuk.c_str()))){
 			ERR("Could not load nodes information by configuration/local SHM.");
+			HostnameMap::Clear();
 			exit(EXIT_FAILURE);
 		}
 		isOneHostTarget = false;
 	}else if(!strInitialHostname.empty()){
-		if(!add_chmpx_node(InitialAllNodes, strInitialHostname, nInitialCtrlPort, strInitialCuk, strInitialCtlEPS, strInitialCustomSeed, isInitialServerMode, true)){
+		if(!add_chmpx_node(InitialAllNodes, CHM_INVALID_CHMPXID, strInitialHostname, nInitialCtrlPort, strInitialCuk, strInitialCtlEPS, strInitialCustomSeed, isInitialServerMode, true)){
 			ERR("Could not load nodes information by configuration.");
+			HostnameMap::Clear();
 			exit(EXIT_FAILURE);
 		}
 		isOneHostTarget = true;
 	}else{
 		ERR("both \"-host\" and \"-conf(or -json)\" option(environment) are not specified.");
+		HostnameMap::Clear();
 		exit(EXIT_FAILURE);
 	}
 
@@ -6282,10 +6898,12 @@ int main(int argc, char** argv)
 	//----------------------
 	if(!BlockSignal(SIGPIPE)){
 		ERR("Could not block SIGPIPE.");
+		HostnameMap::Clear();
 		exit(EXIT_FAILURE);
 	}
 	if(!SetSigIntHandler()){
 		ERR("Could not set SIGINT handler.");
+		HostnameMap::Clear();
 		exit(EXIT_FAILURE);
 	}
 
@@ -6364,6 +6982,7 @@ int main(int argc, char** argv)
 	}
 	InputIF.Clean();
 
+	HostnameMap::Clear();
 	exit(EXIT_SUCCESS);
 }
 
