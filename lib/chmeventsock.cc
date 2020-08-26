@@ -91,6 +91,7 @@ using namespace	std;
 #define	CTL_RES_SUCCESS						"SUCCEED\n"
 #define	CTL_RES_SUCCESS_NOSERVER			"SUCCEED: There no server on RING.\n"
 #define	CTL_RES_SUCCESS_STATUS_NOTICE		"SUCCEED: Send status notice to no server on RING.\n"
+#define	CTL_RES_SUCCESS_ALREADY_SERVICEOUT	"SUCCEED: Already server has been SERVICEOUT.\n"
 #define	CTL_RES_ERROR						"ERROR: Something error is occured.\n"
 #define	CTL_RES_ERROR_PARAMETER				"ERROR: Parameters are wrong.\n"
 #define	CTL_RES_ERROR_COMMUNICATION			"ERROR: Something error is occured in sending/receiving data on RING.\n"
@@ -6724,9 +6725,9 @@ bool ChmEventSock::RequestServiceOut(chmpxid_t chmpxid, string* pstring)
 
 		CHANGE_CHMPXSTS_TO_SRVOUT(status);
 		if(status == old_status){
-			ERR_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by service out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
-			*pstring = CTL_RES_ERROR_STATUS_NOT_ALLOWED;
-			return false;
+			WAN_CHMPRN("chmpxid(0x%016" PRIx64 ") already has status(0x%016" PRIx64 ":%s) by service out request, then nothing to do.", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str());
+			*pstring = CTL_RES_SUCCESS_ALREADY_SERVICEOUT;
+			return true;
 		}
 		MSG_CHMPRN("server(chmpxid:0x%016" PRIx64 ") status(0x%016" PRIx64 ":%s) try to change from old status(0x%016" PRIx64 ":%s).", chmpxid, status, STR_CHMPXSTS_FULL(status).c_str(), old_status, STR_CHMPXSTS_FULL(old_status).c_str());
 
