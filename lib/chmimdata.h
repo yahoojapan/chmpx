@@ -74,7 +74,7 @@ class ChmIMData
 		static bool MakeFilePath(const char* groupname, short port, MKFPMODE mode, std::string& shmpath);
 		static bool MakeShmFilePath(const char* groupname, short port, std::string& shmpath);
 		static bool MakeK2hashFilePath(const char* groupname, short port, std::string& shmpath);
-		static bool CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_status = true);
+		static bool CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_status = true, bool ignore_down = true);
 
 		off_t GetLockOffsetForMQ(void) const;
 		bool CloseShm(void);

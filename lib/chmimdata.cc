@@ -86,7 +86,7 @@ bool ChmIMData::MakeK2hashFilePath(const char* groupname, short port, string& sh
 	return ChmIMData::MakeFilePath(groupname, port, ChmIMData::MKFILEPATH_K2H, shmpath);
 }
 
-bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_status)
+bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_status, bool ignore_down)
 {
 	if(!pbase && 0L == bcount && !pmerge && 0L == mcount){
 		return true;
@@ -94,28 +94,41 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 	if(!pbase || bcount <= 0L || !pmerge || mcount <= 0L){
 		return false;
 	}
-	if(bcount != mcount){
+
+	if(!ignore_down && bcount != mcount){
 		return false;
 	}
-
-	for(long mcnt = 0; mcnt < mcount; mcnt++){
-		long	bcnt;
+	long	mcnt;
+	long	bcnt;
+	for(mcnt = 0; mcnt < mcount; mcnt++){
 		for(bcnt = 0; bcnt < bcount; bcnt++){
 			if(pbase[bcnt].chmpxid == pmerge[mcnt].chmpxid){
 				break;
 			}
 		}
 		if(bcount <= bcnt){
+			if(ignore_down){
+				// In case the SETVICEOUT/DOWN server can be ignored, check the status.
+				//
+				if(	IS_CHMPXSTS_DOWN(pmerge[mcnt].status)	&&
+					IS_CHMPXSTS_SRVOUT(pmerge[mcnt].status)	&&
+					IS_CHMPXSTS_NOACT(pmerge[mcnt].status)	&&
+					IS_CHMPXSTS_NOTHING(pmerge[mcnt].status))
+				{
+					// found SERVIEOUT/DOWN server node, skip this.
+					continue;
+				}
+			}
 			return false;
 		}
 		if(	0 != strncmp(pbase[bcnt].name,						pmerge[mcnt].name,			NI_MAXHOST)			||
 			0 != strncmp(pbase[bcnt].cuk,						pmerge[mcnt].cuk,			CUK_MAX)			||
 			0 != strncmp(pbase[bcnt].custom_seed,				pmerge[mcnt].custom_seed,	CUSTOM_ID_SEED_MAX)	||
 			!CMP_CHMPXSSL(pbase[bcnt].ssl,						pmerge[mcnt].ssl)								||
-			!compare_hostport_pairs(pbase[bcnt].endpoints,		pbase[bcnt].endpoints,		EXTERNAL_EP_MAX)	||
-			!compare_hostport_pairs(pbase[bcnt].ctlendpoints,	pbase[bcnt].ctlendpoints,	EXTERNAL_EP_MAX)	||
-			!compare_hostport_pairs(pbase[bcnt].forward_peers,	pbase[bcnt].forward_peers,	FORWARD_PEER_MAX)	||
-			!compare_hostport_pairs(pbase[bcnt].reverse_peers,	pbase[bcnt].reverse_peers,	REVERSE_PEER_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].endpoints,		pmerge[mcnt].endpoints,		EXTERNAL_EP_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].ctlendpoints,	pmerge[mcnt].ctlendpoints,	EXTERNAL_EP_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].forward_peers,	pmerge[mcnt].forward_peers,	FORWARD_PEER_MAX)	||
+			!compare_hostport_pairs(pbase[bcnt].reverse_peers,	pmerge[mcnt].reverse_peers,	REVERSE_PEER_MAX)	||
 			pbase[bcnt].port									!= pmerge[mcnt].port							||
 			pbase[bcnt].ctlport									!= pmerge[mcnt].ctlport							||
 			(is_status && pbase[bcnt].base_hash					!= pmerge[mcnt].base_hash)						||
@@ -123,6 +136,48 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 			(is_status && pbase[bcnt].status					!= pmerge[mcnt].status)							)
 		{
 			return false;
+		}
+	}
+
+	// If ignoring the SETVICEOUT/DOWN server, check it in reverse as well.
+	// [TODO] Should avoid redundancy
+	//
+	if(ignore_down){
+		for(bcnt = 0; bcnt < bcount; bcnt++){
+			for(mcnt = 0; mcnt < mcount; mcnt++){
+				if(pmerge[mcnt].chmpxid == pbase[bcnt].chmpxid){
+					break;
+				}
+			}
+			if(mcount <= mcnt){
+				// In case the SETVICEOUT/DOWN server can be ignored, check the status.
+				//
+				if(	IS_CHMPXSTS_DOWN(pbase[bcnt].status)	&&
+					IS_CHMPXSTS_SRVOUT(pbase[bcnt].status)	&&
+					IS_CHMPXSTS_NOACT(pbase[bcnt].status)	&&
+					IS_CHMPXSTS_NOTHING(pbase[bcnt].status))
+				{
+					// found SERVIEOUT/DOWN server node, skip this.
+					continue;
+				}
+				return false;
+			}
+			if(	0 != strncmp(pmerge[mcnt].name,						pbase[bcnt].name,			NI_MAXHOST)			||
+				0 != strncmp(pmerge[mcnt].cuk,						pbase[bcnt].cuk,			CUK_MAX)			||
+				0 != strncmp(pmerge[mcnt].custom_seed,				pbase[bcnt].custom_seed,	CUSTOM_ID_SEED_MAX)	||
+				!CMP_CHMPXSSL(pmerge[mcnt].ssl,						pbase[bcnt].ssl)								||
+				!compare_hostport_pairs(pmerge[mcnt].endpoints,		pbase[bcnt].endpoints,		EXTERNAL_EP_MAX)	||
+				!compare_hostport_pairs(pmerge[mcnt].ctlendpoints,	pbase[bcnt].ctlendpoints,	EXTERNAL_EP_MAX)	||
+				!compare_hostport_pairs(pmerge[mcnt].forward_peers,	pbase[bcnt].forward_peers,	FORWARD_PEER_MAX)	||
+				!compare_hostport_pairs(pmerge[mcnt].reverse_peers,	pbase[bcnt].reverse_peers,	REVERSE_PEER_MAX)	||
+				pmerge[mcnt].port									!= pbase[bcnt].port								||
+				pmerge[mcnt].ctlport								!= pbase[bcnt].ctlport							||
+				(is_status && pmerge[mcnt].base_hash				!= pbase[bcnt].base_hash)						||
+				(is_status && pmerge[mcnt].pending_hash				!= pbase[bcnt].pending_hash)					||
+				(is_status && pmerge[mcnt].status					!= pbase[bcnt].status)							)
+			{
+				return false;
+			}
 		}
 	}
 	return true;
