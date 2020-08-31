@@ -1,3 +1,9 @@
+chmpx (1.0.83) unstable; urgency=low
+
+  * Reverted and fixed again about the shared lock - #68
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 31 Aug 2020 13:54:48 +0900
+
 chmpx (1.0.82) unstable; urgency=low
 
   * Fixed chmpxlinetool bug for nodes with different resolv - #66
