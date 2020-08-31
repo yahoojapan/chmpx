@@ -556,8 +556,6 @@ bool ChmIMData::CloseShm(void)
 	CHM_MUMMAP(ShmFd, pChmShm, ShmSize);
 	ChmpxPid = CHM_INVALID_PID;
 
-	ChmLock::UnsetChmShmFd();
-
 	return result;
 }
 
@@ -785,8 +783,6 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 	ShmFd	= fd;
 	ShmSize	= total_shmsize;
 
-	ChmLock::SetChmShmFd(ShmFd);
-
 	return true;
 }
 
@@ -865,8 +861,6 @@ bool ChmIMData::AttachShm(void)
 	pChmShm = reinterpret_cast<PCHMSHM>(shmbase);
 	ShmFd	= fd;
 	ShmSize	= total_shmsize;
-
-	ChmLock::SetChmShmFd(ShmFd);
 
 	return true;
 }
@@ -1155,7 +1149,6 @@ bool ChmIMData::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove,
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_WRITE);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-
 	return tmpchminfo.MergeChmpxSvrs(pchmpxsvrs, count, is_remove, is_init_process, eqfd);
 }
 
