@@ -194,6 +194,9 @@ Please specify the configuration file(.ini .yaml. Json) that was specified when 
 #### -json [json string]
 Please specify the configuration of the JSON string specified when starting the CHMPX process to be connected.
 This option is an exclusive option to the **-conf** option.
+#### -group [group name]
+Specify the group name for chmpx cluster.  
+This option is exclusive with the **-conf** and **-json** options.
 #### -host [hostname]
 Specify the host name of the operating CHMPX process to be connected.  
 This option is exclusive with the **-conf** and **-json** options.
