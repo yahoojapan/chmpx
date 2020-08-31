@@ -55,17 +55,12 @@ typedef enum chm_lock_type{
 class ChmLock : public FLRwlRcsv
 {
 	protected:
-		static int		chmshmfd;		// SHM for CHMPX
-
 		CHMLOCKKIND		kind;			// Lock target kind
 
 	protected:
 		ChmLock(void);					// Not use by any
 
 	public:
-		static int SetChmShmFd(int fd);
-		static int UnsetChmShmFd(void);
-
 		ChmLock(CHMLOCKKIND LockKind, CHMLOCKTYPE LockType);
 		ChmLock(CHMLOCKTYPE LockType, int TargetFd, off_t FileOffset);
 		virtual ~ChmLock();
