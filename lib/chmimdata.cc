@@ -86,7 +86,21 @@ bool ChmIMData::MakeK2hashFilePath(const char* groupname, short port, string& sh
 	return ChmIMData::MakeFilePath(groupname, port, ChmIMData::MKFILEPATH_K2H, shmpath);
 }
 
-bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_status, bool ignore_down)
+bool ChmIMData::CompareChmpxNameAndCustomSeed(const CHMPXSVR& src1, const CHMPXSVR& src2, bool is_check_custom_seed)
+{
+	if(0 == strncmp(src1.name, src2.name, NI_MAXHOST)){
+		return true;
+	}
+	if(!is_check_custom_seed){
+		return false;
+	}
+	if(0 == strncmp(src1.name, src2.custom_seed, NI_MAXHOST) || 0 == strncmp(src2.name, src1.custom_seed, NI_MAXHOST)){	// [NOTE] NI_MAXHOST < CUSTOM_ID_SEED_MAX
+		return true;
+	}
+	return false;
+}
+
+bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge, long mcount, bool is_check_custom_seed, bool is_status, bool ignore_down)
 {
 	if(!pbase && 0L == bcount && !pmerge && 0L == mcount){
 		return true;
@@ -121,7 +135,7 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 			}
 			return false;
 		}
-		if(	0 != strncmp(pbase[bcnt].name,						pmerge[mcnt].name,			NI_MAXHOST)			||
+		if(	!ChmIMData::CompareChmpxNameAndCustomSeed(pbase[bcnt], pmerge[mcnt], is_check_custom_seed)			||
 			0 != strncmp(pbase[bcnt].cuk,						pmerge[mcnt].cuk,			CUK_MAX)			||
 			0 != strncmp(pbase[bcnt].custom_seed,				pmerge[mcnt].custom_seed,	CUSTOM_ID_SEED_MAX)	||
 			!CMP_CHMPXSSL(pbase[bcnt].ssl,						pmerge[mcnt].ssl)								||
@@ -162,7 +176,7 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pbase, long bcount, PCHMPXSVR pmerge,
 				}
 				return false;
 			}
-			if(	0 != strncmp(pmerge[mcnt].name,						pbase[bcnt].name,			NI_MAXHOST)			||
+			if(	!ChmIMData::CompareChmpxNameAndCustomSeed(pmerge[mcnt], pbase[bcnt], is_check_custom_seed)			||
 				0 != strncmp(pmerge[mcnt].cuk,						pbase[bcnt].cuk,			CUK_MAX)			||
 				0 != strncmp(pmerge[mcnt].custom_seed,				pbase[bcnt].custom_seed,	CUSTOM_ID_SEED_MAX)	||
 				!CMP_CHMPXSSL(pmerge[mcnt].ssl,						pbase[bcnt].ssl)								||
@@ -1131,7 +1145,8 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count)
 	}
 
 	// check
-	if(!ChmIMData::CompareChmpxSvrs(pbasechmpxsvrs, basecount, pchmpxsvrs, count)){
+	bool	is_check_custom_seed = (CHMPXID_SEED_CUSTOM == tmpchminfo.GetChmpxSeedType());
+	if(!ChmIMData::CompareChmpxSvrs(pbasechmpxsvrs, basecount, pchmpxsvrs, count, is_check_custom_seed)){
 		MSG_CHMPRN("Not same servers status by each comparing.");
 		CHM_Free(pbasechmpxsvrs);
 		return false;
@@ -1170,7 +1185,8 @@ bool ChmIMData::MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, 
 	}
 
 	// check
-	if(!ChmIMData::CompareChmpxSvrs(pbasechmpxsvrs, basecount, pchmpxsvrs, count, false)){	// without checking status
+	bool	is_check_custom_seed = (CHMPXID_SEED_CUSTOM == tmpchminfo.GetChmpxSeedType());
+	if(!ChmIMData::CompareChmpxSvrs(pbasechmpxsvrs, basecount, pchmpxsvrs, count, is_check_custom_seed, false)){	// without checking status
 		ERR_CHMPRN("For merging, could not merge from new chmpx servers information to now one, there are many difference.");
 		CHM_Free(pbasechmpxsvrs);
 		return false;
