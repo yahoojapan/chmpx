@@ -951,7 +951,7 @@ class chmpx_lap : public structure_lap<T>
 		bool FindSock(int sock);
 		bool Get(chmhash_t& base, chmhash_t& pending) const;
 		bool GetChmpxSvr(PCHMPXSVR chmpxsvr) const;
-		bool MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force = false, int eqfd = CHM_INVALID_HANDLE);
+		bool MergeChmpxSvr(PCHMPXSVR chmpxsvr, CHMPXID_SEED_TYPE type, bool is_force = false, int eqfd = CHM_INVALID_HANDLE);
 
 		bool IsServerMode(void) const { return (basic_type::pAbsPtr && CHMPX_SERVER == basic_type::pAbsPtr->mode); }
 		bool IsSlaveMode(void) const { return (basic_type::pAbsPtr && CHMPX_SLAVE == basic_type::pAbsPtr->mode); }
@@ -1737,7 +1737,7 @@ bool chmpx_lap<T>::GetChmpxSvr(PCHMPXSVR chmpxsvr) const
 // In these case, the caller should make adjustments beforehand.
 //
 template<typename T>
-bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
+bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, CHMPXID_SEED_TYPE type, bool is_force, int eqfd)
 {
 	if(!chmpxsvr){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -1814,9 +1814,22 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		}
 
 	}else{
+		// [NOTE]
+		// Be care for in consideration of special situations such as when the hostname and FQDN are different,
+		// or when the hostname is not registered in DNS.
+		// When using CUSTOM SEED, there is a case that the hostname is set to name. Thus it may not be able
+		// to resolve the name, so resolve this.
+		// However, the chmpxid is conditional on the same.
+		//
 		if(basic_type::pAbsPtr->chmpxid != chmpxsvr->chmpxid || !IsInHostnameList(basic_type::pAbsPtr->name, node_list, foundname, true)){
-			ERR_CHMPRN("name(%s - %s) or chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ") is different.", basic_type::pAbsPtr->name, chmpxsvr->name, basic_type::pAbsPtr->chmpxid, chmpxsvr->chmpxid);
-			return false;
+			if(CHMPXID_SEED_CUSTOM != type || 0 != strncmp(basic_type::pAbsPtr->custom_seed, chmpxsvr->name, CUSTOM_ID_SEED_MAX)){
+				if(CHMPXID_SEED_CUSTOM != type){
+					ERR_CHMPRN("name(%s - %s) or chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ") is different.", basic_type::pAbsPtr->name, chmpxsvr->name, basic_type::pAbsPtr->chmpxid, chmpxsvr->chmpxid);
+				}else{
+					ERR_CHMPRN("name(%s(%s) - %s) or chmpxid(0x%016" PRIx64 " - 0x%016" PRIx64 ") is different.", basic_type::pAbsPtr->name, basic_type::pAbsPtr->custom_seed, chmpxsvr->name, basic_type::pAbsPtr->chmpxid, chmpxsvr->chmpxid);
+				}
+				return false;
+			}
 		}
 		bool	is_overwrite_port	= false;
 		bool	is_overwrite_ctlport= false;
@@ -1890,7 +1903,7 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, bool is_force, int eqfd)
 		basic_type::pAbsPtr->last_status_time	= chmpxsvr->last_status_time;
 		basic_type::pAbsPtr->status				= chmpxsvr->status;
 	}else{
-		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status is did not change from (0x%016" PRIx64 ":%s) to (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, basic_type::pAbsPtr->status, STR_CHMPXSTS_FULL(basic_type::pAbsPtr->status).c_str(), chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
+		MSG_CHMPRN("chmpxid(0x%016" PRIx64 ") status(update time : %zu) is did not change from (0x%016" PRIx64 ":%s) to (0x%016" PRIx64 ":%s) with last update time(%zu)", basic_type::pAbsPtr->chmpxid, basic_type::pAbsPtr->last_status_time, basic_type::pAbsPtr->status, STR_CHMPXSTS_FULL(basic_type::pAbsPtr->status).c_str(), chmpxsvr->status, STR_CHMPXSTS_FULL(chmpxsvr->status).c_str(), chmpxsvr->last_status_time);
 	}
 	return true;
 }
@@ -5990,7 +6003,7 @@ bool chmpxman_lap<T>::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, CHMPXID_SEED_TYPE typ
 			// Since there are addition and deletion of chmpx in the processing after here,
 			// those hash values are recalculated after all processing is completed.
 			//
-			if(!svrchmpx.MergeChmpxSvr(&pchmpxsvrs[cnt], false, eqfd)){						// not force(port/ctlport)
+			if(!svrchmpx.MergeChmpxSvr(&pchmpxsvrs[cnt], type, false, eqfd)){						// not force(port/ctlport)
 				WAN_CHMPRN("Failed to merge CHMPX(%s: 0x%016" PRIx64 ") from CHMPXSVR, but continue...", pchmpxsvrs[cnt].name, pchmpxsvrs[cnt].chmpxid);
 			}
 
