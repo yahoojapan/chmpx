@@ -427,7 +427,7 @@ bool IsMatchHostname(const char* target, strlst_t& regex_lst, string& foundname)
 		regex_t	regex_obj;
 		int		result;
 		if(0 != (result = regcomp(&regex_obj, reg_iter->c_str(), REG_EXTENDED | REG_NOSUB))){
-			WAN_CHMPRN("Failed to compile regex for %s, then skip this and continue...", reg_iter->c_str());
+			WAN_CHMPRN("Failed to compile regex for %s(result=%d), then skip this and continue...", reg_iter->c_str(), result);
 			continue;
 		}
 		// loop for all expand host
