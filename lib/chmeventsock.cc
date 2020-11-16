@@ -7536,6 +7536,9 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 		// compkt
 		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 		PPXCOM_N2_STATUS_REQ	pStatusReq	= CVT_COMPTR_N2_STATUS_REQ(pComAll);
+
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress internalAstError
 		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
 		pStatusReq->head.type	= CHMPX_COM_N2_STATUS_REQ;

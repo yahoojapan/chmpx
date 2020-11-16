@@ -918,9 +918,7 @@ bool ChmSecureSock::LoadCertPrivateKey(const char* pCertFile, const char* pPriva
 		// generate Private Key object
 		if(NULL == (pk11PKeyObj = ChmSecureSock::GeneratePK11GenericObject(pPrivateKeyFile, true))){
 			ERR_CHMPRN("Failed to generate Private Key object.");
-			if(pCert){
-				CERT_DestroyCertificate(pCert);
-			}
+			CERT_DestroyCertificate(pCert);
 			PK11_DestroyGenericObject(pk11CertObj);
 			return false;
 		}

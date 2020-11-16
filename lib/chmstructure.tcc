@@ -6387,6 +6387,8 @@ bool chmpxman_lap<T>::RawCheckContainsChmpxSvrs(const char* hostname, const shor
 	if(pctlport){
 		is_strict = true;
 		if(!CHMEMPTYSTR(pcuk)){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress nullPointer
 			strcuk = pcuk;
 		}
 	}else{
