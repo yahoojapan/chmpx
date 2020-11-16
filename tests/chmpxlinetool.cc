@@ -5590,9 +5590,9 @@ static bool ServiceOutCommand(params_t& params)
 	}else{
 		tghost		= node.GetHostname();
 		tgport		= node.GetCtrlport();
-		tgcuk		= node.GetCuk();
 		tgctleps	= node.GetCtlendpoints();
-		tgcs		= node.GetCusomSeed();
+		//tgcuk		= node.GetCuk();			// cppcheck reports this is unreadVariable
+		//tgcs		= node.GetCusomSeed();		// cppcheck reports this is unreadVariable
 	}
 	if(CHM_INVALID_PORT == tgport){
 		PRN("Target control port is not specified, you need to specify this.");

@@ -320,8 +320,10 @@ bool ChmEventShm::CheckNotifyEvent(void) const
 	// analyze event types
 	struct inotify_event*	in_event	= NULL;
 	bool					result		= false;
-	for(unsigned char* ptr = pevent; (ptr + sizeof(struct inotify_event)) <= (pevent + bytes); ptr += sizeof(struct inotify_event) + in_event->len){
-		in_event = reinterpret_cast<struct inotify_event*>(ptr);
+	uint32_t				tmp_length	= 0;
+	for(unsigned char* ptr = pevent; (ptr + sizeof(struct inotify_event)) <= (pevent + bytes); ptr += sizeof(struct inotify_event) + tmp_length){
+		in_event   = reinterpret_cast<struct inotify_event*>(ptr);
+		tmp_length = in_event->len;
 
 		if(watchfd != in_event->wd){
 			continue;
