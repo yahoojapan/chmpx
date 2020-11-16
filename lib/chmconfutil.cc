@@ -43,7 +43,7 @@ bool right_check_json_string(const char* target)
 	}
 	for(const char* ptr = target; ptr && '\0' != *ptr; ++ptr){
 		if(0 == isspace(*ptr) && '\\' != *ptr){
-			if('{' == *ptr || '[' == *ptr || ':' == *ptr || '}' == *ptr || ']' == *ptr || '\\' == *ptr || '\'' == *ptr || '\"' == *ptr){
+			if('{' == *ptr || '[' == *ptr || ':' == *ptr || '}' == *ptr || ']' == *ptr || '\'' == *ptr || '\"' == *ptr){
 				return true;
 			}
 			break;

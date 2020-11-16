@@ -52,7 +52,7 @@ typedef struct host_port_pair{
 		port(0)
 	{}
 
-	host_port_pair(const struct host_port_pair& other) :
+	explicit host_port_pair(const struct host_port_pair& other) :
 		host(other.host),
 		port(other.port)
 	{}
@@ -153,7 +153,7 @@ typedef struct chm_node_cfg_info{
 		custom_seed("")						// after v1.0.71
 	{}
 
-	chm_node_cfg_info(const struct chm_node_cfg_info& other) :
+	explicit chm_node_cfg_info(const struct chm_node_cfg_info& other) :
 		name(other.name),
 		port(other.port),
 		ctlport(other.ctlport),
@@ -365,7 +365,7 @@ typedef struct chm_cfg_info{
 		nssdb_dir("")
 	{}
 
-	chm_cfg_info(const struct chm_cfg_info& other) :
+	explicit chm_cfg_info(const struct chm_cfg_info& other) :
 		groupname(other.groupname),
 		revision(other.revision),
 		is_server_mode(other.is_server_mode),

@@ -884,7 +884,7 @@ static int RunChild(string cntlfile)
 //---------------------------------------------------------
 // Print Result
 //---------------------------------------------------------
-static void PrintResult(const PEXECCNTL pexeccntl, const PCHLDCNTL pchldcntl, struct timespec& realtime)
+static void PrintResult(const PEXECCNTL pexeccntl, const PCHLDCNTL pchldcntl, const struct timespec& realtime)
 {
 	if(!pexeccntl || !pchldcntl){
 		ERR("Parameters are wrong.");
