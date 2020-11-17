@@ -1,6 +1,6 @@
 CHMPX
 --------
-[![Build Status](https://travis-ci.org/yahoojapan/chmpx.svg?branch=master)](https://travis-ci.org/yahoojapan/chmpx)
+[![C/C++ AntPickax CI](https://github.com/yahoojapan/chmpx/workflows/C/C++%20AntPickax%20CI/badge.svg)](https://github.com/yahoojapan/chmpx/actions)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/yahoojapan/chmpx/master/COPYING)
 [![GitHub forks](https://img.shields.io/github/forks/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/network)
 [![GitHub stars](https://img.shields.io/github/stars/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/stargazers)
