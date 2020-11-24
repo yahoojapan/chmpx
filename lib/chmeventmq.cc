@@ -1251,7 +1251,11 @@ bool ChmEventMq::Processing(PCOMPKT pComPkt)
 		// make packet for MQ
 		COMPKT	SendComPkt;
 		COPY_COMPKT(&SendComPkt, pComPkt);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress redundantAssignment
 		SendComPkt.length = sizeof(COMPKT);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress redundantAssignment
 		SendComPkt.offset = static_cast<off_t>(sizeof(COMPKT));
 
 		unsigned char*	pbody	= reinterpret_cast<unsigned char*>(pComPkt) + pComPkt->offset;
