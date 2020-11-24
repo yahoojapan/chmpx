@@ -1,3 +1,9 @@
+chmpx (1.0.86) unstable; urgency=low
+
+  * Fixed a error by cppcheck 2.2 - #76
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 24 Nov 2020 11:56:24 +0900
+
 chmpx (1.0.85) unstable; urgency=low
 
   * Switched Travis CI to Github actions and extended supported OS - #74
