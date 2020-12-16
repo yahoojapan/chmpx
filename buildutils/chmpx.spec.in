@@ -53,7 +53,11 @@ License: @PKGLICENSE@
 URL: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@
 Source0: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@/archive/%{gittag}/%{name}-%{version}.tar.gz
 Requires: k2hash%{?_isa} >= 1.0.74, libfullock%{?_isa} >= 1.0.36
+%if 0%{?rhel} == 6
 BuildRequires: git-core gcc-c++ make libtool k2hash-devel >= 1.0.74, libfullock-devel >= 1.0.36
+%else
+BuildRequires: systemd git-core gcc-c++ make libtool k2hash-devel >= 1.0.74, libfullock-devel >= 1.0.36
+%endif
 
 %description
 @LONGDESC@
@@ -69,6 +73,12 @@ BuildRequires: git-core gcc-c++ make libtool k2hash-devel >= 1.0.74, libfullock-
 %install
 %make_install
 find %{buildroot} -name '*.la' -exec rm -f {} ';'
+%if 0%{?rhel} != 6
+install -D -m 644 buildutils/chmpx.service %{buildroot}/lib/systemd/system/chmpx.service
+install -D -m 755 buildutils/chmpx-service-helper %{buildroot}/usr/libexec/chmpx-service-helper
+install -D -m 644 buildutils/chmpx-service-helper.conf %{buildroot}/etc/antpickax/chmpx-service-helper.conf
+install -D -m 644 buildutils/chmpx.ini.example %{buildroot}/etc/antpickax/chmpx.ini.example
+%endif
 
 %if %{make_check}
 %check
@@ -98,6 +108,16 @@ rm -rf %{buildroot}
 %{_libdir}/*.so.1*
 %{_mandir}/man1/*
 %{_bindir}/*
+%if 0%{?rhel} != 6
+/lib/systemd/system/chmpx.service
+/usr/libexec/chmpx-service-helper
+/etc/antpickax/*
+%endif
+
+%if 0%{?rhel} != 6
+%preun
+%systemd_preun @PACKAGE_NAME@.service
+%endif
 
 #
 # devel package

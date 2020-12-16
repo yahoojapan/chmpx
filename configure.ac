@@ -78,9 +78,10 @@ AC_FUNC_REALLOC
 AC_FUNC_MKTIME
 AC_FUNC_FORK
 AC_FUNC_ERROR_AT_LINE
-AC_CHECK_FUNCS([ftruncate gethostname memset regcomp setlocale strcasecmp strncasecmp strdup strrchr clock_gettime munmap select socket uname gettimeofday strstr])
-AC_CHECK_HEADERS([termios.h])
+AC_CHECK_FUNCS([ftruncate gethostname memset regcomp setlocale strcasecmp strncasecmp strdup strrchr clock_gettime munmap select socket uname gettimeofday strstr inet_ntoa])
+AC_CHECK_HEADERS([termios.h arpa/inet.h])
 AC_CONFIG_MACRO_DIR([m4])
+AC_HEADER_RESOLV
 
 #
 # Symbols for buildutils

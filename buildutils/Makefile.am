@@ -30,10 +30,17 @@ EXTRA_DIST =make_variables.sh \
 			make_rpm_changelog.sh \
 			make_description.sh \
 			debian_build.sh \
-			rpm_build.sh
+			rpm_build.sh \
+			chmpx.service \
+			chmpx-service-helper \
+			chmpx-service-helper.conf \
+			chmpx.ini.example
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #
