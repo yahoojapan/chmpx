@@ -242,23 +242,23 @@ rm -rf ${EXPANDDIR}/debian/*.ex ${EXPANDDIR}/debian/*.EX ${EXPANDDIR}/debian/${P
 # adding some lines into rules file
 #
 mv ${EXPANDDIR}/debian/rules ${EXPANDDIR}/debian/rules.base
-head -1 ${EXPANDDIR}/debian/rules.base													> ${EXPANDDIR}/debian/rules  || exit 1
-sed '/^#/d' ${EXPANDDIR}/debian/rules.base | sed '/^$/{N; /^\n$/D;}'					>> ${EXPANDDIR}/debian/rules || exit 1
-echo ""																					>> ${EXPANDDIR}/debian/rules || exit 1
-echo "# for ${PACKAGE_NAME} and ${PACKAGE_DEV_NAME} packages"							>> ${EXPANDDIR}/debian/rules || exit 1
-echo "override_dh_auto_install:"														>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	dh_auto_install --destdir=debian/${PACKAGE_NAME}"								>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	dh_auto_install --destdir=debian/${PACKAGE_DEV_NAME}"							>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	if [ -d debian/${PACKAGE_NAME}/usr/include ]; then                              rm -rf debian/${PACKAGE_NAME}/usr/include;                                              fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	if [ -d debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/pkgconfig ]; then       rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/pkgconfig;                       fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	if [ -d debian/${PACKAGE_DEV_NAME}/usr/bin ]; then                              rm -rf debian/${PACKAGE_DEV_NAME}/usr/bin;                                              fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	if [ -d debian/${PACKAGE_DEV_NAME}/usr/share/man ]; then                        rm -rf debian/${PACKAGE_DEV_NAME}/usr/share/man;                                        fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.a >/dev/null 2>&1;         if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.a;       fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.la >/dev/null 2>&1;        if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.la;      fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.so >/dev/null 2>&1;        if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.so;      fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a >/dev/null 2>&1;     if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a;   fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la >/dev/null 2>&1;    if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la;  fi"	>> ${EXPANDDIR}/debian/rules || exit 1
-echo "	ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.* >/dev/null 2>&1;  if [ $? -eq 0 ]; then rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.*;fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+head -1 ${EXPANDDIR}/debian/rules.base																																	> ${EXPANDDIR}/debian/rules  || exit 1
+sed '/^#/d' ${EXPANDDIR}/debian/rules.base | sed '/^$/{N; /^\n$/D;}' | sed 's/autotools-dev/autotools-dev,systemd/'														>> ${EXPANDDIR}/debian/rules || exit 1
+echo ""																																									>> ${EXPANDDIR}/debian/rules || exit 1
+echo "# for ${PACKAGE_NAME} and ${PACKAGE_DEV_NAME} packages"																											>> ${EXPANDDIR}/debian/rules || exit 1
+echo "override_dh_auto_install:"																																		>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	dh_auto_install --destdir=debian/${PACKAGE_NAME}"																												>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	dh_auto_install --destdir=debian/${PACKAGE_DEV_NAME}"																											>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -d debian/${PACKAGE_NAME}/usr/include ]; then                                      rm -rf debian/${PACKAGE_NAME}/usr/include;                          fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -d debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/pkgconfig ]; then               rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/pkgconfig;   fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -d debian/${PACKAGE_DEV_NAME}/usr/bin ]; then                                      rm -rf debian/${PACKAGE_DEV_NAME}/usr/bin;                          fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -d debian/${PACKAGE_DEV_NAME}/usr/share/man ]; then                                rm -rf debian/${PACKAGE_DEV_NAME}/usr/share/man;                    fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.a >/dev/null 2>&1; then         rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.a;         fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.la >/dev/null 2>&1; then        rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.la;        fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.so >/dev/null 2>&1; then        rm -rf debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.so;        fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a >/dev/null 2>&1; then     rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a;     fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la >/dev/null 2>&1; then    rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la;    fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.* >/dev/null 2>&1; then  rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.*;  fi"	>> ${EXPANDDIR}/debian/rules || exit 1
 
 if [ "X${CONFIGUREOPT}" != "X" ]; then
 	echo ""																				>> ${EXPANDDIR}/debian/rules || exit 1
@@ -275,6 +275,14 @@ if [ "X${FOUND_LIB_LINES}" != "X" ]; then
 	echo "usr/lib/x86_64-linux-gnu/${LIB_BASENAME}.so.${LIBRARY_LIBTOOL_VERSION} usr/lib/x86_64-linux-gnu/${LIB_BASENAME}.so"						>> ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.links	|| exit 1
 	echo "usr/lib/x86_64-linux-gnu/${LIB_BASENAME}.so.${LIBRARY_LIBTOOL_VERSION} usr/lib/x86_64-linux-gnu/${LIB_BASENAME}.so.${PACKAGE_MAJOR_VER}"	>> ${EXPANDDIR}/debian/${PACKAGE_NAME}.links		|| exit 1
 fi
+
+#
+# files for systemd service
+#
+cp ${MYSCRIPTDIR}/chmpx.service ${EXPANDDIR}/debian/chmpx.service || exit 1
+echo "buildutils/chmpx-service-helper usr/libexec"			>> ${EXPANDDIR}/debian/${PACKAGE_NAME}.install || exit
+echo "buildutils/chmpx-service-helper.conf etc/antpickax"	>> ${EXPANDDIR}/debian/${PACKAGE_NAME}.install || exit
+echo "buildutils/chmpx.ini.example etc/antpickax"			>> ${EXPANDDIR}/debian/${PACKAGE_NAME}.install || exit
 
 #
 # copy copyright
@@ -429,6 +437,6 @@ exit 0
 # tab-width: 4
 # c-basic-offset: 4
 # End:
-# vim600: expandtab sw=4 ts=4 fdm=marker
-# vim<600: expandtab sw=4 ts=4
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #

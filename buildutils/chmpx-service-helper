@@ -1,0 +1,1200 @@
+#!/bin/sh
+#
+# Helper Script for Systemd Service based by AntPickax
+#
+# Copyright 2020 Yahoo Japan Corporation.
+#
+# AntPickax provides base utility script for systemd service.
+# The script for each component is created based on the
+# helper scripts provided by AntPickax for building systemd
+# services.
+# By changing some variables and functions of the script,
+# it corresponds to the script of each component.
+# 
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Fri, Dec 18 2020
+# REVISION:
+#
+
+#---------------------------------------------------------------------
+# Common variables
+#---------------------------------------------------------------------
+# [NOTE]
+# The script name is important, it specifies the following format.
+#    <sub process name>-service-helper
+# This name determines the PID file name and log file name.
+# If you want to change these names, customize the assignment formulas
+# and values of the following variables.
+#
+
+#
+# For Script
+#
+PRGNAME=`basename $0`
+BASE_PRGNAME=`echo ${PRGNAME} | sed 's/\./ /g' | awk '{print $1}'`
+BASE_SUBPROCNAME=`echo ${BASE_PRGNAME} | sed 's/-/ /g' | awk '{print $1}'`
+BASE_UPPER_SUBPROCNAME=`echo ${BASE_SUBPROCNAME} | tr '[:lower:]' '[:upper:]'`
+SCRIPTDIR=`dirname $0`
+SCRIPTDIR=`cd ${SCRIPTDIR}; pwd`
+CAUGHT_SIGNAL=0
+
+#
+# Default configuration values
+#
+SCRIPT_DIR_PART_NAME="antpickax"
+
+CONFDIR="/etc/${SCRIPT_DIR_PART_NAME}"
+SERVICE_CONF_FILE="${BASE_PRGNAME}.conf"
+OVERRIDE_FILE="override.conf"
+
+INI_CONF_FILE="${CONFDIR}/${BASE_SUBPROCNAME}.ini"
+INI_CONF_FILE_KEYWORD="${BASE_UPPER_SUBPROCNAME}_INI_CONF_FILE"
+
+PIDDIR="/var/run/${SCRIPT_DIR_PART_NAME}"
+SERVICE_PIDFILE="${BASE_PRGNAME}.pid"
+SUBPROCESS_PIDFILE="${BASE_SUBPROCNAME}.pid"
+SUBPROCESS_BIN="${BASE_SUBPROCNAME}"
+SUBPROCESS_USER=`id -un`
+SUBPROCESS_OPTIONS=""
+BEFORE_RUN_SUBPROCESS=""
+
+WAIT_DEPENDPROC_PIDFILE=""
+WAIT_SEC_AFTER_DEPENDPROC_UP=15
+WAIT_SEC_STARTUP=10
+WAIT_SEC_AFTER_SUBPROCESS_UP=15
+INTERVAL_SEC_FOR_LOOP=10
+
+TRYCOUNT_STOP_SUBPROC=10
+
+# [NOTE]
+# The following are the variables used to specify this helper script
+# and the log file for the subprocess.
+# Normally, the log is left to jounald or syslog related to systemd,
+# so it is not specified.
+# If you want to collect logs yourself, set the values in the following
+# variables. For reference, it can be set as follows:
+#
+#	LOGDIR="/var/log/${SCRIPT_DIR_PART_NAME}"
+#	SERVICE_LOGFILE="${BASE_PRGNAME}.log"
+#	SUBPROCESS_LOGFILE="${BASE_SUBPROCNAME}.log"
+#
+# These values can be specified in configuration file or override.conf.
+#
+LOGDIR=""
+SERVICE_LOGFILE=""
+SUBPROCESS_LOGFILE=""
+
+#---------------------------------------------------------------------
+# Utilitiy functions
+#---------------------------------------------------------------------
+#
+# Usage
+#
+func_usage()
+{
+	echo ""
+	echo "Usage:  $1 {-h | --help} {start | stop}"
+	echo ""
+}
+
+#
+# Message
+#
+# $1 	:	1(stdout) or 2(stderr)
+# $2 	:	Level
+# $3... :	Messages
+#
+print_message()
+{
+	if [ $1 -eq 2 ]; then
+		_PRINT_STDERR=1
+	else
+		_PRINT_STDERR=0
+	fi
+	if [ "X$2" = "X" ]; then
+		_PRINT_LEVEL="ERROR"
+	else
+		_PRINT_LEVEL=$2
+	fi
+	_PRINT_DATE=`date +%FT%T%z`
+	shift; shift;
+
+	if [ "X${LOGDIR}" != "X" -a "X${SERVICE_LOGFILE}" != "X" ]; then
+		echo "${_PRINT_DATE} ${PRGNAME} [${_PRINT_LEVEL}] $@" >> ${LOGDIR}/${SERVICE_LOGFILE}
+	else
+		if [ ${_PRINT_STDERR} -eq 1 ]; then
+			echo "${_PRINT_DATE} ${PRGNAME} [${_PRINT_LEVEL}] $@" 1>&2
+		else
+			echo "${_PRINT_DATE} ${PRGNAME} [${_PRINT_LEVEL}] $@"
+		fi
+	fi
+}
+
+log_err()
+{
+	print_message 1 "ERROR" $@
+}
+
+log_warn()
+{
+	print_message 1 "WARNING" $@
+}
+
+log_info()
+{
+	print_message 1 "INFO" $@
+}
+
+prn_err()
+{
+	print_message 2 "ERROR" $@
+}
+
+prn_warn()
+{
+	print_message 2 "WARNING" $@
+}
+
+prn_info()
+{
+	print_message 2 "INFO" $@
+}
+
+#
+# Check file
+#
+# $1 :	File name/path
+#
+is_safe_file()
+{
+	if [ $# -eq 0 ]; then
+		echo "There are no arguments(is_safe_file)"
+		return 1
+	fi
+	if [ ! -f $1 ]; then
+		echo "$1 is not safe file."
+		return 1
+	fi
+	return 0
+}
+
+#
+# Get value by key name from file
+#
+# $1 :	Key name
+# $2 :	File name/path
+#
+extract_value()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 2 ]; then
+		echo "Not enough arguments - $@"
+		return 1
+	fi
+
+	_EXTRACTVALUE_KEY=$1
+	_EXTRACTVALUE_FILE=$2
+	_ERROR_MSG=`is_safe_file ${_EXTRACTVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "${_ERROR_MSG}"
+		return 1
+	fi
+
+	#
+	# Get latest matching line
+	#
+	_EXTRACTVALUE_LINE=`grep -v "^[[:space:]]*#" ${_EXTRACTVALUE_FILE} | grep "^[[:space:]]*${_EXTRACTVALUE_KEY}[[:space:]]*=" | tail -1`
+	if [ "X${_EXTRACTVALUE_LINE}" = "X" ]; then
+		echo ""
+		return 0
+	fi
+
+	#
+	# Get value(trimed head/tail spaces)
+	#
+	_EXTRACTVALUE_VALUE=`echo ${_EXTRACTVALUE_LINE} | sed "s/^[[:space:]]*${_EXTRACTVALUE_KEY}[[:space:]]*=//g" | sed "s/^[[:space:]]*//g" | sed "s/[[:space:]]*$//g"`
+
+	echo ${_EXTRACTVALUE_VALUE}
+	return 0
+}
+
+#
+# Get value by key name from file
+#
+# $1 :	Key name
+# $2 :	File name/path
+# $3 :	Override file name/path(allow empty)
+#
+get_value()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 2 ]; then
+		echo "Not enough arguments - $@"
+		return 1
+	fi
+
+	_GETVALUE_KEY=$1
+	_GETVALUE_FILE=$2
+	_ERROR_MSG=`is_safe_file ${_GETVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "${_ERROR_MSG}"
+		return 1
+	fi
+
+	if [ $# -ge 3 ]; then
+		_GETVALUE_OVERRIDE_FILE=$3
+		_ERROR_MSG=`is_safe_file ${_GETVALUE_OVERRIDE_FILE}`
+		if [ $? -ne 0 ]; then
+			#
+			# Skip this file becase the file is optinal file
+			#
+			prn_warn "${_ERROR_MSG}"
+			_GETVALUE_OVERRIDE_FILE=
+		fi
+	else
+		_GETVALUE_OVERRIDE_FILE=
+	fi
+
+	#
+	# Check override file and switch file and key
+	#
+	# [NOTE]
+	# The override file is used to replace the file and key with different values
+	# in the following formats(file and key pair):
+	#
+	# <file name>:<key name> = <replace file name/path>:<replace key name>
+	#
+	if [ "X${_GETVALUE_OVERRIDE_FILE}" != "X" ]; then
+		#
+		# Make key for override file
+		#
+		_GETVALUE_FILE_NAME=`basename ${_GETVALUE_FILE}`
+		_GETVALUE_OVERRIDE_PAIRKEY="${_GETVALUE_FILE_NAME}:${_GETVALUE_KEY}"
+
+		#
+		# Search key in override configutation file
+		#
+		_GETVALUE_OVERRIDE_VALUE=`extract_value ${_GETVALUE_OVERRIDE_PAIRKEY} ${_GETVALUE_OVERRIDE_FILE}`
+		if [ $? -eq 0 ]; then
+			#
+			# Found key and parse it
+			#
+			# [NOTE]
+			# The value is "<replace file/path>:<replace key name>" or "value"
+			#
+			echo ${_GETVALUE_OVERRIDE_VALUE} | grep ':' >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				#
+				# Case : "value" directly
+				#
+				echo ${_GETVALUE_OVERRIDE_VALUE}
+				return 0
+
+			else
+				#
+				# Case : "<replace file/path>:<replace key name>"
+				#
+				_GETVALUE_REPLACE_FILE=`echo ${_GETVALUE_OVERRIDE_VALUE} | sed 's/:/ /g' | awk '{print $1}'`
+				_GETVALUE_REPLACE_KEY=`echo ${_GETVALUE_OVERRIDE_VALUE} | sed 's/:/ /g' | awk '{print $2}'`
+
+				if [ "X${_GETVALUE_REPLACE_FILE}" != "X" -a "X${_GETVALUE_REPLACE_KEY}" != "X" ]; then
+					#
+					# Check override configuration file
+					#
+					echo ${_GETVALUE_REPLACE_FILE} | grep -o '^/' >/dev/null 2>&1
+					if [ $? -ne 0 ]; then
+						#
+						# file is relative file path, convert to absolute path
+						#
+						_GETVALUE_TMP_FILENAME=`basename ${_GETVALUE_REPLACE_FILE}`
+						_GETVALUE_TMP_RELATIVE=`dirname ${_GETVALUE_REPLACE_FILE}`
+						_GETVALUE_TMP_CURRENT=`dirname ${_GETVALUE_OVERRIDE_FILE}`
+						_GETVALUE_TMP_ABSOLUTE=`cd ${_GETVALUE_TMP_CURRENT}/${_GETVALUE_TMP_RELATIVE}; pwd`
+
+						_GETVALUE_REPLACE_FILE="${_GETVALUE_TMP_ABSOLUTE}/${_GETVALUE_TMP_FILENAME}"
+					fi
+
+					if [ -f ${_GETVALUE_REPLACE_FILE} ]; then
+						#
+						# file is safe, switch file and key
+						#
+						_GETVALUE_KEY=${_GETVALUE_REPLACE_KEY}
+						_GETVALUE_FILE=${_GETVALUE_REPLACE_FILE}
+					fi
+				fi
+			fi
+		fi
+	fi
+
+	#
+	# Search key in configuration file
+	#
+	_GETVALUE_VALUE=`extract_value ${_GETVALUE_KEY} ${_GETVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "Not found ${_GETVALUE_KEY} in ${_GETVALUE_FILE}"
+		return 1
+	fi
+
+	#
+	# Found key and return value
+	#
+	echo ${_GETVALUE_VALUE}
+	return 0
+}
+
+#---------------------------------------------------------------------
+# Utilitiy control functions
+#---------------------------------------------------------------------
+#
+# Check file exists and wait
+#
+# $1 :	file
+# $2 :	interval second for loop
+#
+wait_file()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -ne 2 ]; then
+		echo "Argument is wrong - $@"
+		return 1
+	fi
+
+	_WAITFILE_FILE=$1
+	_WAITFILE_INTERVAL=$2
+
+	#
+	# Loop
+	#
+	while true; do
+		if [ -f ${_WAITFILE_FILE} ]; then
+			echo "Found ${_WAITFILE_FILE} file."
+			return 0
+		fi
+
+		prn_info "${_WAITFILE_FILE} file is not exsted, thus wait to create it."
+		sleep ${_WAITFILE_INTERVAL}
+	done
+
+	echo "Something is wrong after waiting file(${_WAITFILE_FILE}) loop"
+	return 1
+}
+
+#
+# Wait process up
+#
+# $1 :	PID file
+# $2 :	interval second for loop
+# $3 :	wait second after process up(allow 0 or to be omitted)
+#
+wait_process_up()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 2 ]; then
+		echo "Argument is wrong - $@"
+		return 1
+	fi
+
+	_WAITPROC_PID_FILE=$1
+	_WAITPROC_INTERVAL=$2
+	if [ $# -ge 3 ]; then
+		_WAITPROC_AFTER_SEC=$3
+	else
+		_WAITPROC_AFTER_SEC=0
+	fi
+
+	#
+	# Loop
+	#
+	while true; do
+		#
+		# Check PID file
+		#
+		if [ -f ${_WAITPROC_PID_FILE} ]; then
+			#
+			# Get PID
+			#
+			_WAITPROC_PID=`cat ${_WAITPROC_PID_FILE}`
+			if [ $? -ne 0 ]; then
+				prn_info "Could not read PID file(${_WAITPROC_PID_FILE}), it may be not started."
+			else
+				#
+				# Check process
+				#
+				ps -p ${_WAITPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+				if [ $? -ne 0 ]; then
+					prn_info "Found PID file(${_WAITPROC_PID_FILE}) but PID(${_WAITPROC_PID}) is not running."
+				else
+					#
+					# OK
+					#
+					prn_info "PID(${_WAITPROC_PID}) process running."
+
+					#
+					# Sleep
+					#
+					if [ ${_WAITPROC_AFTER_SEC} -gt 0 ]; then
+						sleep ${_WAITPROC_AFTER_SEC}
+					fi
+					return 0
+				fi
+			fi
+		else
+			prn_info "Not found PID file(${_WAITPROC_PID_FILE}), it may be not started."
+		fi
+
+		#
+		# Sleep
+		#
+		if [ ${_WAITPROC_INTERVAL} -gt 0 ]; then
+			sleep ${_WAITPROC_INTERVAL}
+		fi
+	done
+
+	echo "Something is wrong after waiting process(${_WAITPROC_PID_FILE}) loop."
+	return 1
+}
+
+#
+# Start process
+#
+# $1   :	Process name
+# $2   :	Process owner
+# $3   :	PID file
+# $4   :	Wait second after process launch
+# $5   :	Redirect file path or "NO"
+# $6   :	ini file
+# $7.. :	Process options
+#
+# [NOTE]
+# Since this function executes wait internally, it is prohibited to call
+# it in another shell.
+# If you call it in a different shell, you will not be able to trap the
+# signal.
+#
+start_process()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 5 ]; then
+		log_err "Argument is wrong - $@"
+		return 1
+	fi
+
+	_STARTPROC_PROCNAME=$1
+	_STARTPROC_OWNER=$2
+	_STARTPROC_PIDFILE=$3
+	_STARTPROC_WAITSEC=$4
+	_STARTPROC_REDIRECTFILE=$5
+	_STARTPROC_INIFILE=$6
+	shift; shift; shift; shift; shift; shift
+	_STARTPROC_OSTIONS="-conf ${_STARTPROC_INIFILE} $@"
+
+	_STARTPROC_BIN=`which ${_STARTPROC_PROCNAME} 2>/dev/null`
+	if [ $? -ne 0 ]; then
+		log_err "Not found execute file(${_STARTPROC_PROCNAME})."
+		return 1
+	fi
+
+	if [ -f ${_STARTPROC_PIDFILE} ]; then
+		_STARTPROC_PID=`cat ${_STARTPROC_PIDFILE}`
+		if [ $? -eq 0 ]; then
+			ps -p ${_STARTPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				log_err "Could not start a new process because PID file(${_STARTPROC_PIDFILE}) exists and the process(${_STARTPROC_PID}) is running."
+				return 1
+			fi
+		fi
+		rm -f ${_STARTPROC_PIDFILE}
+	fi
+
+	_STARTPROC_CUR_USER=`id -un`
+	if [ "X${_STARTPROC_CUR_USER}" != "X${_STARTPROC_OWNER}" ]; then
+		if [ "X${_STARTPROC_CUR_USER}" != "Xroot" ]; then
+			log_err "The execution user(${_STARTPROC_OWNER}) of the process was specified, but the execution user of this script is not root."
+			return 1
+		fi
+		_STARTPROC_USE_SUDO=1
+	else
+		_STARTPROC_USE_SUDO=0
+	fi
+
+	#
+	# Convert options to an array to avoid using "/bin/sh -c"
+	#
+	# [NOTE]
+	# This processing destroy argements, for using "$@"
+	#
+	set ${_STARTPROC_BIN} ${_STARTPROC_OSTIONS}
+
+	#
+	# Run process
+	#
+	log_info "Launch a new process."
+
+	if [ ${_STARTPROC_USE_SUDO} -eq 1 ]; then
+		if [ "X${_STARTPROC_REDIRECTFILE}" = "XNO" ]; then
+			sudo -u ${_STARTPROC_OWNER} ${_STARTPROC_BIN} $@ &
+		else
+			sudo -u ${_STARTPROC_OWNER} ${_STARTPROC_BIN} $@ >${_STARTPROC_REDIRECTFILE} 2>&1 &
+		fi
+	else
+		if [ "X${_STARTPROC_REDIRECTFILE}" = "XNO" ]; then
+			${_STARTPROC_BIN} $@ &
+		else
+			${_STARTPROC_BIN} $@  >${_STARTPROC_REDIRECTFILE} 2>&1 &
+		fi
+	fi
+	_STARTPROC_PROCESS_ID=$!
+	echo "${_STARTPROC_PROCESS_ID}" > ${_STARTPROC_PIDFILE}
+
+	#
+	# Sleep
+	#
+	if [ ${_STARTPROC_WAITSEC} -gt 0 ]; then
+		sleep ${_STARTPROC_WAITSEC}
+	fi
+
+	#
+	# Check process running
+	#
+	ps -p ${_STARTPROC_PROCESS_ID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		log_err "Could not start a new process, it was launched but exited soon."
+		return 0
+	fi
+	log_info "Success launching a new process, and wait it exiting."
+
+	#
+	# wait
+	#
+	wait ${_STARTPROC_PROCESS_ID}
+
+	log_warn "Process(${_STARTPROC_PROCESS_ID}) exited."
+	return 0
+}
+
+#
+# Stop process
+#
+# $1 :	PID file
+# $2 :	interval second for loop
+# $3 :	Maximum try count
+#
+stop_process()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -ne 3 ]; then
+		echo "Argument is wrong - $@"
+		return 1
+	fi
+
+	_STOPPROC_PID_FILE=$1
+	_STOPPROC_INTERVAL=$2
+	_STOPPROC_TRYCOUNT=$3
+
+	if [ ! -f ${_STOPPROC_PID_FILE} ]; then
+		echo "Already process has probabry stopped, PID file(${_STOPPROC_PID_FILE}) is not existed."
+		return 0
+	fi
+
+	#
+	# Loop
+	#
+	while [ ${_STOPPROC_TRYCOUNT} -gt 0 ]; do
+		#
+		# Get PID
+		#
+		_STOPPROC_PID=`cat ${_STOPPROC_PID_FILE}`
+		if [ $? -ne 0 ]; then
+			echo "Could not read PID file(${_STOPPROC_PID_FILE}), it may be stopped."
+			rm -f ${_STOPPROC_PID_FILE}
+			return 0
+		fi
+
+		#
+		# Check process
+		#
+		ps -p ${_STOPPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Stopped PID(${_STOPPROC_PID}) process."
+			rm -f ${_STOPPROC_PID_FILE}
+			return 0
+		fi
+
+		#
+		# Send signal HUP
+		#
+		prn_info "Send signal HUP to PID(${_STOPPROC_PID}) process."
+		kill -HUP ${_STOPPROC_PID}
+		if [ $? -eq 0 ]; then
+			sleep ${_STOPPROC_INTERVAL}
+		fi
+
+		#
+		# Check process
+		#
+		ps -p ${_STOPPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Stopped PID(${_STOPPROC_PID}) process."
+			rm -f ${_STOPPROC_PID_FILE}
+			return 0
+		fi
+		prn_info "Could not stop PID(${_STOPPROC_PID}) process by signal HUP."
+
+		#
+		# Send signal KILL
+		#
+		prn_info "Send signal KILL to PID(${_STOPPROC_PID}) process."
+		kill -KILL ${_STOPPROC_PID}
+		if [ $? -eq 0 ]; then
+			sleep ${_STOPPROC_INTERVAL}
+		fi
+
+		#
+		# Check process
+		#
+		ps -p ${_STOPPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Stopped PID(${_STOPPROC_PID}) process."
+			rm -f ${_STOPPROC_PID_FILE}
+			return 0
+		fi
+		prn_info "Could not stop PID(${_STOPPROC_PID}) process by signal KILL."
+
+		_STOPPROC_TRYCOUNT=`expr ${_STOPPROC_TRYCOUNT} - 1`
+	done
+
+	echo "Could not stop PID(${_STOPPROC_PID}) process."
+	return 1
+}
+
+#
+# Exit script
+#
+# $1 :	Exit code
+#
+exit_main()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 1 ]; then
+		_EXIT_CODE=1
+	else
+		_EXIT_CODE=$1
+	fi
+
+	#
+	# Stop subprocess and remove pid file
+	#
+	_TMP_MSG=`stop_process ${PIDDIR}/${SUBPROCESS_PIDFILE} ${INTERVAL_SEC_FOR_LOOP} ${TRYCOUNT_STOP_SUBPROC}`
+	if [ $? -eq 0 ]; then
+		log_info ${_TMP_MSG}
+	else
+		log_err ${_TMP_MSG}
+	fi
+
+	#
+	# Remove pid file
+	#
+	if [ -f ${PIDDIR}/${SERVICE_PIDFILE} ]; then
+		rm -f ${PIDDIR}/${SERVICE_PIDFILE}
+	fi
+
+	exit ${_EXIT_CODE}
+}
+
+#---------------------------------------------------------------------
+# Options
+#---------------------------------------------------------------------
+PRGNAME=`basename $0`
+SCRIPTDIR=`dirname $0`
+SCRIPTDIR=`cd ${SCRIPTDIR}; pwd`
+SCRIPT_MODE=""
+
+while [ $# -ne 0 ]; do
+	if [ "X$1" = "X" ]; then
+		break;
+
+	elif [ "X$1" = "X-h" -o "X$1" = "X-H" -o "X$1" = "X--HELP" -o "X$1" = "X--help" ]; then
+		func_usage $PRGNAME
+		exit 0
+
+	elif [ "X$1" = "Xstart" -o "X$1" = "XSTART" ]; then
+		if [ "X${SCRIPT_MODE}" != "X" ]; then
+			log_err "Option $1 is conflicted, already set \"${SCRIPT_MODE}\" mode."
+			exit 1
+		fi
+		SCRIPT_MODE="START"
+
+	elif [ "X$1" = "Xstop" -o "X$1" = "XSTOP" ]; then
+		if [ "X${SCRIPT_MODE}" != "X" ]; then
+			log_err "Option $1 is conflicted, already set \"${SCRIPT_MODE}\" mode."
+			exit 1
+		fi
+		SCRIPT_MODE="STOP"
+
+	elif [ "X$1" = "Xrestart" -o "X$1" = "XRESTART" ]; then
+		if [ "X${SCRIPT_MODE}" != "X" ]; then
+			log_err "Option $1 is conflicted, already set \"${SCRIPT_MODE}\" mode."
+			exit 1
+		fi
+		SCRIPT_MODE="RESTART"
+
+	else
+		log_err "Unknown option: $1, check usage with the -h option."
+		exit 1
+	fi
+	shift
+done
+
+if [ "X${SCRIPT_MODE}" = "X" ]; then
+	log_err "Option \"start\" or \"stop\" must be specified."
+	exit 1
+fi
+
+#---------------------------------------------------------------------
+# Load configuration and check
+#---------------------------------------------------------------------
+#
+# INI_CONF_FILE
+#
+_TMP_VALUE=`get_value ${INI_CONF_FILE_KEYWORD} ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(${INI_CONF_FILE_KEYWORD}) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	echo ${_TMP_VALUE} | grep -o '^/' >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		#
+		# file is relative file path, convert to absolute path
+		#
+		_TMP_FILENAME=`basename ${_TMP_VALUE}`
+		_TMP_RELATIVE=`dirname ${_TMP_VALUE}`
+		_TMP_ABSOLUTE=`cd ${CONFDIR}/${_TMP_RELATIVE}; pwd`
+
+		INI_CONF_FILE="${_TMP_ABSOLUTE}/${_TMP_VALUE}"
+	else
+		INI_CONF_FILE=${_TMP_VALUE}
+	fi
+fi
+
+#
+# PIDDIR
+#
+_TMP_VALUE=`get_value "PIDDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(PIDDIR) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	PIDDIR=${_TMP_VALUE}
+fi
+if [ "X${PIDDIR}" != "X" ]; then
+	if [ ! -d ${PIDDIR} ]; then
+		mkdir -p ${PIDDIR}
+		if [ $? -ne 0 ]; then
+			log_err "Could not make directory ${PIDDIR} for PID file."
+			exit 1
+		fi
+	fi
+fi
+
+#
+# SERVICE_PIDFILE
+#
+_TMP_VALUE=`get_value "SERVICE_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SERVICE_PIDFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SERVICE_PIDFILE=${_TMP_VALUE}
+fi
+
+#
+# SUBPROCESS_PIDFILE
+#
+_TMP_VALUE=`get_value "SUBPROCESS_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SUBPROCESS_PIDFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SUBPROCESS_PIDFILE=${_TMP_VALUE}
+fi
+
+#
+# SUBPROCESS_USER
+#
+_TMP_VALUE=`get_value "SUBPROCESS_USER" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the subprocess user(SUBPROCESS_USER) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SUBPROCESS_USER=${_TMP_VALUE}
+fi
+
+#
+# LOGDIR
+#
+_TMP_VALUE=`get_value "LOGDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(LOGDIR) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	LOGDIR=${_TMP_VALUE}
+fi
+if [ "X${LOGDIR}" != "X" ]; then
+	if [ ! -d ${LOGDIR} ]; then
+		mkdir -p ${LOGDIR}
+		if [ $? -ne 0 ]; then
+			log_err "Could not make directory ${LOGDIR} for log files."
+			exit 1
+		fi
+	fi
+	# [NOTE]
+	# If you start a subprocess other than the user of this script, you must allow permissions.
+	#
+	chmod 0777 ${LOGDIR}
+	if [ $? -ne 0 ]; then
+		log_warn "Could not change attributes for directory ${LOGDIR}, but it is not critical so continue..."
+	fi
+fi
+
+#
+# SERVICE_LOGFILE
+#
+_TMP_VALUE=`get_value "SERVICE_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SERVICE_LOGFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SERVICE_LOGFILE=${_TMP_VALUE}
+fi
+
+#
+# SUBPROCESS_LOGFILE
+#
+_TMP_VALUE=`get_value "SUBPROCESS_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SUBPROCESS_LOGFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SUBPROCESS_LOGFILE=${_TMP_VALUE}
+fi
+
+#
+# WAIT_DEPENDPROC_PIDFILE
+#
+_TMP_VALUE=`get_value "WAIT_DEPENDPROC_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(WAIT_DEPENDPROC_PIDFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	WAIT_DEPENDPROC_PIDFILE=${_TMP_VALUE}
+fi
+
+#
+# WAIT_SEC_AFTER_DEPENDPROC_UP
+#
+_TMP_VALUE=`get_value "WAIT_SEC_AFTER_DEPENDPROC_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+	if [ $? -ge 2 ]; then
+		log_err "The configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value must be number : ${_TMP_VALUE}"
+		exit 1
+	fi
+	WAIT_SEC_AFTER_DEPENDPROC_UP=${_TMP_VALUE}
+fi
+
+#
+# WAIT_SEC_STARTUP
+#
+_TMP_VALUE=`get_value "WAIT_SEC_STARTUP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(WAIT_SEC_STARTUP) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+	if [ $? -ge 2 ]; then
+		log_err "The configuration(WAIT_SEC_STARTUP) value must be number : ${_TMP_VALUE}"
+		exit 1
+	fi
+	WAIT_SEC_STARTUP=${_TMP_VALUE}
+fi
+
+#
+# WAIT_SEC_AFTER_SUBPROCESS_UP
+#
+_TMP_VALUE=`get_value "WAIT_SEC_AFTER_SUBPROCESS_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+	if [ $? -ge 2 ]; then
+		log_err "The configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value must be number : ${_TMP_VALUE}"
+		exit 1
+	fi
+	WAIT_SEC_AFTER_SUBPROCESS_UP=${_TMP_VALUE}
+fi
+
+#
+# INTERVAL_SEC_FOR_LOOP
+#
+_TMP_VALUE=`get_value "INTERVAL_SEC_FOR_LOOP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(INTERVAL_SEC_FOR_LOOP) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+	if [ $? -ge 2 ]; then
+		log_err "The configuration(INTERVAL_SEC_FOR_LOOP) value must be number : ${_TMP_VALUE}"
+		exit 1
+	fi
+	INTERVAL_SEC_FOR_LOOP=${_TMP_VALUE}
+fi
+
+#
+# TRYCOUNT_STOP_SUBPROC
+#
+_TMP_VALUE=`get_value "TRYCOUNT_STOP_SUBPROC" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(TRYCOUNT_STOP_SUBPROC) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+	if [ $? -ge 2 ]; then
+		log_err "The configuration(TRYCOUNT_STOP_SUBPROC) value must be number : ${_TMP_VALUE}"
+		exit 1
+	fi
+	TRYCOUNT_STOP_SUBPROC=${_TMP_VALUE}
+fi
+
+#
+# SUBPROCESS_OPTIONS
+#
+_TMP_VALUE=`get_value "SUBPROCESS_OPTIONS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SUBPROCESS_OPTIONS) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SUBPROCESS_OPTIONS=${_TMP_VALUE}
+fi
+
+#
+# BEFORE_RUN_SUBPROCESS
+#
+_TMP_VALUE=`get_value "BEFORE_RUN_SUBPROCESS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(BEFORE_RUN_SUBPROCESS) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	BEFORE_RUN_SUBPROCESS=${_TMP_VALUE}
+fi
+
+#---------------------------------------------------------------------
+# Signales
+#---------------------------------------------------------------------
+#
+# Signal handler
+#
+SigHandle()
+{
+	CAUGHT_SIGNAL=1
+
+	#
+	# Try count is set 1 for emergency
+	#
+	TRYCOUNT_STOP_SUBPROC=1
+
+	log_info "Caught signal $1, try to stop subprocess and exit."
+	exit_main 0
+}
+
+#
+# Set trap signals
+#
+# SIGHUP(1) / SIGINT(2) / SIGQUIT(3) / SIGABRT(6) / SIGTERM(15)
+#
+trap 'SigHandle 1'	1
+trap 'SigHandle 2'	2
+trap 'SigHandle 3'	3
+trap 'SigHandle 6'	6
+trap 'SigHandle 15'	15
+
+#---------------------------------------------------------------------
+# Main
+#---------------------------------------------------------------------
+log_info "Start processing"
+
+if [ "X${SCRIPT_MODE}" = "XSTOP" ]; then
+	#
+	# Check old process PID file
+	#
+	if [ ! -f ${PIDDIR}/${SERVICE_PIDFILE} ]; then
+		log_info "There is not PID file(${PIDDIR}/${SERVICE_PIDFILE}), then the process has stopped."
+		exit 0
+	fi
+	OLD_PROCESS_PID=`cat ${PIDDIR}/${SERVICE_PIDFILE}`
+
+	#
+	# Check old process
+	#
+	ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		log_info "PID(${OLD_PROCESS_PID}) process is not exusted, then the process has stopped."
+		rm -f ${PIDDIR}/${SERVICE_PIDFILE}
+		exit 0
+	fi
+
+	#
+	# Send signal HUP
+	#
+	log_info "Try to stop PID(${OLD_PROCESS_PID}) process."
+	kill -HUP ${OLD_PROCESS_PID}
+	sleep ${INTERVAL_SEC_FOR_LOOP}
+
+	#
+	# Re-Check old process
+	#
+	ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		#
+		# Send signal KILL
+		#
+		kill -KILL ${OLD_PROCESS_PID}
+		sleep ${INTERVAL_SEC_FOR_LOOP}
+
+		ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			log_err "Could not stop PID(${OLD_PROCESS_PID}) process."
+			exit 1
+		fi
+	fi
+	rm -f ${PIDDIR}/${SERVICE_PIDFILE}
+
+else
+	#
+	# Check old process
+	#
+	if [ -f ${PIDDIR}/${SERVICE_PIDFILE} ]; then
+		OLD_PROCESS_PID=`cat ${PIDDIR}/${SERVICE_PIDFILE}`
+		if [ $$ -ne ${OLD_PROCESS_PID} ]; then
+			ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				log_err "Process PID(${OLD_PROCESS_PID}) has not stopped yet."
+				exit 1
+			fi
+			#
+			# Over write Process id to PID FILE
+			#
+			echo $$ > ${PIDDIR}/${SERVICE_PIDFILE}
+		fi
+	else
+		#
+		# Write Process id to PID FILE
+		#
+		echo $$ > ${PIDDIR}/${SERVICE_PIDFILE}
+	fi
+
+	#
+	# Wait after startup
+	#
+	sleep ${WAIT_SEC_STARTUP}
+	log_info "Since the waiting time after startup has expired, processing will continue."
+
+	#
+	# Loop
+	#
+	while true; do
+		#
+		# Wait ini file
+		#
+		_TMP_MSG=`wait_file ${INI_CONF_FILE} ${INTERVAL_SEC_FOR_LOOP}`
+		if [ $? -ne 0 ]; then
+			log_err "Failed waiting/checking the ini file(${INI_CONF_FILE}) : ${_TMP_MSG}"
+			exit_main 1
+		fi
+
+		#
+		# Wait depended process up
+		#
+		if [ "X${WAIT_DEPENDPROC_PIDFILE}" != "X" ]; then
+			_TMP_MSG=`wait_process_up ${WAIT_DEPENDPROC_PIDFILE} ${INTERVAL_SEC_FOR_LOOP} ${WAIT_SEC_AFTER_DEPENDPROC_UP}`
+			if [ $? -ne 0 ]; then
+				log_err "Failed waiting/checking process(${WAIT_DEPENDPROC_PIDFILE}) : ${_TMP_MSG}"
+				exit_main 1
+			fi
+		fi
+
+		#
+		# Execute before launch subprocess
+		#
+		if [ "X${BEFORE_RUN_SUBPROCESS}" != "X" ]; then
+			/bin/sh -c "${BEFORE_RUN_SUBPROCESS}"
+			if [ $? -ne 0 ]; then
+				log_warn "Failed to execute (${BEFORE_RUN_SUBPROCESS}) before lauching subprocess, but continue..."
+			fi
+		fi
+
+		#
+		# Start subprocess and wait
+		#
+		# [NOTE]
+		# Since the start_process function executes wait internally, it is prohibited to
+		# call it in a different shell.
+		#
+		_TMP_SUBPROCESS_OPTIONS=${SUBPROCESS_OPTIONS}
+		if [ "X${LOGDIR}" != "X" -a "X${SUBPROCESS_LOGFILE}" != "X" ]; then
+			_TMP_SUBPROCESS_REDIRECTFILE=${LOGDIR}/${SUBPROCESS_LOGFILE}
+		else
+			_TMP_SUBPROCESS_REDIRECTFILE="NO"
+		fi
+
+		start_process ${SUBPROCESS_BIN} ${SUBPROCESS_USER} ${PIDDIR}/${SUBPROCESS_PIDFILE} ${WAIT_SEC_AFTER_SUBPROCESS_UP} ${_TMP_SUBPROCESS_REDIRECTFILE} ${INI_CONF_FILE} ${_TMP_SUBPROCESS_OPTIONS}
+		if [ $? -ne 0 ]; then
+			log_err "Failed launching subprocess(${SUBPROCESS_BIN}) : ${_TMP_MSG}"
+			exit_main 1
+		fi
+		if [ ${CAUGHT_SIGNAL} -eq 1 ]; then
+			break;
+		fi
+
+		#
+		# Sleep
+		#
+		if [ ${INTERVAL_SEC_FOR_LOOP} -gt 0 ]; then
+			sleep ${INTERVAL_SEC_FOR_LOOP}
+		fi
+	done
+fi
+
+#
+# Finish
+#
+exit 0
+
+#
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
+#
