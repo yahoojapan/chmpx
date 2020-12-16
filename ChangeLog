@@ -1,3 +1,10 @@
+chmpx (1.0.87) unstable; urgency=low
+
+  * Added systemd service files to package - #79
+  * Fixed centos8 build and removed centos6 build - #78
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 16 Dec 2020 18:48:13 +0900
+
 chmpx (1.0.86) unstable; urgency=low
 
   * Fixed a error by cppcheck 2.2 - #76
