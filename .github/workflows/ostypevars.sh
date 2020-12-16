@@ -76,7 +76,7 @@ IS_OS_FEDORA=0
 #---------------------------------------------------------------------
 if [ "X${CI_OSTYPE}" = "Xubuntu:20.04" -o "X${CI_OSTYPE}" = "Xubuntu:focal" ]; then
 	DIST_TAG="ubuntu/focal"
-	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev"
+	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	CONFIGURE_EXT_OPT="--with-gnutls"
 	INSTALLER_BIN="apt-get"
 	INSTALL_QUIET_ARG="-qq"
@@ -88,7 +88,7 @@ if [ "X${CI_OSTYPE}" = "Xubuntu:20.04" -o "X${CI_OSTYPE}" = "Xubuntu:focal" ]; t
 
 elif [ "X${CI_OSTYPE}" = "Xubuntu:18.04" -o "X${CI_OSTYPE}" = "Xubuntu:bionic" ]; then
 	DIST_TAG="ubuntu/bionic"
-	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev"
+	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	CONFIGURE_EXT_OPT="--with-gnutls"
 	INSTALLER_BIN="apt-get"
 	INSTALL_QUIET_ARG="-qq"
@@ -100,7 +100,7 @@ elif [ "X${CI_OSTYPE}" = "Xubuntu:18.04" -o "X${CI_OSTYPE}" = "Xubuntu:bionic" ]
 
 elif [ "X${CI_OSTYPE}" = "Xubuntu:16.04" -o "X${CI_OSTYPE}" = "Xubuntu:xenial" ]; then
 	DIST_TAG="ubuntu/xenial"
-	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev"
+	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	CONFIGURE_EXT_OPT="--with-gnutls"
 	INSTALLER_BIN="apt-get"
 	INSTALL_QUIET_ARG="-qq"
@@ -112,7 +112,7 @@ elif [ "X${CI_OSTYPE}" = "Xubuntu:16.04" -o "X${CI_OSTYPE}" = "Xubuntu:xenial" ]
 
 elif [ "X${CI_OSTYPE}" = "Xdebian:10" -o "X${CI_OSTYPE}" = "Xdebian:buster" ]; then
 	DIST_TAG="debian/buster"
-	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev"
+	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	CONFIGURE_EXT_OPT="--with-gnutls"
 	INSTALLER_BIN="apt-get"
 	INSTALL_QUIET_ARG="-qq"
@@ -124,7 +124,7 @@ elif [ "X${CI_OSTYPE}" = "Xdebian:10" -o "X${CI_OSTYPE}" = "Xdebian:buster" ]; t
 
 elif [ "X${CI_OSTYPE}" = "Xdebian:9" -o "X${CI_OSTYPE}" = "Xdebian:stretch" ]; then
 	DIST_TAG="debian/stretch"
-	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev"
+	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	CONFIGURE_EXT_OPT="--with-gnutls"
 	INSTALLER_BIN="apt-get"
 	INSTALL_QUIET_ARG="-qq"
