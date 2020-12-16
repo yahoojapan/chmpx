@@ -24,8 +24,8 @@
 # GLOBAL SECTION
 #
 [GLOBAL]
-FILEVERSION		= 2
-DATE			= Tue, 12 May 2015 18:10:19 +0900
+FILEVERSION		= 3
+DATE			= Fri, 11 Dec 2020 10:39:09 +0900
 GROUP			= SAMPLE
 MODE			= SERVER
 DELIVERMODE		= RANDOM
@@ -70,7 +70,7 @@ K2HMAXELE		= 8
 # SERVER NODES SECTION
 #
 [SVRNODE]
-NAME			= test[0-9][0-9].server.chmpx.yahoo.co.jp
+NAME			= localhost
 #PORT			= 8020
 #CTLPORT		= 8021
 #SSL			= no
@@ -86,12 +86,17 @@ NAME			= test[0-9][0-9].server.chmpx.yahoo.co.jp
 #
 [SLVNODE]
 NAME			= [.]*
-#NAME			= test[0-9][0-9].slave.chmpx.yahoo.co.jp
+#NAME			= localhost
 #CTLPORT		= 8021
 #CAPATH			= null
 #SLAVE_CERT		= null
 #SLAVE_PRIKEY		= null
 
 #
-# EOF
+# Local variables:
+# tab-width: 8
+# c-basic-offset: 8
+# End:
+# vim600: noexpandtab sw=8 ts=8 fdm=marker
+# vim<600: noexpandtab sw=8 ts=8
 #
