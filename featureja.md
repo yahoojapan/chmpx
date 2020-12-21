@@ -14,6 +14,10 @@ next_string: Details
 ---
 
 # 特徴
+
+## 柔軟なインストール
+CHMPXは、あなたのOSに応じて、柔軟にインストールが可能です。あなたのOSが、Ubuntu、CentOS、Fedora、Debianなら、[packagecloud.io](https://packagecloud.io/antpickax/stable)からソースコードをビルドすることなく、簡単にインストールできます。それ以外のOSであっても、自身で[ビルド](https://chmpx.antpick.ax/buildja.html)して使うことができます。
+
 ## 構成
 CHMPXは、サーバーノードとスレーブノードの2つのタイプが存在します。  
 サーバーノードは主に、データ/サービス/機能などのリソース提供するサーバープログラムの動作するホスト上で動作させます。  

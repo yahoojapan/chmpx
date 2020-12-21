@@ -55,7 +55,7 @@ This section instructs how to install each dependent library and the header file
 
 **Note**: As I described in the previous section, [K2HASH Build](https://k2hash.antpick.ax/build.html) build option affects the **CHMPX** build option. See the Table1 in the previous section.
 
-For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
+For recent Debian-based Linux distributions users, follow the steps below:
 ```bash
 $ sudo apt-get update -y
 $ sudo apt-get install curl -y
@@ -66,7 +66,18 @@ $ sudo apt-get install autoconf autotools-dev gcc g++ make gdb libtool pkg-confi
 $ sudo apt-get install git -y
 ```
 
-For Fedora28 or CentOS7.x(6.x) users, follow the steps below:
+For users who use supported Fedora other than latest version, follow the steps below:
+```bash
+$ sudo dnf makecache
+$ sudo dnf install curl -y
+$ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.rpm.sh \
+    | sudo bash
+$ sudo dnf install autoconf automake gcc gcc-c++ gdb make libtool pkgconfig \
+    libyaml-devel libfullock-devel k2hash-devel nss-devel -y
+$ sudo dnf install git -y
+```
+
+For other recent RPM-based Linux distributions users, follow the steps below:
 ```bash
 $ sudo yum makecache
 $ sudo yum install curl -y
@@ -88,7 +99,7 @@ $ git clone https://github.com/yahoojapan/chmpx.git
 
 Just follow the steps below to build **CHMPX** and install it. We use [GNU Automake](https://www.gnu.org/software/automake/) to build **CHMPX**.
 
-For DebianStretch or Ubuntu(Bionic Beaver) users, follow the steps below:
+For recent Debian-based Linux distributions users, follow the steps below:
 ```bash
 $ cd chmpx
 $ sh autogen.sh
@@ -97,7 +108,7 @@ $ make
 $ sudo make install
 ```
 
-For Fedora28 or CentOS7.x(6.x) users, follow the steps below:
+For recent RPM-based Linux distributions users, follow the steps below:
 ```bash
 $ cd chmpx
 $ sh autogen.sh
