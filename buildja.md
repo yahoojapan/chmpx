@@ -55,7 +55,7 @@ SSL/TLSプロトコルを実装するアプリケーションは、1つのSSL/TL
 
 **注**：前のセクションで説明したように、[K2HASH Build](https://k2hash.antpick.ax/buildja.html)のビルドオプションは**CHMPX**ビルドオプションに影響します。 前のセクションの表1を参照してください。
 
-DebianStretchまたはUbuntu（Bionic Beaver）をお使いの場合は、以下の手順に従ってください。
+最近のDebianベースLinuxの利用者は、以下の手順に従ってください。
 ```bash
 $ sudo apt-get update -y
 $ sudo apt-get install curl -y
@@ -66,7 +66,18 @@ $ sudo apt-get install autoconf autotools-dev gcc g++ make gdb libtool pkg-confi
 $ sudo apt-get install git -y
 ```
 
-Fedora28またはCentOS7.x（6.x）ユーザーの場合は、以下の手順に従ってください。
+Fedoraの利用者は、以下の手順に従ってください。
+```bash
+$ sudo dnf makecache
+$ sudo dnf install curl -y
+$ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.rpm.sh \
+    | sudo bash
+$ sudo dnf install autoconf automake gcc gcc-c++ gdb make libtool pkgconfig \
+    libyaml-devel libfullock-devel k2hash-devel nss-devel -y
+$ sudo dnf install git -y
+```
+
+その他最近のRPMベースのLinuxの場合は、以下の手順に従ってください。
 ```bash
 $ sudo yum makecache
 $ sudo yum install curl -y
@@ -89,7 +100,7 @@ $ git clone https://github.com/yahoojapan/chmpx.git
 
 以下の手順に従って**CHMPX**をビルドしてインストールしてください。 [GNU Automake](https://www.gnu.org/software/automake/)を使って**CHMPX**を構築します。
 
-DebianStretchまたはUbuntu（Bionic Beaver）をお使いの場合は、以下の手順に従ってください。
+DebianベースLinuxの場合は、以下の手順に従ってください。
 ```bash
 $ cd chmpx
 $ sh autogen.sh
@@ -98,7 +109,7 @@ $ make
 $ sudo make install
 ```
 
-Fedora28またはCentOS7.x（6.x）ユーザーの場合は、以下の手順に従ってください。
+RPMベースLinuxの場合は、以下の手順に従ってください。
 ```bash
 $ cd chmpx
 $ sh autogen.sh
