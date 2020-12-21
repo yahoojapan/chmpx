@@ -14,6 +14,10 @@ next_string: Details
 ---
 
 # Feature
+
+## Flexible installation
+We provide suitable CHMPX installation for your OS. If you use Ubuntu, CentOS, Fedora or Debian, you can easily install it from [packagecloud.io] (https://packagecloud.io/antpickax/stable). Even if you use none of them, you can use it by [Build] (https://chmpx.antpick.ax/build.html) by yourself.
+
 ## Connections
 CHMPX program takes two types, server node and slave node.  
 The server node operates mainly on the host on which the server program providing the resource such as data/service/function.  
