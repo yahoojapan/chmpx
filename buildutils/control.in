@@ -3,7 +3,6 @@ Section: net
 Priority: optional
 Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
 Build-Depends: @DEBHELPER_DEP@, dh-systemd (>= 1.5), k2hash-dev (>= 1.0.74), libfullock-dev (>= 1.0.36), libyaml-dev
-Depends: ${misc:Depends}, init-system-helpers (>= 1.14)
 Standards-Version: 3.9.8
 Homepage: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
 Vcs-Git: git://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@.git
@@ -24,6 +23,6 @@ Section: net
 Architecture: amd64
 Conflicts: chmproxy
 Replaces: chmproxy
-Depends: ${shlibs:Depends}, ${misc:Depends}, k2hash (>= 1.0.74), libfullock (>= 1.0.36)
+Depends: ${shlibs:Depends}, ${misc:Depends}, init-system-helpers (>= 1.14), k2hash (>= 1.0.74), libfullock (>= 1.0.36)
 Description: @SHORTDESC@
 @DEBLONGDESC@

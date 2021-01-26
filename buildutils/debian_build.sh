@@ -259,12 +259,30 @@ echo "	if ls debian/${PACKAGE_NAME}/usr/lib/x86_64-linux-gnu/*.so >/dev/null 2>&
 echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a >/dev/null 2>&1; then     rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.a;     fi"	>> ${EXPANDDIR}/debian/rules || exit 1
 echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la >/dev/null 2>&1; then    rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.la;    fi"	>> ${EXPANDDIR}/debian/rules || exit 1
 echo "	if ls debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.* >/dev/null 2>&1; then  rm -rf debian/${PACKAGE_DEV_NAME}/usr/lib/x86_64-linux-gnu/*.so.*;  fi"	>> ${EXPANDDIR}/debian/rules || exit 1
+echo ""																																									>> ${EXPANDDIR}/debian/rules || exit 1
+echo "# Not enable by installing."																																		>> ${EXPANDDIR}/debian/rules || exit 1
+echo "override_dh_systemd_enable:"																																		>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	dh_systemd_enable"																																				>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -f debian/${PACKAGE_NAME}.preinst.debhelper ]; then	rm -f debian/${PACKAGE_NAME}.preinst.debhelper;		fi"												>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -f debian/${PACKAGE_NAME}.postinst.debhelper ]; then	rm -f debian/${PACKAGE_NAME}.postinst.debhelper;	fi"												>> ${EXPANDDIR}/debian/rules || exit 1
+echo ""																																									>> ${EXPANDDIR}/debian/rules || exit 1
+echo "# Not support init.d"																																				>> ${EXPANDDIR}/debian/rules || exit 1
+echo "override_dh_installinit:"																																			>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	echo 'Not enable init'"																																			>> ${EXPANDDIR}/debian/rules || exit 1
+echo ""																																									>> ${EXPANDDIR}/debian/rules || exit 1
+echo "# Not start by installing."																																		>> ${EXPANDDIR}/debian/rules || exit 1
+echo "override_dh_systemd_start:"																																		>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	dh_systemd_start"																																				>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -f debian/${PACKAGE_NAME}.preinst.debhelper ]; then	rm -f debian/${PACKAGE_NAME}.preinst.debhelper;		fi"												>> ${EXPANDDIR}/debian/rules || exit 1
+echo "	if [ -f debian/${PACKAGE_NAME}.postinst.debhelper ]; then	rm -f debian/${PACKAGE_NAME}.postinst.debhelper;	fi"												>> ${EXPANDDIR}/debian/rules || exit 1
 
 if [ "X${CONFIGUREOPT}" != "X" ]; then
-	echo ""																				>> ${EXPANDDIR}/debian/rules || exit 1
-	echo "override_dh_auto_configure:"													>> ${EXPANDDIR}/debian/rules || exit 1
-	echo "	dh_auto_configure -- ${CONFIGUREOPT}"										>> ${EXPANDDIR}/debian/rules || exit 1
+	echo ""																																								>> ${EXPANDDIR}/debian/rules || exit 1
+	echo "override_dh_auto_configure:"																																	>> ${EXPANDDIR}/debian/rules || exit 1
+	echo "	dh_auto_configure -- ${CONFIGUREOPT}"																														>> ${EXPANDDIR}/debian/rules || exit 1
 fi
+
+rm ${EXPANDDIR}/debian/rules.base
 
 #
 # create links file for library
@@ -314,42 +332,6 @@ else
 fi
 if [ ! -f ${EXPANDDIR}/debian/compat ]; then
 	echo "9" > ${EXPANDDIR}/debian/compat
-fi
-
-#
-# preinst/postinst/prerm/postrm
-#
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.preinst ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.preinst ${EXPANDDIR}/debian/${PACKAGE_NAME}.preinst || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.preinst || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.postinst ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.postinst ${EXPANDDIR}/debian/${PACKAGE_NAME}.postinst || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.postinst || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.prerm ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.prerm ${EXPANDDIR}/debian/${PACKAGE_NAME}.prerm || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.prerm || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.postrm ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.postrm ${EXPANDDIR}/debian/${PACKAGE_NAME}.postrm || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.postrm || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.preinst ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.preinst ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.preinst || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.preinst || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postinst ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postinst ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postinst || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postinst || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.prerm ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.prerm ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.prerm || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.prerm || exit 1
-fi
-if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postrm ]; then
-	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postrm ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postrm || exit 1
-	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postrm || exit 1
 fi
 
 echo "===== prepare working directory: end ==============="
