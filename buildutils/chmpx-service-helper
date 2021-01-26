@@ -718,6 +718,280 @@ exit_main()
 	exit ${_EXIT_CODE}
 }
 
+#
+# Load and Set global variables
+#
+# Set Variables
+#	INI_CONF_FILE
+#	PIDDIR
+#	SERVICE_PIDFILE
+#	SUBPROCESS_PIDFILE
+#	SUBPROCESS_USER
+#	LOGDIR
+#	SERVICE_LOGFILE
+#	SUBPROCESS_LOGFILE
+#	WAIT_DEPENDPROC_PIDFILE
+#	WAIT_SEC_AFTER_DEPENDPROC_UP
+#	WAIT_SEC_STARTUP
+#	WAIT_SEC_AFTER_SUBPROCESS_UP
+#	INTERVAL_SEC_FOR_LOOP
+#	TRYCOUNT_STOP_SUBPROC
+#	SUBPROCESS_OPTIONS
+#	BEFORE_RUN_SUBPROCESS
+#
+# Input parameters
+#	$1: exit	Last command when finish processing(defaut: return).
+#
+load_variables()
+{
+	_TMP_FIN_CMD="return"
+	if [ $# -gt 0 ]; then
+		if [ "X$1" = "Xexit" ]; then
+			_TMP_FIN_CMD="exit"
+		fi
+	fi
+
+	#
+	# INI_CONF_FILE
+	#
+	_TMP_VALUE=`get_value ${INI_CONF_FILE_KEYWORD} ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(${INI_CONF_FILE_KEYWORD}) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		echo ${_TMP_VALUE} | grep -o '^/' >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			#
+			# file is relative file path, convert to absolute path
+			#
+			_TMP_FILENAME=`basename ${_TMP_VALUE}`
+			_TMP_RELATIVE=`dirname ${_TMP_VALUE}`
+			_TMP_ABSOLUTE=`cd ${CONFDIR}/${_TMP_RELATIVE}; pwd`
+
+			INI_CONF_FILE="${_TMP_ABSOLUTE}/${_TMP_VALUE}"
+		else
+			INI_CONF_FILE=${_TMP_VALUE}
+		fi
+	fi
+
+	#
+	# PIDDIR
+	#
+	_TMP_VALUE=`get_value "PIDDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(PIDDIR) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		PIDDIR=${_TMP_VALUE}
+	fi
+	if [ "X${PIDDIR}" != "X" ]; then
+		if [ ! -d ${PIDDIR} ]; then
+			mkdir -p ${PIDDIR}
+			if [ $? -ne 0 ]; then
+				log_err "Could not make directory ${PIDDIR} for PID file."
+				${_TMP_FIN_CMD} 1
+			fi
+		fi
+	fi
+
+	#
+	# SERVICE_PIDFILE
+	#
+	_TMP_VALUE=`get_value "SERVICE_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(SERVICE_PIDFILE) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SERVICE_PIDFILE=${_TMP_VALUE}
+	fi
+
+	#
+	# SUBPROCESS_PIDFILE
+	#
+	_TMP_VALUE=`get_value "SUBPROCESS_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(SUBPROCESS_PIDFILE) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SUBPROCESS_PIDFILE=${_TMP_VALUE}
+	fi
+
+	#
+	# SUBPROCESS_USER
+	#
+	_TMP_VALUE=`get_value "SUBPROCESS_USER" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the subprocess user(SUBPROCESS_USER) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SUBPROCESS_USER=${_TMP_VALUE}
+	fi
+
+	#
+	# LOGDIR
+	#
+	_TMP_VALUE=`get_value "LOGDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(LOGDIR) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		LOGDIR=${_TMP_VALUE}
+	fi
+	if [ "X${LOGDIR}" != "X" ]; then
+		if [ ! -d ${LOGDIR} ]; then
+			mkdir -p ${LOGDIR}
+			if [ $? -ne 0 ]; then
+				log_err "Could not make directory ${LOGDIR} for log files."
+				${_TMP_FIN_CMD} 1
+			fi
+		fi
+		# [NOTE]
+		# If you start a subprocess other than the user of this script, you must allow permissions.
+		#
+		chmod 0777 ${LOGDIR}
+		if [ $? -ne 0 ]; then
+			log_warn "Could not change attributes for directory ${LOGDIR}, but it is not critical so continue..."
+		fi
+	fi
+
+	#
+	# SERVICE_LOGFILE
+	#
+	_TMP_VALUE=`get_value "SERVICE_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(SERVICE_LOGFILE) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SERVICE_LOGFILE=${_TMP_VALUE}
+	fi
+
+	#
+	# SUBPROCESS_LOGFILE
+	#
+	_TMP_VALUE=`get_value "SUBPROCESS_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(SUBPROCESS_LOGFILE) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SUBPROCESS_LOGFILE=${_TMP_VALUE}
+	fi
+
+	#
+	# WAIT_DEPENDPROC_PIDFILE
+	#
+	_TMP_VALUE=`get_value "WAIT_DEPENDPROC_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(WAIT_DEPENDPROC_PIDFILE) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		WAIT_DEPENDPROC_PIDFILE=${_TMP_VALUE}
+	fi
+
+	#
+	# WAIT_SEC_AFTER_DEPENDPROC_UP
+	#
+	_TMP_VALUE=`get_value "WAIT_SEC_AFTER_DEPENDPROC_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+		if [ $? -ge 2 ]; then
+			log_err "The configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value must be number : ${_TMP_VALUE}"
+			${_TMP_FIN_CMD} 1
+		fi
+		WAIT_SEC_AFTER_DEPENDPROC_UP=${_TMP_VALUE}
+	fi
+
+	#
+	# WAIT_SEC_STARTUP
+	#
+	_TMP_VALUE=`get_value "WAIT_SEC_STARTUP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(WAIT_SEC_STARTUP) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+		if [ $? -ge 2 ]; then
+			log_err "The configuration(WAIT_SEC_STARTUP) value must be number : ${_TMP_VALUE}"
+			${_TMP_FIN_CMD} 1
+		fi
+		WAIT_SEC_STARTUP=${_TMP_VALUE}
+	fi
+
+	#
+	# WAIT_SEC_AFTER_SUBPROCESS_UP
+	#
+	_TMP_VALUE=`get_value "WAIT_SEC_AFTER_SUBPROCESS_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+		if [ $? -ge 2 ]; then
+			log_err "The configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value must be number : ${_TMP_VALUE}"
+			${_TMP_FIN_CMD} 1
+		fi
+		WAIT_SEC_AFTER_SUBPROCESS_UP=${_TMP_VALUE}
+	fi
+
+	#
+	# INTERVAL_SEC_FOR_LOOP
+	#
+	_TMP_VALUE=`get_value "INTERVAL_SEC_FOR_LOOP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(INTERVAL_SEC_FOR_LOOP) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+		if [ $? -ge 2 ]; then
+			log_err "The configuration(INTERVAL_SEC_FOR_LOOP) value must be number : ${_TMP_VALUE}"
+			${_TMP_FIN_CMD} 1
+		fi
+		INTERVAL_SEC_FOR_LOOP=${_TMP_VALUE}
+	fi
+
+	#
+	# TRYCOUNT_STOP_SUBPROC
+	#
+	_TMP_VALUE=`get_value "TRYCOUNT_STOP_SUBPROC" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(TRYCOUNT_STOP_SUBPROC) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
+		if [ $? -ge 2 ]; then
+			log_err "The configuration(TRYCOUNT_STOP_SUBPROC) value must be number : ${_TMP_VALUE}"
+			${_TMP_FIN_CMD} 1
+		fi
+		TRYCOUNT_STOP_SUBPROC=${_TMP_VALUE}
+	fi
+
+	#
+	# SUBPROCESS_OPTIONS
+	#
+	_TMP_VALUE=`get_value "SUBPROCESS_OPTIONS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(SUBPROCESS_OPTIONS) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		SUBPROCESS_OPTIONS=${_TMP_VALUE}
+	fi
+
+	#
+	# BEFORE_RUN_SUBPROCESS
+	#
+	_TMP_VALUE=`get_value "BEFORE_RUN_SUBPROCESS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+	if [ $? -ne 0 ]; then
+		log_err "Failed loading the configuration(BEFORE_RUN_SUBPROCESS) value : ${_TMP_VALUE}"
+		${_TMP_FIN_CMD} 1
+	elif [ "X${_TMP_VALUE}" != "X" ]; then
+		BEFORE_RUN_SUBPROCESS=${_TMP_VALUE}
+	fi
+
+	return 0
+}
+
 #---------------------------------------------------------------------
 # Options
 #---------------------------------------------------------------------
@@ -768,247 +1042,6 @@ if [ "X${SCRIPT_MODE}" = "X" ]; then
 fi
 
 #---------------------------------------------------------------------
-# Load configuration and check
-#---------------------------------------------------------------------
-#
-# INI_CONF_FILE
-#
-_TMP_VALUE=`get_value ${INI_CONF_FILE_KEYWORD} ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(${INI_CONF_FILE_KEYWORD}) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	echo ${_TMP_VALUE} | grep -o '^/' >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		#
-		# file is relative file path, convert to absolute path
-		#
-		_TMP_FILENAME=`basename ${_TMP_VALUE}`
-		_TMP_RELATIVE=`dirname ${_TMP_VALUE}`
-		_TMP_ABSOLUTE=`cd ${CONFDIR}/${_TMP_RELATIVE}; pwd`
-
-		INI_CONF_FILE="${_TMP_ABSOLUTE}/${_TMP_VALUE}"
-	else
-		INI_CONF_FILE=${_TMP_VALUE}
-	fi
-fi
-
-#
-# PIDDIR
-#
-_TMP_VALUE=`get_value "PIDDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(PIDDIR) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	PIDDIR=${_TMP_VALUE}
-fi
-if [ "X${PIDDIR}" != "X" ]; then
-	if [ ! -d ${PIDDIR} ]; then
-		mkdir -p ${PIDDIR}
-		if [ $? -ne 0 ]; then
-			log_err "Could not make directory ${PIDDIR} for PID file."
-			exit 1
-		fi
-	fi
-fi
-
-#
-# SERVICE_PIDFILE
-#
-_TMP_VALUE=`get_value "SERVICE_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(SERVICE_PIDFILE) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SERVICE_PIDFILE=${_TMP_VALUE}
-fi
-
-#
-# SUBPROCESS_PIDFILE
-#
-_TMP_VALUE=`get_value "SUBPROCESS_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(SUBPROCESS_PIDFILE) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SUBPROCESS_PIDFILE=${_TMP_VALUE}
-fi
-
-#
-# SUBPROCESS_USER
-#
-_TMP_VALUE=`get_value "SUBPROCESS_USER" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the subprocess user(SUBPROCESS_USER) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SUBPROCESS_USER=${_TMP_VALUE}
-fi
-
-#
-# LOGDIR
-#
-_TMP_VALUE=`get_value "LOGDIR" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(LOGDIR) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	LOGDIR=${_TMP_VALUE}
-fi
-if [ "X${LOGDIR}" != "X" ]; then
-	if [ ! -d ${LOGDIR} ]; then
-		mkdir -p ${LOGDIR}
-		if [ $? -ne 0 ]; then
-			log_err "Could not make directory ${LOGDIR} for log files."
-			exit 1
-		fi
-	fi
-	# [NOTE]
-	# If you start a subprocess other than the user of this script, you must allow permissions.
-	#
-	chmod 0777 ${LOGDIR}
-	if [ $? -ne 0 ]; then
-		log_warn "Could not change attributes for directory ${LOGDIR}, but it is not critical so continue..."
-	fi
-fi
-
-#
-# SERVICE_LOGFILE
-#
-_TMP_VALUE=`get_value "SERVICE_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(SERVICE_LOGFILE) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SERVICE_LOGFILE=${_TMP_VALUE}
-fi
-
-#
-# SUBPROCESS_LOGFILE
-#
-_TMP_VALUE=`get_value "SUBPROCESS_LOGFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(SUBPROCESS_LOGFILE) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SUBPROCESS_LOGFILE=${_TMP_VALUE}
-fi
-
-#
-# WAIT_DEPENDPROC_PIDFILE
-#
-_TMP_VALUE=`get_value "WAIT_DEPENDPROC_PIDFILE" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(WAIT_DEPENDPROC_PIDFILE) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	WAIT_DEPENDPROC_PIDFILE=${_TMP_VALUE}
-fi
-
-#
-# WAIT_SEC_AFTER_DEPENDPROC_UP
-#
-_TMP_VALUE=`get_value "WAIT_SEC_AFTER_DEPENDPROC_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
-	if [ $? -ge 2 ]; then
-		log_err "The configuration(WAIT_SEC_AFTER_DEPENDPROC_UP) value must be number : ${_TMP_VALUE}"
-		exit 1
-	fi
-	WAIT_SEC_AFTER_DEPENDPROC_UP=${_TMP_VALUE}
-fi
-
-#
-# WAIT_SEC_STARTUP
-#
-_TMP_VALUE=`get_value "WAIT_SEC_STARTUP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(WAIT_SEC_STARTUP) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
-	if [ $? -ge 2 ]; then
-		log_err "The configuration(WAIT_SEC_STARTUP) value must be number : ${_TMP_VALUE}"
-		exit 1
-	fi
-	WAIT_SEC_STARTUP=${_TMP_VALUE}
-fi
-
-#
-# WAIT_SEC_AFTER_SUBPROCESS_UP
-#
-_TMP_VALUE=`get_value "WAIT_SEC_AFTER_SUBPROCESS_UP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
-	if [ $? -ge 2 ]; then
-		log_err "The configuration(WAIT_SEC_AFTER_SUBPROCESS_UP) value must be number : ${_TMP_VALUE}"
-		exit 1
-	fi
-	WAIT_SEC_AFTER_SUBPROCESS_UP=${_TMP_VALUE}
-fi
-
-#
-# INTERVAL_SEC_FOR_LOOP
-#
-_TMP_VALUE=`get_value "INTERVAL_SEC_FOR_LOOP" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(INTERVAL_SEC_FOR_LOOP) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
-	if [ $? -ge 2 ]; then
-		log_err "The configuration(INTERVAL_SEC_FOR_LOOP) value must be number : ${_TMP_VALUE}"
-		exit 1
-	fi
-	INTERVAL_SEC_FOR_LOOP=${_TMP_VALUE}
-fi
-
-#
-# TRYCOUNT_STOP_SUBPROC
-#
-_TMP_VALUE=`get_value "TRYCOUNT_STOP_SUBPROC" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(TRYCOUNT_STOP_SUBPROC) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	expr "${_TMP_VALUE}" + 1 >/dev/null 2>&1
-	if [ $? -ge 2 ]; then
-		log_err "The configuration(TRYCOUNT_STOP_SUBPROC) value must be number : ${_TMP_VALUE}"
-		exit 1
-	fi
-	TRYCOUNT_STOP_SUBPROC=${_TMP_VALUE}
-fi
-
-#
-# SUBPROCESS_OPTIONS
-#
-_TMP_VALUE=`get_value "SUBPROCESS_OPTIONS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(SUBPROCESS_OPTIONS) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	SUBPROCESS_OPTIONS=${_TMP_VALUE}
-fi
-
-#
-# BEFORE_RUN_SUBPROCESS
-#
-_TMP_VALUE=`get_value "BEFORE_RUN_SUBPROCESS" ${CONFDIR}/${SERVICE_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
-if [ $? -ne 0 ]; then
-	log_err "Failed loading the configuration(BEFORE_RUN_SUBPROCESS) value : ${_TMP_VALUE}"
-	exit 1
-elif [ "X${_TMP_VALUE}" != "X" ]; then
-	BEFORE_RUN_SUBPROCESS=${_TMP_VALUE}
-fi
-
-#---------------------------------------------------------------------
 # Signales
 #---------------------------------------------------------------------
 #
@@ -1042,6 +1075,11 @@ trap 'SigHandle 15'	15
 # Main
 #---------------------------------------------------------------------
 log_info "Start processing"
+
+#
+# Load and Set variables
+#
+load_variables "exit"
 
 if [ "X${SCRIPT_MODE}" = "XSTOP" ]; then
 	#
@@ -1124,6 +1162,19 @@ else
 	#
 	while true; do
 		#
+		# Relaad variables(without error exiting)
+		#
+		load_variables
+		if [ $? -ne 0 ]; then
+			if [ ${INTERVAL_SEC_FOR_LOOP} -gt 0 ]; then
+				sleep ${INTERVAL_SEC_FOR_LOOP}
+			else
+				sleep 1
+			fi
+			continue
+		fi
+
+		#
 		# Wait ini file
 		#
 		_TMP_MSG=`wait_file ${INI_CONF_FILE} ${INTERVAL_SEC_FOR_LOOP}`
@@ -1181,6 +1232,8 @@ else
 		#
 		if [ ${INTERVAL_SEC_FOR_LOOP} -gt 0 ]; then
 			sleep ${INTERVAL_SEC_FOR_LOOP}
+		else
+			sleep 1
 		fi
 	done
 fi
