@@ -16,10 +16,10 @@ next_string: Build
 # Usage
 After building CHMPX, you can check the operation by the following procedure.
 
-## Sample Configuration
+## 1. Sample Configuration
 The following is the configuration used for CHMPX test. please refer.
 
-### For server node.
+### 1.1 For server node.
 - Configuration file formatted by INI
 [test_server.ini]({{ site.github.repository_url }}/blob/master/tests/test_server.ini)
 - Configuration file formatted by YAML
@@ -29,7 +29,7 @@ The following is the configuration used for CHMPX test. please refer.
 - Configuration by string of JSON
 The character string after "SERVER=" in the [test_json_string.data]({{ site.github.repository_url }}/blob/master/tests/test_json_string.data) file
 
-### For slave node
+### 1.2 For slave node
 - Configuration file formatted by INI
 [test_slave.ini]({{ site.github.repository_url }}/blob/master/tests/test_slave.ini)
 - Configuration file formatted by YAML
@@ -39,9 +39,9 @@ The character string after "SERVER=" in the [test_json_string.data]({{ site.gith
 - Configuration by string of JSON
 The character string after "SLAVE=" in the [test_json_string.data]({{ site.github.repository_url }}/blob/master/tests/test_json_string.data) file
 
-## Operation check
+## 2. Operation check
 
-### 1. Creating a usage environment
+### 2.1 Creating a usage environment
 There are two ways to install **CHMPX** in your environment.  
 One is to download and install the package of **CHMPX** from [packagecloud.io](https://packagecloud.io/).  
 The other way is to build and install **CHMPX** from source code yourself.  
@@ -95,31 +95,31 @@ In this case, build from the [source code](https://github.com/yahoojapan/chmpx) 
 #### Build and install from source code
 For details on how to build and install **CHMPX** from [source code](https://github.com/yahoojapan/chmpx), please see [Build](https://chmpx.antpick.ax/build.html).
 
-### 2. Run CHMPX for server node
+### 2.2 Run CHMPX for server node
 ```
 $ chmpx -conf test_server.ini
 ```
 
-### 3. Run server program(chmpxbench server mode) which joins server node CHMPX
+### 2.3 Run server program(chmpxbench server mode) which joins server node CHMPX
 ```
 $ chmpxbench -s -conf test_server.ini -l 0 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey TEST
 ```
 
-### 4. Run CHMPX for slave node
+### 2.4 Run CHMPX for slave node
 ```
 $ chmpx -conf test_slave.ini
 ```
 
-### 5. Run client program(chmpxbench client mode) which joins slave node CHMPX
+### 2.5 Run client program(chmpxbench client mode) which joins slave node CHMPX
 ```
 $ chmpxbench -c -conf test_slave.ini -l 1 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey TEST
 ```
 _If there is no error with the above operation, there is no problem._
 
-1. Exit all programs  
+## 3. Exit all programs  
 Send signal HUP to all programs (chmpx, chmpxbench), and it will exit automatically.
 
-## CHMPX control command
+## 4. CHMPX control command
 CHMPX is started by specifying the control port which is for controlling the CHMPX process itself and CHMPX server nodes on RING.  
 By connecting to this control port and sending control command, you can manage and confirm status for CHMPX process and CHMPX server nodes on RING.
 Control commands can be roughly divided into commands that control the CHMPX process itself that receives the commands and commands that control the CHMPX server nodes (RING) on the RING.
@@ -127,17 +127,17 @@ You can use these control commands to check and change the status of CHMPX serve
 
 We recommend not using the control command directly via this control port, but using **chmpxlinetool** which is easy to use.
 
-### How to use
+### 4.1 How to use
 There is an item of **CTLPORT** in the configuration(file or JSON string) for starting the CHMPX program.  
 You must specify a control port for this **CTLPORT**.
 You can connect to this control port and send control commands as a string to the CHMPX process.
 The CHMPX process receives a control command and processes and responds according to that command.
 Please note that we currently do not support SSL encryption for connection and communication with the control port. (It will be supported in the future)
 
-### About access to control port
+### 4.2 About access to control port
 Access to the control port is possible only for the server node and the slave node specified in the configuration (file or JSON string).
 
-### Control command (effective for CHMPX process only)
+### 4.3 Control command (effective for CHMPX process only)
 #### VERSION
 This command returns the version of the CHMPX process.
 
@@ -204,3 +204,122 @@ This command instructs all CHMPX server nodes on RING to enable **AUTOMERGE** se
 This command cancels the state where **AUTOMERGE** setting is invalid(SUSPEND).
 With this command, this setting state is reflected not only to all CHMPX server nodes on RING but also to CHMPX server nodes that join RING later.
 
+## 5. Systemd Service
+After installing CHMPX as a package, that package contains a systemd service called **chmpx.service**.  
+This section describes how to start the CHMPX process using this **chmpx.service**.
+
+### 5.1 Configuration for CHMPX process
+When starting CHMPX with **chmpx.service**, the `/etc/antpickax/chmpx.ini` file is used as the configuration file.  
+Please prepare this file first.
+
+### 5.2 Start chmpx.service
+Immediately after installing the CHMPX package, **chmpx.service** is disabled.  
+When the configuration file(`/etc/antpickax/chmpx.ini`) is ready, first enable **chmpx.service** and then start.  
+```
+$ sudo systemctl enable chmpx.service
+$ sudo systemctl start chmpx.service
+```
+With the above procedure, CHMPX will be started by **chmpx.service**.
+
+### 5.3 Customizing
+You can customize the behavior of **chmpx.service** by modifying the `/etc/antpickax/chmpx-service-helper.conf` file.  
+Alternatively, you can prepare the `/etc/antpickax/override.conf` file and customize it as well.  
+If both files customize for the same keyword, the `/etc/antpickax/override.conf` file takes precedence.
+
+#### About chmpx-service-helper.conf
+The keywords that can be customized in the `chmpx-service-helper.conf` file are listed below.
+
+##### INI_CONF_FILE
+Specifies the path to the configuration file that is specified when starting CHMPX.  
+The default is `/etc/antpickax/chmpx.ini`.
+
+##### PIDDIR
+Specifies the directory where the process IDs of CHMPX processes and processes related to **chmpx.service** are stored.  
+The default is `/var/run/antpickax`.
+
+##### SERVICE_PIDFILE
+Specifies the filename to store the process ID of the process associated with **chmpx.service**.  
+The default is `chmpx-service-helper.pid`.
+
+##### SUBPROCESS_PIDFILE
+Specifies the file name that stores the process ID of the CHMPX process.  
+The default is `chmpx.pid`.
+
+##### SUBPROCESS_USER
+Specifies the user to start the CHMPX process.  
+The default is the user who started **chmpx.service**.
+
+##### LOGDIR
+Specifies the directory that stores logs for CHMPX processes and processes related to **chmpx.service**.  
+By default, `journald` is responsible for log management.
+
+##### SERVICE_LOGFILE
+Specifies the filename to store logs for processes related to **chmpx.service**.  
+By default, `journald` is responsible for log management.
+
+##### SUBPROCESS_LOGFILE
+Specifies the name of the file that stores the CHMPX process logs.  
+By default, `journald` is responsible for log management.
+
+##### WAIT_DEPENDPROC_PIDFILE
+Before starting the CHMPX process, specify the file path of the process ID of the process waiting to start.  
+No default is specified. It means default case will start the CHMPX process without waiting for another process to start.
+
+##### WAIT_SEC_AFTER_DEPENDPROC_UP
+Waiting to start before starting the CHMPX process Specifies the amount of time to wait in seconds after the process starts.  
+The default is 15 seconds. However, since `WAIT_DEPENDPROC_PIDFILE` is not specified, it does not wait for another process to start.
+
+##### WAIT_SEC_STARTUP
+Specifies the amount of time in seconds to wait before starting the CHMPX process after **chmpx.service** is started.  
+The default is 10 seconds.
+
+##### WAIT_SEC_AFTER_SUBPROCESS_UP
+Specify the waiting time in seconds after starting the CHMPX process before checking the status of the CHMPX process.  
+The default is 15 seconds.
+
+##### INTERVAL_SEC_FOR_LOOP
+Specify the time in seconds when waiting for process restart, stop confirmation, etc.  
+The default is 10 seconds.
+
+##### TRYCOUNT_STOP_SUBPROC
+Specifies the maximum number of attempts to stop the CHMPX process. If this number is exceeded, it is considered that the CHMPX process stop has failed.  
+The default is 10 times.
+
+##### SUBPROCESS_OPTIONS
+Specifies the options to pass when the CHMPX process starts.  
+The default is empty.
+
+##### BEFORE_RUN_SUBPROCESS
+You can specify a command to execute before starting the CHMPX process.  
+The default is empty.
+
+#### About override.conf
+The `override.conf` file takes precedence over the `chmpx-service-helper.conf` file.  
+The keywords that can be customized in the `override.conf` file are the same as in the `chmpx-service-helper.conf` file.  
+However, the format of the `override.conf` file is different from the `chmpx-service-helper.conf` file.
+
+##### Format 1
+```
+<customize configuration file path>:<keyword> = <value>
+```
+It is a format to set the value directly by specifying the path and keyword of the customized configuration file.  
+For example, specify as follows.  
+```
+/etc/antpickax/chmpx-service-helper.conf:CHMPX_INI_CONF_FILE = /etc/antpickax/custom.ini
+```
+
+##### Format 2
+```
+<customize configuration file path>:<keyword> = <customize configuration file path>:<keyword>
+```
+It is a format to specify the path and keyword of the customized configuration file and set the value in another configuration file.  
+For example, specify as follows.  
+```
+/etc/antpickax/chmpx-service-helper.conf:CHMPX_INI_CONF_FILE = /etc/antpickax/other.conf:CHMPX_INI_CONF_FILE
+```
+
+### 5.4 Stop chmpx.service
+```
+$ sudo systemctl stop chmpx.service
+```
+With the above procedure, CHMPX will be stopped by **chmpx.service**.

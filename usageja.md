@@ -14,10 +14,10 @@ next_string: Build
 ---
 
 # 使い方
-## サンプルコンフィグレーション
+## 1. サンプルコンフィグレーション
 CHMPXの利用するコンフィグレーションのサンプルを示します。
 
-### サーバーノード
+### 1.1 サーバーノード
 - INI形式
 [test_server.ini]({{ site.github.repository_url }}/blob/master/tests/test_server.ini)
 - YAML形式
@@ -27,7 +27,7 @@ CHMPXの利用するコンフィグレーションのサンプルを示します
 - JSON文字列
 [test_json_string.data]({{ site.github.repository_url }}/blob/master/tests/test_json_string.data) ファイルの中の "SERVER=" の以降の文字列
 
-### スレーブノード
+### 1.2 スレーブノード
 - INI形式
 [test_slave.ini]({{ site.github.repository_url }}/blob/master/tests/test_slave.ini)
 - YAML形式
@@ -37,10 +37,10 @@ CHMPXの利用するコンフィグレーションのサンプルを示します
 - JSON文字列
 [test_json_string.data]({{ site.github.repository_url }}/blob/master/tests/test_json_string.data) ファイルの中の "SLAVE=" の以降の文字列
 
-## 簡単な動作確認
+## 2. 簡単な動作確認
 CHMPXをビルドした後で、動作確認をしてみます。
 
-### 1. 利用環境構築
+### 2.1 利用環境構築
 
 **CHMPX** をご利用の環境にインストールするには、2つの方法があります。  
 ひとつは、[packagecloud.io](https://packagecloud.io/)から **CHMPX** のパッケージをダウンロードし、インストールする方法です。  
@@ -95,34 +95,34 @@ $ sudo yum install chmpx-devel
 #### ソースコードからビルド・インストール
 **CHMPX** を[ソースコード](https://github.com/yahoojapan/chmpx)からビルドし、インストールする方法は、[ビルド](https://chmpx.antpick.ax/buildja.html)を参照してください。
 
-### 2. CHMPXサーバーノードを起動
+### 2.2 CHMPXサーバーノードを起動
 ```
 $ chmpx -conf test_server.ini
 ```
 
-### 3. サーバープログラムを起動
+### 2.3 サーバープログラムを起動
 ```
 $ chmpxbench -s -conf test_server.ini -l 0 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey TEST
 ```
 
-### 4. CHMPXスレーブノード起動
+### 2.4 CHMPXスレーブノード起動
 ```
 $ chmpx -conf test_slave.ini
 ```
 
-### 5. クライアントプログラムを起動
+### 2.5 クライアントプログラムを起動
 ```
 $ chmpxbench -c -conf test_slave.ini -l 1 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey TEST
 ```
 
 以上の動作でエラーが出なければ問題ありません。
 
-## プログラムの終了
+## 3. プログラムの終了
 chmpx、chmpxbenchともにシグナルHUPを送ります。  
 自動的に終了します。
 
 
-## CHMPX制御コマンド
+## 4. CHMPX制御コマンド
 CHMPXは、CHMPXプロセス自身およびRING上のCHMPXサーバーノード群を制御するためのポートを指定して起動されます。  
 この制御ポートに対して、制御コマンドを送ることでCHMPXプロセス、RING上のCHMPXサーバーノード群の制御、状態管理、確認ができます。
 制御コマンドは、そのコマンドを受け取るCHMPXプロセス自身を制御するコマンドと、RING上のCHMPXサーバーノード群（RING）を制御するコマンドに大別できます。
@@ -130,17 +130,17 @@ CHMPXは、CHMPXプロセス自身およびRING上のCHMPXサーバーノード�
 また、CHMPXプロセス自身の状態確認、変更もできます。  
 この制御ポート経由の制御コマンドを直接利用せず、簡単に利用できる**chmpxlinetool**を利用することを推奨します。
 
-### 使い方
+### 4.1 使い方
 CHMPXプログラム起動時に指定するコンフィグレーション（ファイル、JSON文字列）に、**CTLPORT**の項目があります。
 この**CTLPORT**は、制御ポートを示しています。
 この制御ポートに接続し、制御コマンドを文字列でCHMPXプロセスに渡すことができます。
 CHMPXプロセスは制御コマンドを受け、そのコマンドに応じた処理、返答を行います。  
 なお、現在制御ポートとの接続と通信は暗号化をサポートしていません。（今後サポートされます）
 
-### 制御ポートのアクセス制限
+### 4.2 制御ポートのアクセス制限
 制御ポートへのアクセスは、コンフィグレーション（ファイル、JSON文字列）で指定されているサーバーノード、スレーブノードのみが可能です。
 
-### 制御コマンド（CHMPXプロセスのみへ実効）
+### 4.3 制御コマンド（CHMPXプロセスのみへ実効）
 #### VERSION
 CHMPXプロセスのバージョンを返します。
 
@@ -206,3 +206,122 @@ CHMPXは起動時にコンフィグレーションから**AUTOMERGE**の設定�
 **AUTOMERGE**の設定が無効（SUSPEND）となっている状態を解除します。
 このコマンドにより、RING上の全CHMPXサーバーノードだけではなく、後からRINGに参加するCHMPXサーバーノードに対しても、この設定状態が反映されます。
 
+## 5. systemdサービス
+CHMPXをパッケージとしてインストールした場合、そのパッケージには **chmpx.service** というsystemdサービスが含まれています。  
+ここでは、この **chmpx.service** を使ったCHMPXプロセスの起動方法を説明します。
+
+### 5.1 コンフィグレーション
+**chmpx.service** によりCHMPXを起動する場合、コンフィグレーションファイルとして、`/etc/antpickax/chmpx.ini`ファイルが使われます。  
+このファイルを最初に準備してください。
+
+### 5.2 chmpx.service 起動
+CHMPXパッケージをインストールした直後は、**chmpx.service** は無効となっています。  
+コンフィグレーションファイル（`/etc/antpickax/chmpx.ini`）の準備ができたら、まず **chmpx.service** を有効にし、次に開始します。
+```
+$ sudo systemctl enable chmpx.service
+$ sudo systemctl start chmpx.service
+```
+以上で、CHMPXが起動します。
+
+### 5.3 カスタマイズ
+`/etc/antpickax/chmpx-service-helper.conf`ファイルを変更することで、**chmpx.service** の動作をカスタマイズすることができます。  
+もしくは、`/etc/antpickax/override.conf`ファイルを準備して、同様にカスタマイズすることができます。  
+両ファイルが、同じキーワードをカスタマイズした場合は、`/etc/antpickax/override.conf`ファイルが優先されます。
+
+#### chmpx-service-helper.conf
+`chmpx-service-helper.conf`ファイルでカスタマイズできるキーワードを以下に示します。
+
+##### INI_CONF_FILE
+CHMPXを起動するときに指定されるコンフィグレーションファイルのパスを指定します。  
+デフォルトは、`/etc/antpickax/chmpx.ini`です。
+
+##### PIDDIR
+CHMPXプロセスおよび、**chmpx.service**に関連するプロセスのプロセスIDを保管するディレクトリを指定します。  
+デフォルトは、`/var/run/antpickax`です。
+
+##### SERVICE_PIDFILE
+**chmpx.service**に関連するプロセスのプロセスIDを保管するファイル名を指定します。  
+デフォルトは、`chmpx-service-helper.pid`です。
+
+##### SUBPROCESS_PIDFILE
+CHMPXプロセスのプロセスIDを保管するファイル名を指定します。  
+デフォルトは、`chmpx.pid`です。
+
+##### SUBPROCESS_USER
+CHMPXプロセスを起動するユーザを指定します。  
+デフォルトは、**chmpx.service**を起動したユーザです。
+
+##### LOGDIR
+CHMPXプロセスおよび、**chmpx.service**に関連するプロセスのログを格納するディレクトリを指定します。  
+デフォルトでは、`journald`にログ管理を任せています。
+
+##### SERVICE_LOGFILE
+**chmpx.service**に関連するプロセスのログを保管するファイル名を指定します。  
+デフォルトでは、`journald`にログ管理を任せています。
+
+##### SUBPROCESS_LOGFILE
+CHMPXプロセスのログを格納するファイル名を指定します。  
+デフォルトでは、`journald`にログ管理を任せています。
+
+##### WAIT_DEPENDPROC_PIDFILE
+CHMPXプロセスを起動する前に、起動を待つプロセスのプロセスIDのファイルパスを指定します。  
+デフォルトは、未指定であり、CHMPXプロセスは他のプロセスの起動を待たずに起動します。
+
+##### WAIT_SEC_AFTER_DEPENDPROC_UP
+CHMPXプロセスを起動する前に、起動を待つプロセスが起動した後、待機する時間を秒で指定します。  
+デフォルトは、15秒です。ただし、`WAIT_DEPENDPROC_PIDFILE`は未指定なので、他のプロセス起動を待機することはありません。
+
+##### WAIT_SEC_STARTUP
+**chmpx.service**が起動された後、CHMPXプロセスを起動するまでの待機時間を秒で指定します。  
+デフォルトは、10秒です。
+
+##### WAIT_SEC_AFTER_SUBPROCESS_UP
+CHMPXプロセスを起動した後、CHMPXプロセスの状態を確認するまでの待機時間を秒で指定します。  
+デフォルトは、15秒です。
+
+##### INTERVAL_SEC_FOR_LOOP
+プロセスの再起動、停止確認などで待機するときの時間を秒で指定します。  
+デフォルトは、10秒です。
+
+##### TRYCOUNT_STOP_SUBPROC
+CHMPXプロセス停止を試行する最大回数を指定します。この回数を超過する場合は、CHMPXプロセス停止を失敗したと判断します。  
+デフォルトは、10回です。
+
+##### SUBPROCESS_OPTIONS
+CHMPXプロセス起動時に引き渡すオプションを指定します。  
+デフォルトは、空です。
+
+##### BEFORE_RUN_SUBPROCESS
+CHMPXプロセス起動前に実行するコマンドを指定できます。
+デフォルトは、空です。
+
+#### override.conf
+`override.conf`ファイルは、`chmpx-service-helper.conf`ファイルよりも優先されます。  
+`override.conf`ファイルでカスタマイズできるキーワードは、`chmpx-service-helper.conf`ファイルと同じです。  
+ただし、`override.conf`ファイルの書式は、`chmpx-service-helper.conf`ファイルと異なります。
+
+##### 書式1
+```
+<customize configuration file path>:<keyword> = <value>
+```
+カスタマイズコンフィグレーションファイルのパスとキーワードを指定して、値を直接設定する書式です。  
+例えば、以下のように指定します。  
+```
+/etc/antpickax/chmpx-service-helper.conf:CHMPX_INI_CONF_FILE = /etc/antpickax/custom.ini
+```
+
+##### 書式2
+```
+<customize configuration file path>:<keyword> = <customize configuration file path>:<keyword>
+```
+カスタマイズコンフィグレーションファイルのパスとキーワードを指定して、値を他のコンフィグレーションファイルで設定する書式です。  
+例えば、以下のように指定します。  
+```
+/etc/antpickax/chmpx-service-helper.conf:CHMPX_INI_CONF_FILE = /etc/antpickax/other.conf:CHMPX_INI_CONF_FILE
+```
+
+### 5.4 chmpx.service 停止
+```
+$ sudo systemctl stop chmpx.service
+```
+以上で、CHMPXを停止できます。
