@@ -1,3 +1,9 @@
+chmpx (1.0.89) unstable; urgency=low
+
+  * Updated files for systemd service - #84
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 26 Jan 2021 14:43:10 +0900
+
 chmpx (1.0.88) unstable; urgency=low
 
   * Added dh-systemd pakacge for building a package - #81
