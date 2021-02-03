@@ -1,3 +1,9 @@
+chmpx (1.0.90) unstable; urgency=low
+
+  * Enhanced confirmation of wait process for chmpx.service - #87
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 03 Feb 2021 19:19:49 +0900
+
 chmpx (1.0.89) unstable; urgency=low
 
   * Updated files for systemd service - #84
