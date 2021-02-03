@@ -436,17 +436,31 @@ wait_process_up()
 					prn_info "Found PID file(${_WAITPROC_PID_FILE}) but PID(${_WAITPROC_PID}) is not running."
 				else
 					#
-					# OK
+					# OK(single checking)
 					#
-					prn_info "PID(${_WAITPROC_PID}) process running."
+					if [ ${_WAITPROC_AFTER_SEC} -le 0 ]; then
+						prn_info "PID(${_WAITPROC_PID}) process running."
+						return 0
+					fi
 
 					#
 					# Sleep
 					#
-					if [ ${_WAITPROC_AFTER_SEC} -gt 0 ]; then
-						sleep ${_WAITPROC_AFTER_SEC}
+					sleep ${_WAITPROC_AFTER_SEC}
+
+					#
+					# Re-check process
+					#
+					ps -p ${_WAITPROC_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+					if [ $? -ne 0 ]; then
+						prn_info "Found PID file(${_WAITPROC_PID_FILE}) but PID(${_WAITPROC_PID}) is not running."
+					else
+						#
+						# OK(double checking)
+						#
+						prn_info "PID(${_WAITPROC_PID}) process running."
+						return 0
 					fi
-					return 0
 				fi
 			fi
 		else
