@@ -1120,13 +1120,34 @@ if [ "X${SCRIPT_MODE}" = "XSTOP" ]; then
 	#
 	log_info "Try to stop PID(${OLD_PROCESS_PID}) process."
 	kill -HUP ${OLD_PROCESS_PID}
-	sleep ${INTERVAL_SEC_FOR_LOOP}
 
 	#
-	# Re-Check old process
+	# Wait old process stopping
 	#
-	ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
+	_LOOP_COUNT=10
+	while [ ${_LOOP_COUNT} -gt 0 ]; do
+		#
+		# Sleep
+		#
+		sleep ${INTERVAL_SEC_FOR_LOOP}
+
+		#
+		# Check process running
+		#
+		ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			#
+			# Stopped
+			#
+			break
+		fi
+		_LOOP_COUNT=`expr ${_LOOP_COUNT} - 1`
+	done
+
+	#
+	# Force stop if not stopped
+	#
+	if [ ${_LOOP_COUNT} -le 0 ]; then
 		#
 		# Send signal KILL
 		#
@@ -1139,6 +1160,10 @@ if [ "X${SCRIPT_MODE}" = "XSTOP" ]; then
 			exit 1
 		fi
 	fi
+
+	#
+	# Success
+	#
 	rm -f ${PIDDIR}/${SERVICE_PIDFILE}
 
 else
