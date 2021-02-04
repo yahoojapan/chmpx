@@ -559,18 +559,29 @@ start_process()
 
 	if [ ${_STARTPROC_USE_SUDO} -eq 1 ]; then
 		if [ "X${_STARTPROC_REDIRECTFILE}" = "XNO" ]; then
-			sudo -u ${_STARTPROC_OWNER} ${_STARTPROC_BIN} $@ &
+			sudo -u ${_STARTPROC_OWNER} $@ &
 		else
-			sudo -u ${_STARTPROC_OWNER} ${_STARTPROC_BIN} $@ >${_STARTPROC_REDIRECTFILE} 2>&1 &
+			sudo -u ${_STARTPROC_OWNER} $@ >${_STARTPROC_REDIRECTFILE} 2>&1 &
 		fi
+
+		# [NOTE]
+		# Detects the PID of sudo's child process because it is running a
+		# subprocess via the sudo command.
+		#
+		sleep 1
+		_STARTPROC_PROCESS_ID=`ps --ppid $! | grep ${_STARTPROC_PROCNAME} | grep -v sudo | awk '{print $1}'`
 	else
 		if [ "X${_STARTPROC_REDIRECTFILE}" = "XNO" ]; then
-			${_STARTPROC_BIN} $@ &
+			$@ &
 		else
-			${_STARTPROC_BIN} $@  >${_STARTPROC_REDIRECTFILE} 2>&1 &
+			$@ >${_STARTPROC_REDIRECTFILE} 2>&1 &
 		fi
+		_STARTPROC_PROCESS_ID=$!
 	fi
-	_STARTPROC_PROCESS_ID=$!
+	if [ -z ${_STARTPROC_PROCESS_ID} ]; then
+		log_err "Could not start a new process, it was launched but exited soon."
+		return 1
+	fi
 	echo "${_STARTPROC_PROCESS_ID}" > ${_STARTPROC_PIDFILE}
 
 	#
@@ -586,14 +597,24 @@ start_process()
 	ps -p ${_STARTPROC_PROCESS_ID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		log_err "Could not start a new process, it was launched but exited soon."
-		return 0
+		return 1
 	fi
 	log_info "Success launching a new process, and wait it exiting."
 
 	#
 	# wait
 	#
-	wait ${_STARTPROC_PROCESS_ID}
+	# [NOTE]
+	# Do not execute the wait command directly for _STARTPROC_PROCESS_ID.
+	# If it is started via the sudo command, the wait command cannot be
+	# executed because it is not a direct child process of this script.
+	# Therefore, the tail command waits for the end of _STARTPROC_PROCESS_ID.
+	# However, if you wait with the tail command, the signal will also be
+	# blocked, so execute the tail command itself in the background and
+	# wait for the tail command's PID with the wait command.
+	#
+	tail -f --pid=${_STARTPROC_PROCESS_ID} /dev/null &
+	wait $!
 
 	log_warn "Process(${_STARTPROC_PROCESS_ID}) exited."
 	return 0
