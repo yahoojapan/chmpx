@@ -1,3 +1,10 @@
+chmpx (1.0.91) unstable; urgency=low
+
+  * Fixed an issue with stopping service subprocesses - #90
+  * Bypass a specific version of cppcheck due to poor performance - #89
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 04 Feb 2021 12:13:09 +0900
+
 chmpx (1.0.90) unstable; urgency=low
 
   * Enhanced confirmation of wait process for chmpx.service - #87
