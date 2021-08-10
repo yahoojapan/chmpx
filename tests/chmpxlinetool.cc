@@ -30,6 +30,7 @@
 #include <netinet/tcp.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <libgen.h>
 #include <unistd.h>
 #include <termios.h>
 #include <signal.h>
@@ -6932,6 +6933,8 @@ int main(int argc, char** argv)
 			}
 			StartupLoopCommand.clear();
 
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress knownConditionTrueFalse
 		}else if(IsWelcomMsg){
 			// print message
 			PRN("-------------------------------------------------------");

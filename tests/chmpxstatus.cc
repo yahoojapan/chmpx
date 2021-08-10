@@ -20,9 +20,11 @@
  * REVISION:
  *
  */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <libgen.h>
 
 #include "chmcommon.h"
 #include "chmstructure.h"
