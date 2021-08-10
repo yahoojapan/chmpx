@@ -219,9 +219,8 @@ template<typename T> inline void FIN_MATE_TIMESPEC2(T* start, T* fin, T* elapsed
 			(ptr)->tv_sec	= sec; \
 			if(nsec >= (1000 * 1000 * 1000)){ \
 				(ptr)->tv_sec	+= (nsec / (1000 * 1000 * 1000)); \
-				nsec			=  (nsec % (1000 * 1000 * 1000)); \
 			} \
-			(ptr)->tv_nsec	= nsec; \
+			(ptr)->tv_nsec	=  (nsec % (1000 * 1000 * 1000)); \
 		}
 #define	COPY_TIMESPEC(dest, src)			\
 		{ \

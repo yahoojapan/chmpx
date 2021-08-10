@@ -23,6 +23,7 @@
 
 #include <fullock/flckutil.h>
 #include <k2hash/k2hutil.h>
+#include <libgen.h>
 
 #include "chmconfutil.h"
 #include "chmutil.h"

@@ -1470,8 +1470,8 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 			}else{
 				MSG_CHMPRN("sock(%d) is closed while processing thread.", sock);
 
-				chmpxid_t	nowchmpxid = pSockObj ? pSockObj->GetAssociateChmpxid(sock) : CHM_INVALID_CHMPXID;
-				string		nowachname = pSockObj ? pSockObj->GetAssociateAcceptHostName(sock) : string("");
+				chmpxid_t	nowchmpxid = pSockObj->GetAssociateChmpxid(sock);
+				string		nowachname = pSockObj->GetAssociateAcceptHostName(sock);
 				if(tgchmpxid != nowchmpxid || tgachname != nowachname){
 					MSG_CHMPRN("Associate chmpxid of target sock(%d) was changed from old chmpxid(0x%016" PRIx64 ") or accept host(%s) to now chmpxid(0x%016" PRIx64 ") or accept host(%s).", sock, tgchmpxid, tgachname.c_str(), nowchmpxid, nowachname.c_str());
 					changed_sock = true;
@@ -4137,8 +4137,8 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
-	chmpxid_t	chmpxid;
+	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	chmpxid_t	chmpxid	= 0L;
 
 	if(CHM_INVALID_CHMPXID != (chmpxid = pImData->GetNextRingChmpxId())){
 		//MSG_CHMPRN("Not need to connect rechain RING.");
