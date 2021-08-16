@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <libgen.h>
 #include <string>
 #include <iostream>
 #include <map>

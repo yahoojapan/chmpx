@@ -419,11 +419,10 @@ kill -9 ${CHMPXSLVPID} ${CHMPXSVRPID} > /dev/null 2>&1
 ##############
 echo "------ RESULT ----------------------------------------------"
 SVRRESULT=`cat /tmp/testsvr_${PROCID}.log`
-SLVRESULTERRLINE=`grep 'Total error count' /tmp/testslv_${PROCID}.log`
-SLVRESULTERRCNT=`echo $SLVRESULTERRLINE | awk '{print $4}'`
+SLVRESULTERRCNT=`grep 'Total error count' /tmp/testslv_${PROCID}.log | awk '{print $4}'`
 
 RESULT=0
-if [ "X$SVRRESULT" != "X" -o "X$SLVRESULTERRLINE" = "X" -o "X$SLVRESULTERRCNT" != "X0" ]; then
+if [ "X$SVRRESULT" != "X" -o "X$SLVRESULTERRCNT" != "X0" ]; then
 	RESULT=1
 fi
 

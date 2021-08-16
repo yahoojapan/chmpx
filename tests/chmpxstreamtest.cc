@@ -25,6 +25,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <libgen.h>
 #include <string>
 #include <iostream>
 

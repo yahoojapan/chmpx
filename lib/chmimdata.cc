@@ -48,7 +48,8 @@ using namespace std;
 #define	CHMSHM_SHMFILE_EXT			".chmpx"
 #define	CHMSHM_K2HASH_EXT			".k2h"
 #define	CHMSHM_BACKUP_EXT			"bup"
-#define	CHMSHM_FILE_BASEDIR			"/tmp"
+#define	CHMSHM_FILE_BASEDIR			"/var/lib/antpickax"
+#define	CHMSHM_FILE_TMP_BASEDIR		"/tmp"
 
 //---------------------------------------------------------
 // Class Variables
@@ -60,11 +61,30 @@ const int	ChmIMData::SYSPAGE_SIZE;
 //---------------------------------------------------------
 bool ChmIMData::MakeFilePath(const char* groupname, short port, MKFPMODE mode, string& shmpath)
 {
+	static bool		stc_init_basedir = false;
+	static string	stc_basedir;
+
+	if(!stc_init_basedir){
+		struct stat	st;
+		if(0 != stat(CHMSHM_FILE_BASEDIR, &st)){
+			WAN_CHMPRN("%s directory is not existed, then use %s", CHMSHM_FILE_BASEDIR, CHMSHM_FILE_TMP_BASEDIR);
+			stc_basedir = CHMSHM_FILE_TMP_BASEDIR;
+		}else{
+			if(0 == (st.st_mode & S_IFDIR)){
+				WAN_CHMPRN("%s is not directory, then use %s", CHMSHM_FILE_BASEDIR, CHMSHM_FILE_TMP_BASEDIR);
+				stc_basedir = CHMSHM_FILE_TMP_BASEDIR;
+			}else{
+				stc_basedir = CHMSHM_FILE_BASEDIR;
+			}
+		}
+		stc_init_basedir = true;
+	}
+
 	if(ISEMPTYSTR(groupname)){
 		ERR_CHMPRN("parameter is wrong.");
 		return false;
 	}
-	shmpath = CHMSHM_FILE_BASEDIR;
+	shmpath = stc_basedir;
 	shmpath += "/";
 	shmpath += groupname;
 	if(CHM_INVALID_PORT != port){
@@ -2073,7 +2093,7 @@ long ChmIMData::GetReceiverChmpxids(chmhash_t hash, c2ctype_t c2ctype, chmpxidli
 			WAN_CHMPRN("COM_C2C type(%s) should be COM_C2C_NORMAL, so continue as COM_C2C_NORMAL.", STRCOMC2CTYPE(c2ctype));
 		}
 
-		chmpxid_t	tmpchmpxid;
+		chmpxid_t	tmpchmpxid = 0L;
 		if(IsRandomDeliver()){
 			// Random --> terminal chmpxid is one
 			if(CHM_INVALID_CHMPXID == (tmpchmpxid = GetRandomServerChmpxId(true))){		// only up server, not suspend server
