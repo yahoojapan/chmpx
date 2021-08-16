@@ -236,7 +236,8 @@ AC_CONFIG_FILES([Makefile
 				buildutils/Makefile
 				buildutils/control
 				buildutils/copyright
-				buildutils/chmpx.spec])
+				buildutils/chmpx.spec
+				buildutils/Dockerfile.templ])
 
 AC_OUTPUT
 

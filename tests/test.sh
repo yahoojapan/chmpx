@@ -418,7 +418,7 @@ kill -9 ${CHMPXSLVPID} ${CHMPXSVRPID} > /dev/null 2>&1
 # Check
 ##############
 echo "------ RESULT ----------------------------------------------"
-SVRRESULT=`cat /tmp/testsvr_${PROCID}.log`
+SVRRESULT=`cat /tmp/testsvr_${PROCID}.log | grep -v "^Receive : "`
 SLVRESULTERRCNT=`grep 'Total error count' /tmp/testslv_${PROCID}.log | awk '{print $4}'`
 
 RESULT=0
