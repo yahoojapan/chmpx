@@ -1239,6 +1239,7 @@ bool CHMConf::IsSsl(void) const
 
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
 		if(iter->is_ssl){
+			fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);		// UNLOCK
 			return true;
 		}
 	}

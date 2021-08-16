@@ -27,6 +27,7 @@
 #include <sys/inotify.h>
 #include <sys/epoll.h>
 #include <signal.h>
+#include <libgen.h>
 #include <map>
 #include <string>
 
