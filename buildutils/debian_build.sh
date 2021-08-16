@@ -334,6 +334,42 @@ if [ ! -f ${EXPANDDIR}/debian/compat ]; then
 	echo "9" > ${EXPANDDIR}/debian/compat
 fi
 
+#
+# preinst/postinst/prerm/postrm
+#
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.preinst ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.preinst ${EXPANDDIR}/debian/${PACKAGE_NAME}.preinst || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.preinst || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.postinst ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.postinst ${EXPANDDIR}/debian/${PACKAGE_NAME}.postinst || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.postinst || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.prerm ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.prerm ${EXPANDDIR}/debian/${PACKAGE_NAME}.prerm || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.prerm || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_NAME}.postrm ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_NAME}.postrm ${EXPANDDIR}/debian/${PACKAGE_NAME}.postrm || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_NAME}.postrm || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.preinst ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.preinst ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.preinst || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.preinst || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postinst ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postinst ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postinst || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postinst || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.prerm ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.prerm ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.prerm || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.prerm || exit 1
+fi
+if [ -f ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postrm ]; then
+	cp -p ${MYSCRIPTDIR}/${PACKAGE_DEV_NAME}.postrm ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postrm || exit 1
+	chmod +x ${EXPANDDIR}/debian/${PACKAGE_DEV_NAME}.postrm || exit 1
+fi
+
 echo "===== prepare working directory: end ==============="
 
 #
