@@ -7,6 +7,8 @@ CHMPX
 [![GitHub issues](https://img.shields.io/github/issues/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/issues)
 [![debian packages](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 [![RPM packages](https://img.shields.io/badge/rpm-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
+[![Docker image](https://img.shields.io/docker/pulls/antpickax/chmpx.svg)](https://hub.docker.com/r/antpickax/chmpx)
+[![Docker dev image](https://img.shields.io/docker/pulls/antpickax/chmpx-dev.svg)](https://hub.docker.com/r/antpickax/chmpx-dev)
 
 CHMPX - Consistent Hashing Mq inProcess data eXchange
 
@@ -25,7 +27,7 @@ As a result, it provides a high performance, a high scalability.
   - Supports interprocess communication across the servers.
   - Supports synchronous/asynchronous communication.
   - Supports communicating messages in the target specified(HASH).
-  - Supports plugin Hashing function for target messaging.(k2hash)
+  - Supports plugin Hashing function for target messaging.
   - Supports communicating messages in the random.
   - Supports SSL communication.
   - The message communication possible bypass.
@@ -48,10 +50,14 @@ As a result, it provides a high performance, a high scalability.
   - [RPM packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
   - [Debian packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
 
+### Docker images
+  - [chmpx(Docker Hub)](https://hub.docker.com/r/antpickax/chmpx)
+  - [chmpx-dev(Docker Hub)](https://hub.docker.com/r/antpickax/chmpx-dev)
+
 ### License
 This software is released under the MIT License, see the license file.
 
 ### AntPickax
-k2hash is one of [AntPickax](https://antpick.ax/) products.
+chmpx is one of [AntPickax](https://antpick.ax/) products.
 
 Copyright(C) 2014 Yahoo Japan corporation.
