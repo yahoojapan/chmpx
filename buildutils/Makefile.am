@@ -34,7 +34,8 @@ EXTRA_DIST =make_variables.sh \
 			chmpx.service \
 			chmpx-service-helper \
 			chmpx-service-helper.conf \
-			chmpx.ini.example
+			chmpx.ini.example \
+			chmpx.postinst
 
 #
 # Local variables:
