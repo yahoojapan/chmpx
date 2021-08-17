@@ -1,3 +1,10 @@
+chmpx (1.0.93) unstable; urgency=low
+
+  * Added docker build and push in Github Actions - #95
+  * Functional improvements and bug fixes - #94
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 17 Aug 2021 16:19:55 +0900
+
 chmpx (1.0.92) unstable; urgency=low
 
   * Fixed a bug in chmpx-service-helper - #92
