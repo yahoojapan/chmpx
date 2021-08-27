@@ -1,3 +1,9 @@
+chmpx (1.0.94) unstable; urgency=low
+
+  * Fixed docker image build for ubuntu - #97
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 27 Aug 2021 11:41:37 +0900
+
 chmpx (1.0.93) unstable; urgency=low
 
   * Added docker build and push in Github Actions - #95
