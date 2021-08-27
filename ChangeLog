@@ -1,3 +1,9 @@
+chmpx (1.0.95) unstable; urgency=low
+
+  * Fixed Dockerfile template for calling ldconfig - #99
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 27 Aug 2021 16:20:41 +0900
+
 chmpx (1.0.94) unstable; urgency=low
 
   * Fixed docker image build for ubuntu - #97
