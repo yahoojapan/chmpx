@@ -74,7 +74,7 @@ elif [ "X${DOCKER_IMAGE_OSTYPE}" = "Xubuntu" ]; then
 	PKGMGR_UPDATE_OPT="update -qq -y"
 	PKGMGR_INSTALL_OPT="install -qq -y"
 	PKG_INSTALL_LIST_BUILDER="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config procps libyaml-dev gnutls-dev"
-	PKG_INSTALL_LIST_BIN=""
+	PKG_INSTALL_LIST_BIN="libyaml-0-2"
 
 	BUILDER_CONFIGURE_FLAG="--with-gnutls"
 
