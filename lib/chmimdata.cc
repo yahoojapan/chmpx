@@ -117,6 +117,23 @@ bool ChmIMData::CompareChmpxNameAndCustomSeed(const CHMPXSVR& src1, const CHMPXS
 	if(0 == strncmp(src1.name, src2.custom_seed, NI_MAXHOST) || 0 == strncmp(src2.name, src1.custom_seed, NI_MAXHOST)){	// [NOTE] NI_MAXHOST < CUSTOM_ID_SEED_MAX
 		return true;
 	}
+
+	// [NOTE]
+	// A very complex problem arises when IP addresses are assigned to multiple names.
+	// In this case, assuming CUSTOM SEED, compare by all names.
+	//
+	strlst_t	hostnames1;
+	strlst_t	hostnames2;
+	ChmNetDb::Get()->GetHostnameList(src1.name, hostnames1, true);
+	ChmNetDb::Get()->GetHostnameList(src2.name, hostnames2, true);
+	for(strlst_t::const_iterator iter1 = hostnames1.begin(); iter1 != hostnames1.end(); ++iter1){
+		for(strlst_t::const_iterator iter2 = hostnames2.begin(); iter2 != hostnames2.end(); ++iter2){
+			if(0 == strcmp(iter1->c_str(), iter2->c_str())){
+				return true;
+			}
+		}
+	}
+
 	return false;
 }
 
