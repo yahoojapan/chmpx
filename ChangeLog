@@ -1,3 +1,9 @@
+chmpx (1.0.96) unstable; urgency=low
+
+  * Fixed a bug that a case of registered multi-FQDNs in DNS - #101
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 08 Sep 2021 10:29:12 +0900
+
 chmpx (1.0.95) unstable; urgency=low
 
   * Fixed Dockerfile template for calling ldconfig - #99
