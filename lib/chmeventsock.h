@@ -263,7 +263,7 @@ class ChmEventSock : public ChmEventBase
 
 		// px2px commands
 		bool PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_sock_close);
-		bool PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComReceiveStatusReq(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComReceiveStatusRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, bool is_init_process = false);
 		bool PxComSendConinitReq(int sock, chmpxid_t chmpxid);
 		bool PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& comver, std::string& name, chmpxid_t& from_chmpxid, short& ctlport, std::string& cuk, std::string& custom_seed, hostport_list_t& endpoints, hostport_list_t& ctlendpoints, hostport_list_t& forward_peers, hostport_list_t& reverse_peers);
@@ -289,19 +289,19 @@ class ChmEventSock : public ChmEventBase
 		bool PxComSendMergeNoSuspend(chmpxid_t chmpxid);
 		bool PxComReceiveMergeNoSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid);
-		bool PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
+		bool PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 		bool PxComReceiveMergeSuspendRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
 		bool PxComSendServerDown(chmpxid_t chmpxid, chmpxid_t downchmpxid);
 		bool PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
 
-		bool PxCltReceiveJoinNotify(PCOMHEAD pComHead, PPXCLT_ALL pComAll);
+		bool PxCltReceiveJoinNotify(const PCOMHEAD pComHead, const PPXCLT_ALL pComAll);
 
 		bool PxComSendReqUpdateData(chmpxid_t chmpxid, const PPXCOMMON_MERGE_PARAM pmerge_param);
 		bool PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt);
-		bool PxComReceiveResUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
-		bool PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll);
+		bool PxComReceiveResUpdateData(const PCOMHEAD pComHead, PPXCOM_ALL pComAll);
+		bool PxComReceiveResultUpdateData(const PCOMHEAD pComHead, PPXCOM_ALL pComAll);
 		bool PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_sock_close);											// 1.0.71 or later
-		bool PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, PPXCOM_ALL pComAll);											// 1.0.71 or later
+		bool PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, const PPXCOM_ALL pComAll);										// 1.0.71 or later
 		bool PxComReceiveVersionRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt, comver_t& com_proto_version);	// 1.0.71 or later
 
 	public:

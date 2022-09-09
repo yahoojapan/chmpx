@@ -52,11 +52,6 @@ AC_PROG_RANLIB
 AC_CHECK_LIB(dl, dlopen)
 
 #
-# Checks for header files.
-#
-AC_CHECK_HEADERS([locale.h netdb.h fcntl.h sys/socket.h sys/time.h endian.h sys/endian.h netinet/in.h])
-
-#
 # Checks for typedefs, structures, and compiler characteristics.
 #
 AC_HEADER_STDBOOL
@@ -79,20 +74,45 @@ AC_FUNC_MKTIME
 AC_FUNC_FORK
 AC_FUNC_ERROR_AT_LINE
 AC_CHECK_FUNCS([ftruncate gethostname memset regcomp setlocale strcasecmp strncasecmp strdup strrchr clock_gettime munmap select socket uname gettimeofday strstr inet_ntoa])
-AC_CHECK_HEADERS([termios.h arpa/inet.h])
+AC_CHECK_HEADERS([locale.h netdb.h fcntl.h sys/socket.h sys/time.h endian.h sys/endian.h netinet/in.h termios.h arpa/inet.h inttypes.h strings.h unistd.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_HEADER_RESOLV
 
 #
+# Load customizable variables
+#
+AC_CHECK_FILE([configure.custom],
+	[
+		configure_custom_file="configure.custom"
+		custom_git_domain="$(grep '^\s*GIT_DOMAIN\s*=' configure.custom | sed -e 's|^\s*GIT_DOMAIN\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+		custom_git_org="$(grep '^\s*GIT_ORG\s*=' configure.custom | sed -e 's|^\s*GIT_ORG\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+		custom_git_repo="$(grep '^\s*GIT_REPO\s*=' configure.custom | sed -e 's|^\s*GIT_REPO\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+		custom_git_endpoint="$(grep '^\s*GIT_EP_V3_REPO\s*=' configure.custom | sed -e 's|^\s*GIT_EP_V3_REPO\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+		custom_dev_email="$(grep '^\s*DEV_EMAIL\s*=' configure.custom | sed -e 's|^\s*DEV_EMAIL\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+		custom_dev_name="$(grep '^\s*DEB_NAME\s*=' configure.custom | sed -e 's|^\s*DEB_NAME\s*=\s*||g' -e 's|^\s*||g' -e 's|\s*$||g')"
+	],
+	[
+		configure_custom_file=""
+		custom_git_domain="github.com"
+		custom_git_org="yahoojapan"
+		custom_git_repo="chmpx"
+		custom_git_endpoint="https://api.github.com/repos/"
+		custom_dev_email="antpickax-support@mail.yahoo.co.jp"
+		custom_dev_name="CHMPX_DEVELOPER"
+	]
+)
+
+#
 # Symbols for buildutils
 #
-AC_SUBST([GIT_DOMAIN], "github.com")
-AC_SUBST([GIT_ORG], "yahoojapan")
-AC_SUBST([GIT_REPO], "chmpx")
-AC_SUBST([CURRENTREV], "`$(pwd)/buildutils/make_commit_hash.sh -o yahoojapan -r chmpx -short`")
-AC_SUBST([DEV_EMAIL], "`echo ${DEBEMAIL:-antpickax-support@mail.yahoo.co.jp}`")
-AC_SUBST([DEV_NAME], "`echo ${DEBFULLNAME:-CHMPX_DEVELOPER}`")
-
+AC_SUBST([CONFIGURECUSTOM], "${configure_custom_file}")
+AC_SUBST([GIT_DOMAIN], "${custom_git_domain}")
+AC_SUBST([GIT_ORG], "${custom_git_org}")
+AC_SUBST([GIT_REPO], "${custom_git_repo}")
+AC_SUBST([CURRENTREV], "$($(pwd)/buildutils/make_commit_hash.sh -o "${custom_git_org}" -r "${custom_git_repo}" -ep "${custom_git_endpoint}" -short)")
+AC_SUBST([DEV_EMAIL], "$(echo ${DEBEMAIL:-"${custom_dev_email}"})")
+AC_SUBST([DEV_NAME], "$(echo ${DEBFULLNAME:-"${custom_dev_name}"})")
+#
 AC_SUBST([RPMCHANGELOG], "`$(pwd)/buildutils/make_rpm_changelog.sh $(pwd)/ChangeLog`")
 AC_SUBST([SHORTDESC], "`$(pwd)/buildutils/make_description.sh $(pwd)/docs/chmpx.1 -short`")
 AC_SUBST([LONGDESC], "`$(pwd)/buildutils/make_description.sh $(pwd)/docs/chmpx.1 -long`")
@@ -242,7 +262,10 @@ AC_CONFIG_FILES([Makefile
 AC_OUTPUT
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #

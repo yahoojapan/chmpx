@@ -22,7 +22,7 @@
 
 SUBDIRS=lib src tests docs buildutils
 ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST=RELEASE_VERSION
+EXTRA_DIST=RELEASE_VERSION @CONFIGURECUSTOM@
 
 CPPCHECK_CMD=	cppcheck
 CPPCHECK_OPT=	--quiet \
@@ -68,7 +68,10 @@ cppcheck:
 	fi
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #

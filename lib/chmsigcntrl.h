@@ -47,7 +47,7 @@ class ChmSigCntrl
 		ChmSigCntrl(void);
 		virtual ~ChmSigCntrl();
 
-		bool Initialize(int* psignums, int count);
+		bool Initialize(const int* psignums, int count);
 		bool GetSignalMask(sigset_t& sigset);
 		bool SetSignalProcMask(void);
 		bool SetHandler(int signum, sighandler_t handler) { return SetHandlerEx(signum, handler, false); }
