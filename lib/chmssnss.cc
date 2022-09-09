@@ -1046,6 +1046,8 @@ bool ChmSecureSock::SetBlockingMode(PRFileDesc* SSSession, bool is_blocking)
 	return true;
 }
 
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress constParameter
 bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !sslsession || !IS_SAFE_CHKRESULTSSL_TYPE(type)){

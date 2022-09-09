@@ -1993,6 +1993,8 @@ class chmpxlist_lap : public structure_lap<T>
 		chmpxlist_lap(st_ptr_type ptr = NULL, st_ptr_type* absmapptr = NULL, PCHMPX* pchmpxarrbase = NULL, PCHMPX* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* psockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		PCHMPX GetAbsChmpxPtr(void) const { return (basic_type::pAbsPtr ? &basic_type::pAbsPtr->chmpx : NULL); }
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress clarifyCondition
 		PCHMPX GetRelChmpxPtr(void) const { return (basic_type::pAbsPtr ? CHM_REL(basic_type::pShmBase, &basic_type::pAbsPtr->chmpx, PCHMPX) : NULL); }
 
 		void Reset(st_ptr_type ptr, st_ptr_type* absmapptr, PCHMPX* pchmpxarrbase, PCHMPX* pchmpxarrpend, long* psockfreecnt, PCHMSOCKLIST* psockfrees, const void* shmbase, bool is_abs = true);
@@ -3691,6 +3693,8 @@ class mqmsgheadlist_lap : public structure_lap<T>
 		mqmsgheadlist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		PMQMSGHEAD GetAbsMqMsgHeadPtr(void) const { return (basic_type::pAbsPtr ? &basic_type::pAbsPtr->msghead : NULL); }
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress clarifyCondition
 		PMQMSGHEAD GetRelMqMsgHeadPtr(void) const { return (basic_type::pAbsPtr ? CHM_REL(basic_type::pShmBase, &basic_type::pAbsPtr->msghead, PMQMSGHEAD) : NULL); }
 
 		virtual bool Initialize(void);
@@ -4131,6 +4135,8 @@ PMQMSGHEAD mqmsgheadlist_lap<T>::Find(msgid_t msgid, bool is_abs, bool is_to_fir
 	for(st_ptr_type cur = basic_type::pAbsPtr; cur; cur = CHM_ABS(basic_type::pShmBase, cur->next, st_ptr_type)){
 		mqmsgheadlap	tmpmqmsghead(&cur->msghead, basic_type::pShmBase);
 		if(msgid == tmpmqmsghead.GetMsgId()){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress clarifyCondition
 			return (is_abs ? &cur->msghead : CHM_REL(basic_type::pShmBase, &cur->msghead, PMQMSGHEAD));
 		}
 	}
@@ -7842,7 +7848,11 @@ class chminfo_lap : public structure_lap<T>
 		bool GetMsgidListByUniqPid(msgidlist_t& list, bool is_clear_list = false);				// Get msgid list for all uniq PID(from activated list)
 
 		pid_t GetChmpxSvrPid(void) const { return (basic_type::pAbsPtr ? basic_type::pAbsPtr->pid : CHM_INVALID_PID); }
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress clarifyCondition
 		pid_t* GetChmpxSvrPidAddr(bool is_abs) { return (!basic_type::pAbsPtr ? NULL : is_abs ? &(basic_type::pAbsPtr->pid) : CHM_REL(basic_type::pShmBase, &(basic_type::pAbsPtr->pid), pid_t*)); }
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress clarifyCondition
 		void* GetClientPidListOffset(void) { return (!basic_type::pAbsPtr ? NULL : CHM_REL(basic_type::pShmBase, &(basic_type::pAbsPtr->client_pids), void*)); }
 
 		bool GetSelfChmpxSvr(PCHMPXSVR chmpxsvr) const;
