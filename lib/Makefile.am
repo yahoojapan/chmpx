@@ -108,8 +108,15 @@ libchmpx_la_LDFLAGS	= -version-info $(LIB_VERSION_INFO)
 libchmpx_la_LIBADD	= $(k2hash_LIBS) $(fullock_LIBS) $(SSL_TLS_LIBS) -lyaml -lrt -lresolv -lpthread
 
 ACLOCAL_AMFLAGS		= -I m4
-AM_CFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS)
-AM_CPPFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS)
+
+# [NOTE]
+# "-Waddress-of-packed-member" optsion was introduced by default
+# from GCC 9.
+# Knowing that packed structure is CPU architecture dependent,
+# this program ignores this warning.
+#
+AM_CFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS) -Wno-address-of-packed-member
+AM_CPPFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS) -Wno-address-of-packed-member
 
 ### version(commit hash)
 .PHONY:	chmpxversion
@@ -118,7 +125,10 @@ chmpxversion.cc:	chmpxversion
 	@../buildutils/make_commit_hash_source.sh chmpxversion.cc chmpx_commit_hash
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #

@@ -876,7 +876,7 @@ static int RunChild(string cntlfile)
 			continue;
 		}
 	}
-	K2H_Delete(pthparam);
+	delete [] pthparam;
 
 	// exit
 	return EXIT_SUCCESS;

@@ -969,6 +969,8 @@ off_t ChmIMData::GetLockOffsetForMQ(void) const
 		ERR_CHMPRN("There is no attached ChmShm.");
 		return 0L;
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress clarifyCondition
 	long*	rel_freemsgcnt = CHM_REL(pChmShm, &(pChmShm->info.free_msg_count), long*);
 	return reinterpret_cast<off_t>(rel_freemsgcnt);
 }

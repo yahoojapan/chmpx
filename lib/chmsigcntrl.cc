@@ -89,7 +89,7 @@ ChmSigCntrl::~ChmSigCntrl()
 {
 }
 
-bool ChmSigCntrl::Initialize(int* psignums, int count)
+bool ChmSigCntrl::Initialize(const int* psignums, int count)
 {
 	ChmSigCntrl::GetHelper().Lock();
 

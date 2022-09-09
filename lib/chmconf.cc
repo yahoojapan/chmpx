@@ -352,7 +352,7 @@ bool CHMConf::Clean(void)
 		UnsetEventQueue();
 	}
 
-	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
+	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval)){}	// LOCK
 	CHM_Delete(pchmcfginfo);
 	fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);				// UNLOCK
 

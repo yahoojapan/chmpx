@@ -1625,25 +1625,23 @@ bool ChmEventMq::RawReceive(mqd_t mqfd, const COMPOSEDMSGID& composed)
 	pComPkt = pTmp;
 
 	// Dispatching
-	if(pComPkt){
-		bool	is_need_ack	= (COM_C2C == pComPkt->head.type && use_mq_ack && pChmCntrl->IsChmpxType());
+	bool	is_need_ack	= (COM_C2C == pComPkt->head.type && use_mq_ack && pChmCntrl->IsChmpxType());
 
-		if(pChmCntrl && !pChmCntrl->Processing(pComPkt, ChmCntrl::EVOBJ_TYPE_EVMQ)){
-			// send failure ack
-			if(is_need_ack && !SendAck(composed, false)){
-				ERR_CHMPRN("Failed sending failure ACK to to MQ(%d).", mqfd);
-			}
-			ERR_CHMPRN("Failed processing after receiving from MQ(%d).", mqfd);
-			CHM_Free(pComPkt);
-			return false;
+	if(pChmCntrl && !pChmCntrl->Processing(pComPkt, ChmCntrl::EVOBJ_TYPE_EVMQ)){
+		// send failure ack
+		if(is_need_ack && !SendAck(composed, false)){
+			ERR_CHMPRN("Failed sending failure ACK to to MQ(%d).", mqfd);
 		}
+		ERR_CHMPRN("Failed processing after receiving from MQ(%d).", mqfd);
 		CHM_Free(pComPkt);
+		return false;
+	}
+	CHM_Free(pComPkt);
 
-		// send success ack
-		if(is_need_ack && !SendAck(composed, true)){
-			ERR_CHMPRN("Failed sending success ACK to to MQ(%d).", mqfd);
-			return false;
-		}
+	// send success ack
+	if(is_need_ack && !SendAck(composed, true)){
+		ERR_CHMPRN("Failed sending success ACK to to MQ(%d).", mqfd);
+		return false;
 	}
 	return true;
 }
