@@ -1459,7 +1459,7 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress nullPointerRedundantCheck
 	suseconds_t	waittime = pSockObj->sock_wait_time;
-	bool		is_closed;
+	bool		is_closed= false;
 	int			werr;
 	while(0 == (werr = ChmEventSock::WaitForReady(sock, WAIT_READ_FD, 0, false, waittime))){		// check rest data & return assap
 		// Processing
@@ -7587,7 +7587,7 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
 {
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -9971,7 +9971,7 @@ bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
 {
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10204,7 +10204,7 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 	return true;
 }
 
-bool ChmEventSock::PxCltReceiveJoinNotify(PCOMHEAD pComHead, PPXCLT_ALL pComAll)
+bool ChmEventSock::PxCltReceiveJoinNotify(const PCOMHEAD pComHead, const PPXCLT_ALL pComAll)
 {
 	if(!pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10532,7 +10532,7 @@ bool ChmEventSock::PxComSendResUpdateData(chmpxid_t chmpxid, size_t length, cons
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveResUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll)
+bool ChmEventSock::PxComReceiveResUpdateData(const PCOMHEAD pComHead, PPXCOM_ALL pComAll)
 {
 	if(!pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10596,7 +10596,7 @@ bool ChmEventSock::PxComSendResultUpdateData(chmpxid_t chmpxid, reqidmapflag_t r
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveResultUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComAll)
+bool ChmEventSock::PxComReceiveResultUpdateData(const PCOMHEAD pComHead, PPXCOM_ALL pComAll)
 {
 	if(!pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10699,7 +10699,7 @@ bool ChmEventSock::PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_so
 // Therefore, instead of processing in the reception main loop, CHMPX_COM_VERSION_RES is
 // returned directly in this method.
 //
-bool ChmEventSock::PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, PPXCOM_ALL pComAll)
+bool ChmEventSock::PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, const PPXCOM_ALL pComAll)
 {
 	if(CHM_INVALID_SOCK == sock || !pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");

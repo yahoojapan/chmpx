@@ -198,7 +198,7 @@ bool ChmEventShm::GetEventQueueFds(event_fds_t& fds)
 
 bool ChmEventShm::SetEventQueue(void)
 {
-	if(0 == chmshmfile.c_str()){
+	if(chmshmfile.empty()){
 		ERR_CHMPRN("This object does not have chmshm file path.");
 		return false;
 	}
