@@ -38,9 +38,10 @@ func_usage()
 	echo "	-h(help)                print help."
 	echo ""
 }
-PRGNAME=`basename $0`
-MYSCRIPTDIR=`dirname $0`
-SRCTOP=`cd ${MYSCRIPTDIR}/..; pwd`
+
+PRGNAME=$(basename "$0")
+MYSCRIPTDIR=$(dirname "$0")
+SRCTOP=$(cd "${MYSCRIPTDIR}/.." || exit 1; pwd)
 RELEASE_VERSION_FILE="${SRCTOP}/RELEASE_VERSION"
 
 #
@@ -48,135 +49,136 @@ RELEASE_VERSION_FILE="${SRCTOP}/RELEASE_VERSION"
 #
 PRGMODE=""
 while [ $# -ne 0 ]; do
-	if [ "X$1" = "X" ]; then
+	if [ -z "$1" ]; then
 		break;
 
-	elif [ "X$1" = "X-h" -o "X$1" = "X-help" ]; then
-		func_usage $PRGNAME
+	elif [ "$1" = "-h" ] || [ "$1" = "-help" ]; then
+		func_usage "${PRGNAME}"
 		exit 0
 
-	elif [ "X$1" = "X-pkg_version" ]; then
+	elif [ "$1" = "-pkg_version" ]; then
 		PRGMODE="PKG"
 
-	elif [ "X$1" = "X-lib_version_info" ]; then
+	elif [ "$1" = "-lib_version_info" ]; then
 		PRGMODE="LIB"
 
-	elif [ "X$1" = "X-lib_version_for_link" ]; then
+	elif [ "$1" = "-lib_version_for_link" ]; then
 		PRGMODE="LINK"
 
-	elif [ "X$1" = "X-major_number" ]; then
+	elif [ "$1" = "-major_number" ]; then
 		PRGMODE="MAJOR"
 
-	elif [ "X$1" = "X-debhelper_dep" ]; then
+	elif [ "$1" = "-debhelper_dep" ]; then
 		PRGMODE="DEBHELPER"
 
-	elif [ "X$1" = "X-rpmpkg_group" ]; then
+	elif [ "$1" = "-rpmpkg_group" ]; then
 		PRGMODE="RPMGROUP"
 
 	else
 		echo "ERROR: unknown option $1" 1>&2
-		echo -n "0"
+		printf '0'
 		exit 1
 	fi
 	shift
 done
-if [ "X${PRGMODE}" = "X" ]; then
+if [ -z "${PRGMODE}" ]; then
 	echo "ERROR: option is not specified." 1>&2
-	echo -n "0"
+	printf '0'
 	exit 1
 fi
 
 #
 # Make result
 #
-if [ ${PRGMODE} = "PKG" ]; then
-	RESULT=`cat ${RELEASE_VERSION_FILE}`
+if [ "${PRGMODE}" = "PKG" ]; then
+	RESULT=$(cat "${RELEASE_VERSION_FILE}")
 
-elif [ ${PRGMODE} = "LIB" -o ${PRGMODE} = "LINK" ]; then
-	MAJOR_VERSION=`cat ${RELEASE_VERSION_FILE} | sed 's/["|\.]/ /g' | awk '{print $1}'`
-	MID_VERSION=`cat ${RELEASE_VERSION_FILE} | sed 's/["|\.]/ /g' | awk '{print $2}'`
-	LAST_VERSION=`cat ${RELEASE_VERSION_FILE} | sed 's/["|\.]/ /g' | awk '{print $3}'`
+elif [ "${PRGMODE}" = "LIB" ] || [ "${PRGMODE}" = "LINK" ]; then
+	MAJOR_VERSION=$(sed -e 's/["|\.]/ /g' "${RELEASE_VERSION_FILE}" | awk '{print $1}')
+	MID_VERSION=$(sed -e 's/["|\.]/ /g' "${RELEASE_VERSION_FILE}" | awk '{print $2}')
+	LAST_VERSION=$(sed -e 's/["|\.]/ /g' "${RELEASE_VERSION_FILE}" | awk '{print $3}')
 
 	# check version number
+	# shellcheck disable=SC2003
 	expr "${MAJOR_VERSION}" + 1 >/dev/null 2>&1
 	if [ $? -ge 2 ]; then
 		echo "ERROR: wrong version number in RELEASE_VERSION file" 1>&2
-		echo -n "0"
+		printf '0'
 		exit 1
 	fi
+	# shellcheck disable=SC2003
 	expr "${MID_VERSION}" + 1 >/dev/null 2>&1
 	if [ $? -ge 2 ]; then
 		echo "ERROR: wrong version number in RELEASE_VERSION file" 1>&2
-		echo -n "0"
+		printf '0'
 		exit 1
 	fi
+	# shellcheck disable=SC2003
 	expr "${LAST_VERSION}" + 1 >/dev/null 2>&1
 	if [ $? -ge 2 ]; then
 		echo "ERROR: wrong version number in RELEASE_VERSION file" 1>&2
-		echo -n "0"
+		printf '0'
 		exit 1
 	fi
 
 	# make library revision number
-	if [ ${MID_VERSION} -gt 0 ]; then
-		REV_VERSION=`expr ${MID_VERSION} \* 100`
-		REV_VERSION=`expr ${LAST_VERSION} + ${REV_VERSION}`
+	if [ "${MID_VERSION}" -gt 0 ]; then
+		REV_VERSION=$((MID_VERSION * 100))
+		REV_VERSION=$((MID_VERSION * 100))
+		REV_VERSION=$((LAST_VERSION + REV_VERSION))
 	else
-		REV_VERSION=${LAST_VERSION}
+		REV_VERSION="${LAST_VERSION}"
 	fi
 
-	if [ ${PRGMODE} = "LIB" ]; then
+	if [ "${PRGMODE}" = "LIB" ]; then
 		RESULT="${MAJOR_VERSION}:${REV_VERSION}:0"
 	else
 		RESULT="${MAJOR_VERSION}.0.${REV_VERSION}"
 	fi
 
-elif [ ${PRGMODE} = "MAJOR" ]; then
-	RESULT=`cat ${RELEASE_VERSION_FILE} | sed 's/["|\.]/ /g' | awk '{print $1}'`
+elif [ "${PRGMODE}" = "MAJOR" ]; then
+	RESULT=$(sed 's/["|\.]/ /g' "${RELEASE_VERSION_FILE}" | awk '{print $1}')
 
-elif [ ${PRGMODE} = "DEBHELPER" ]; then
+elif [ "${PRGMODE}" = "DEBHELPER" ]; then
 	# [NOTE]
 	# This option returns debhelper dependency string in control file for debian package.
 	# That string is depended debhelper package version and os etc.
 	# (if not ubuntu/debian os, returns default string)
 	#
-	apt-cache --version >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		IS_OS_UBUNTU=0
-		if [ -f /etc/lsb-release ]; then
-			grep [Uu]buntu /etc/lsb-release >/dev/null 2>&1
-			if [ $? -eq 0 ]; then
-				IS_OS_UBUNTU=1
-			fi
-		fi
+	OS_ID_STRING=$(grep '^ID[[:space:]]*=[[:space:]]*' /etc/os-release | sed -e 's|^ID[[:space:]]*=[[:space:]]*||g' -e 's|^[[:space:]]*||g' -e 's|[[:space:]]*$||g')
 
-		DEBHELPER_MAJOR_VER=`apt-cache show debhelper 2>/dev/null | grep Version 2>/dev/null | awk '{print $2}' 2>/dev/null | sed 's/\..*/ /g' 2>/dev/null`
-		expr "${DEBHELPER_MAJOR_VER}" + 1 >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			DEBHELPER_MAJOR_VER=0
-		else
-			DEBHELPER_MAJOR_VER=`expr "${DEBHELPER_MAJOR_VER}" + 0`
-		fi
-		if [ ${DEBHELPER_MAJOR_VER} -lt 10 ]; then
-			RESULT="debhelper (>= 9), autotools-dev"
-		else
-			if [ ${IS_OS_UBUNTU} -eq 1 ]; then
-				RESULT="debhelper (>= 10)"
-			else
-				RESULT="debhelper (>= 10), autotools-dev"
-			fi
-		fi
-	else
-		# Not debian/ubuntu, set default
-		RESULT="debhelper (>= 10), autotools-dev"
+	DEBHELPER_MAJOR_VER=$(apt-cache show debhelper 2>/dev/null | grep Version 2>/dev/null | awk '{print $2}' 2>/dev/null | sed 's/\..*/ /g' 2>/dev/null)
+	# shellcheck disable=SC2003
+	expr "${DEBHELPER_MAJOR_VER}" + 1 >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		DEBHELPER_MAJOR_VER=0
 	fi
 
-elif [ ${PRGMODE} = "RPMGROUP" ]; then
+	if [ -n "${OS_ID_STRING}" ]; then
+		if [ "${OS_ID_STRING}" = "debian" ]; then
+			RESULT="debhelper (>= 9.20160709) | dh-systemd, autotools-dev"
+
+		elif [ "${OS_ID_STRING}" = "ubuntu" ]; then
+			if [ ${DEBHELPER_MAJOR_VER} -lt 10 ]; then
+				RESULT="debhelper (>= 9.20160709) | dh-systemd, autotools-dev"
+			else
+				RESULT="debhelper (>= 9.20160709) | dh-systemd"
+			fi
+		else
+			# Not debian/ubuntu, set default
+			RESULT="debhelper (>= 9.20160709) | dh-systemd, autotools-dev"
+		fi
+	else
+		# Unknown OS, set default
+		RESULT="debhelper (>= 9.20160709) | dh-systemd, autotools-dev"
+	fi
+
+elif [ "${PRGMODE}" = "RPMGROUP" ]; then
 	# [NOTE]
 	# Fedora rpm does not need "Group" key in spec file.
 	# If not fedora, returns "NEEDRPMGROUP", and you must replace this string in configure.ac
 	#
-	if [ -f /etc/fedora-release ]; then
+	if grep -q '^ID[[:space:]]*=[[:space:]]*["]*fedora["]*[[:space:]]*$' /etc/os-release; then
 		RESULT=""
 	else
 		RESULT="NEEDRPMGROUP"
@@ -186,12 +188,15 @@ fi
 #
 # Output result
 #
-echo -n $RESULT
+printf '%s' "${RESULT}"
 
 exit 0
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #
