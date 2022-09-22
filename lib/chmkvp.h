@@ -41,7 +41,7 @@ class ChmBinData
 		bool			is_allocate;
 
 	public:
-		ChmBinData(unsigned char* bydata = NULL, size_t bylength = 0L, bool is_duplicate = false);
+		explicit ChmBinData(unsigned char* bydata = NULL, size_t bylength = 0L, bool is_duplicate = false);
 		ChmBinData(PCHMBIN pchmbin, bool is_duplicate);
 		virtual ~ChmBinData();
 
@@ -77,7 +77,7 @@ class ChmKVPair
 		ChmBinData	Value;
 
 	public:
-		ChmKVPair(unsigned char* bykey = NULL, size_t keylen = 0L, unsigned char* byval = NULL, size_t vallen = 0L, bool is_duplicate = false);
+		explicit ChmKVPair(unsigned char* bykey = NULL, size_t keylen = 0L, unsigned char* byval = NULL, size_t vallen = 0L, bool is_duplicate = false);
 		ChmKVPair(ChmBinData* pKey, ChmBinData* pValue, bool is_duplicate = false);
 		ChmKVPair(PCHMKVP pkvp, bool is_duplicate);
 		virtual ~ChmKVPair();

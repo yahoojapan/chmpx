@@ -60,7 +60,7 @@ typedef struct chm_gnutls_ss_context{
 	string	strSlaveCert;
 	string	strSlavePKey;
 
-	chm_gnutls_ss_context(const char* pServerCert = NULL, const char* pServerPKey = NULL, const char* pSlaveCert = NULL, const char* pSlavePKey = NULL) : 
+	explicit chm_gnutls_ss_context(const char* pServerCert = NULL, const char* pServerPKey = NULL, const char* pSlaveCert = NULL, const char* pSlavePKey = NULL) : 
 		strServerCert(CHMEMPTYSTR(pServerCert) ? "" : pServerCert), strServerPKey(CHMEMPTYSTR(pServerPKey) ? "" : pServerPKey), strSlaveCert(CHMEMPTYSTR(pSlaveCert) ? "" : pSlaveCert), strSlavePKey(CHMEMPTYSTR(pSlavePKey) ? "" : pSlavePKey)
 	{
 	}
@@ -113,7 +113,7 @@ typedef struct chm_gnutls_session{
 	gnutls_session_t					session;
 	gnutls_priority_t					priority_cache;
 
-	chm_gnutls_session(bool is_svr = false, ChmSSCtx ctx = NULL, gnutls_certificate_credentials_t cert = NULL, gnutls_session_t ses = NULL, gnutls_priority_t pricache = NULL) :
+	explicit chm_gnutls_session(bool is_svr = false, ChmSSCtx ctx = NULL, gnutls_certificate_credentials_t cert = NULL, gnutls_session_t ses = NULL, gnutls_priority_t pricache = NULL) :
 		is_server(is_svr), SSCtx(NULL), cert_cred(cert), session(ses), priority_cache(pricache)
 	{
 		// cppcheck-suppress unmatchedSuppression

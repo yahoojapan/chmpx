@@ -2983,7 +2983,7 @@ static string CutEmptyLine(const string& strBase)
 {
 	string	strResult = strBase;
 	if(!strResult.empty() && '\n' == strResult[strResult.length() - 1]){
-		strResult = strResult.substr(0, strResult.length() - 1);
+		strResult.resize(strResult.length() - 1);
 	}
 	return strResult;
 }
@@ -3233,6 +3233,8 @@ static bool AddNodesFromDumpResult(nodectrllist_t& nodes, string& strDump)
 		strParsed = strParsed.substr(pos + strlen(DUMP_KEY_CR));
 
 		// Parse slave chmpxs
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		strParsed = ParseChmpxListFromDumpResult(nodes, strParsed, false, is_error);
 		if(is_error){
 			ERR("Could not parse server chmpx.");
@@ -3718,6 +3720,8 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, chmpxid_t chmpxid, con
 		strParsed		= strParsed.substr(pos + strlen(DUMP_KEY_CR));
 		if(strChmpxCount != "0"){
 			// Parse slave chmpxs
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			strParsed = ParseUnitDatasFromDumpResult(detail.slaves, exceptchmpxid, false, strParsed);
 		}
 	}
@@ -4719,7 +4723,7 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 			if(string::npos != (pos2 = strLastUpdate.find("("))){
 				strLastUpdate		= strLastUpdate.substr(pos2 + 1);
 				if(string::npos != (pos2 = strLastUpdate.find(")"))){
-					strLastUpdate	= strLastUpdate.substr(0, pos2);
+					strLastUpdate.resize(pos2);
 				}else{
 					// why?, but continue...
 				}
@@ -5145,22 +5149,22 @@ static bool parse_host_parameter(const string& params, string& host, short& ctrl
 	string::size_type	chpos;
 	if(string::npos != (chpos = host.find(":"))){
 		string	strport	= host.substr(chpos + 1);
-		host			= host.substr(0, chpos);
+		host.resize(chpos);
 
 		if(string::npos == (chpos = strport.find(":"))){
 			ctrlport	= static_cast<short>(atoi(strport.c_str()));
 		}else{
 			cuk			= strport.substr(chpos + 1);
-			strport		= strport.substr(0, chpos);
+			strport.resize(chpos);
 			ctrlport	= static_cast<short>(atoi(strport.c_str()));
 
 			if(string::npos != (chpos = cuk.find(":"))){
 				custom_seed	= cuk.substr(chpos + 1);
-				cuk			= cuk.substr(0, chpos);
+				cuk.resize(chpos);
 
 				if(string::npos != (chpos = custom_seed.find(":"))){
 					ctlendpoints= custom_seed.substr(chpos + 1);
-					custom_seed	= custom_seed.substr(0, chpos);
+					custom_seed.resize(chpos);
 				}
 			}
 		}

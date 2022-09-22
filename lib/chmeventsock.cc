@@ -910,6 +910,8 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 	if(!ChmEventSock::RawSend(ctlsock, NULL, pbydata, length, is_closed, false, retrycnt, waittime)){
 		ERR_CHMPRN("Could not send to %s:%d(sock:%d).", hostname, ctlport, ctlsock);
 		if(!is_closed){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(ctlsock);
 		}
 		return false;
@@ -923,6 +925,8 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 	if(!ChmEventSock::RawReceiveAny(ctlsock, is_closed, reinterpret_cast<unsigned char*>(szReceive), &RecLength, false, retrycnt * 10, waittime)){	// wait 10 times by normal
 		ERR_CHMPRN("Failed to receive data from ctlport ctlsock(%d), ctlsock is %s.", ctlsock, is_closed ? "closed" : "not closed");
 		if(!is_closed){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(ctlsock);
 		}
 		return false;
@@ -2119,6 +2123,8 @@ bool ChmEventSock::SetEventQueue(void)
 		eqevent.events	= EPOLLIN | EPOLLET | EPOLLRDHUP;			// EPOLLRDHUP is set
 		if(-1 == epoll_ctl(eqfd, EPOLL_CTL_ADD, sock, &eqevent)){
 			ERR_CHMPRN("Failed to add sock(port %d: sock %d) into epoll event(%d), errno=%d", port, sock, eqfd, errno);
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(sock);
 			return false;
 		}
@@ -2130,6 +2136,8 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != sock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL);
 		}
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
 		return false;
 	}
@@ -2143,7 +2151,11 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != sock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL);
 		}
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(ctlsock);
 		return false;
 	}
@@ -3567,6 +3579,7 @@ bool ChmEventSock::CloseSSL(int sock, bool with_sock)
 		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress uselessAssignmentPtrArg
 		// cppcheck-suppress uselessAssignmentArg
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
 	}
 	return true;
@@ -4262,6 +4275,8 @@ bool ChmEventSock::Accept(int sock)
 	string	strhostname;
 	if(!ChmNetDb::CvtAddrInfoToIpAddress(&from, fromlen, stripaddress)){
 		ERR_CHMPRN("Failed to convert addrinfo(new sock=%d) to ipaddress.", newsock);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(newsock);
 		return false;
 	}
@@ -5969,6 +5984,8 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 			startup_servicein = false;
 
 			// re-get status
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			status = pImData->GetSelfStatus();
 		}else{
 			// Not [SERVICE OUT] [UP] [NOACT] [NOTHING] status

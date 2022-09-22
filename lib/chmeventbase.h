@@ -47,7 +47,7 @@ class ChmEventBase
 		ChmCntrl*	pChmCntrl;
 
 	public:
-		ChmEventBase(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL);
+		explicit ChmEventBase(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL);
 		virtual ~ChmEventBase();
 
 		bool IsEmpty(void) const { return (!pChmCntrl || CHM_INVALID_HANDLE == eqfd); }
