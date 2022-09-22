@@ -464,7 +464,7 @@ class structure_lap
 		const void*		pShmBase;
 
 	public:
-		structure_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit structure_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 		virtual ~structure_lap();
 
 		st_ptr_type GetAbsPtr(void) const { return pAbsPtr; }
@@ -533,7 +533,7 @@ class chmsocklist_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		chmsocklist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmsocklist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		bool Initialize(st_ptr_type prev, st_ptr_type next, bool is_abs = true);
@@ -925,7 +925,7 @@ class chmpx_lap : public structure_lap<T>
 		bool Initialize(CHMPXID_SEED_TYPE type, const char* hostname, const char* group, CHMPXMODE mode, short port, short ctlport, const char* cuk, const char* custom_seed, const PCHMPXHP_RAWPAIR pendpoints, const PCHMPXHP_RAWPAIR pctlendpoints, const PCHMPXHP_RAWPAIR pforward_peers, const PCHMPXHP_RAWPAIR preverse_peers, const CHMPXSSL& ssl);
 
 	public:
-		chmpx_lap(st_ptr_type ptr = NULL, st_ptr_type* pchmpxarrbase = NULL, st_ptr_type* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* pabssockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmpx_lap(st_ptr_type ptr = NULL, st_ptr_type* pchmpxarrbase = NULL, st_ptr_type* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* pabssockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		void Reset(st_ptr_type ptr, st_ptr_type* pchmpxarrbase, st_ptr_type* pchmpxarrpend, long* psockfreecnt, PCHMSOCKLIST* pabssockfrees, const void* shmbase, bool is_abs = true);
 		virtual bool Initialize(void);
@@ -1990,7 +1990,7 @@ class chmpxlist_lap : public structure_lap<T>
 		st_ptr_type SearchChmpxid(chmpxid_t chmpxid);
 
 	public:
-		chmpxlist_lap(st_ptr_type ptr = NULL, st_ptr_type* absmapptr = NULL, PCHMPX* pchmpxarrbase = NULL, PCHMPX* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* psockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmpxlist_lap(st_ptr_type ptr = NULL, st_ptr_type* absmapptr = NULL, PCHMPX* pchmpxarrbase = NULL, PCHMPX* pchmpxarrpend = NULL, long* psockfreecnt = NULL, PCHMSOCKLIST* psockfrees = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		PCHMPX GetAbsChmpxPtr(void) const { return (basic_type::pAbsPtr ? &basic_type::pAbsPtr->chmpx : NULL); }
 		// cppcheck-suppress unmatchedSuppression
@@ -3273,7 +3273,7 @@ class chmstat_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		chmstat_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmstat_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
@@ -3431,7 +3431,7 @@ class mqmsghead_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		mqmsghead_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit mqmsghead_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
@@ -3627,7 +3627,7 @@ class mqmsgheadarr_lap : public structure_lap<T>
 		long						chmpxmsg_count;
 
 	public:
-		mqmsgheadarr_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, long max_msg_count = 0L, bool is_abs = true);
+		explicit mqmsgheadarr_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, long max_msg_count = 0L, bool is_abs = true);
 
 		bool FillMsgId(msgid_t base_msgid);
 		long Count(void) const { return chmpxmsg_count; }
@@ -3690,7 +3690,7 @@ class mqmsgheadlist_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		mqmsgheadlist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit mqmsgheadlist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		PMQMSGHEAD GetAbsMqMsgHeadPtr(void) const { return (basic_type::pAbsPtr ? &basic_type::pAbsPtr->msghead : NULL); }
 		// cppcheck-suppress unmatchedSuppression
@@ -4253,7 +4253,7 @@ class chmlograw_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		chmlograw_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmlograw_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
@@ -4387,7 +4387,7 @@ class chmlog_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		chmlog_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmlog_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
@@ -4660,7 +4660,7 @@ class cltproclist_lap : public structure_lap<T>
 		typedef structure_lap<T>	basic_type;
 
 	public:
-		cltproclist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit cltproclist_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		bool Initialize(st_ptr_type prev, st_ptr_type next, bool is_abs = true);
@@ -5072,7 +5072,7 @@ class chmpxman_lap : public structure_lap<T>
 		bool RawCheckContainsChmpxSvrs(const char* hostname, const short* pctlport, const char* pcuk, std::string* pnormalizedname, PCHMPXSSL pssl) const;
 
 	public:
-		chmpxman_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chmpxman_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
@@ -7822,7 +7822,7 @@ class chminfo_lap : public structure_lap<T>
 		bool SetMergingClinetPid(pid_t pid);
 
 	public:
-		chminfo_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
+		explicit chminfo_lap(st_ptr_type ptr = NULL, const void* shmbase = NULL, bool is_abs = true);
 
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;

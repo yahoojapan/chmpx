@@ -153,6 +153,8 @@ bool ChmEventMq::InitializeMaxMqSystemSize(long maxmsg)
 		size_t	length = 0L;
 		if(NULL == (pbuff = reinterpret_cast<char*>(chm_read(fd, &length)))){
 			ERR_CHMPRN("Could not read file %s", PROCFILE_FOR_MQ);
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSE(fd);
 			return false;
 		}
@@ -209,6 +211,8 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 		}
 		// copy param
 		CHM_MERGE_GETPARAM	getparam;
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		getparam.starthash			= 0;									// must be start position 0
 		getparam.startts.tv_nsec	= pUpdateDataParam->startts.tv_nsec;
 		getparam.startts.tv_sec		= pUpdateDataParam->startts.tv_sec;

@@ -81,7 +81,7 @@ class ChmSecureSock
 		static int Read(ChmSSSession sslsession, void* pbuf, int length);
 		static int Write(ChmSSSession sslsession, const void* pbuf, int length);
 
-		ChmSecureSock(const char* CApath = NULL, const char* CAfile = NULL, bool is_verify_peer = false);
+		explicit ChmSecureSock(const char* CApath = NULL, const char* CAfile = NULL, bool is_verify_peer = false);
 		virtual ~ChmSecureSock();
 
 		bool Clean(void);

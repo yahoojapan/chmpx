@@ -690,6 +690,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 	// truncate with filling zero
 	if(!truncate_filling_zero(fd, total_shmsize, ChmIMData::SYSPAGE_SIZE)){
 		ERR_CHMPRN("Could not truncate file(%s) with filling zero.", shmpath.c_str());
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 		return false;
 	}
@@ -698,6 +700,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 	void*	shmbase;
 	if(MAP_FAILED == (shmbase = mmap(NULL, total_shmsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0))){
 		ERR_CHMPRN("Could not mmap file(%s), errno = %d", shmpath.c_str(), errno);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 		return false;
 	}
@@ -739,6 +743,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 				chmpxlistlap	tmpchmpxlist(&chmpxlist[cnt], NULL, NULL, NULL, NULL, NULL, shmbase);		// absmapptr, chmpx*s are NULL, these can allow only here(calling only Initialize()).
 				if(!tmpchmpxlist.Initialize(prev, next)){
 					ERR_CHMPRN("Failed to initialize No.%ld CHMPXLIST.", cnt);
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_MUMMAP(fd, shmbase, total_shmsize);
 					return false;
 				}
@@ -759,6 +765,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 				mqmsgheadlistlap	tmpmqmsgheadlist(&mqmsglist[cnt], shmbase);
 				if(!tmpmqmsgheadlist.Initialize(prev, next)){
 					ERR_CHMPRN("Failed to initialize No.%ld MQMSGHEADLIST.", cnt);
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_MUMMAP(fd, shmbase, total_shmsize);
 					return false;
 				}
@@ -774,6 +782,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 				cltproclistlap	tmpcltproclist(&cltproclist[cnt], shmbase);
 				if(!tmpcltproclist.Initialize(prev, next)){
 					ERR_CHMPRN("Failed to initialize No.%ld PCLTPROCLIST.", cnt);
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_MUMMAP(fd, shmbase, total_shmsize);
 					return false;
 				}
@@ -785,6 +795,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 				chmlograwlap	tmplograw(&lograw[cnt], shmbase);
 				if(!tmplograw.Initialize()){
 					ERR_CHMPRN("Failed to initialize No.%ld CHMLOGRAW.", cnt);
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_MUMMAP(fd, shmbase, total_shmsize);
 					return false;
 				}
@@ -800,6 +812,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 				chmsocklistlap	tmpchmsocklist(&chmsocklist[cnt], shmbase);
 				if(!tmpchmsocklist.Initialize(prev, next)){
 					ERR_CHMPRN("Failed to initialize No.%ld PCHMSOCKLIST.", cnt);
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_MUMMAP(fd, shmbase, total_shmsize);
 					return false;
 				}
@@ -817,6 +831,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 		chmloglap	tmpchmlog(&pChmBase->chmpxlog, shmbase);
 		if(!tmpchmlog.Initialize(rel_lograwarea, chmcfg.max_histlog_count)){
 			ERR_CHMPRN("Failed to initialize CHMLOG.");
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_MUMMAP(fd, shmbase, total_shmsize);
 			return false;
 		}
@@ -825,6 +841,8 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 		chminfolap	tmpchminfo(&pChmBase->info, shmbase);
 		if(!tmpchminfo.Initialize(&chmcfg, rel_chmpxmsgarea, pself, pnormalizedname, rel_chmpxarea, rel_chmpxpidarea, rel_chmsockarea, rel_pchmpxarr_base, rel_pchmpxarr_pend)){
 			ERR_CHMPRN("Failed to initialize CHMINFO.");
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_MUMMAP(fd, shmbase, total_shmsize);
 			return false;
 		}
@@ -895,6 +913,8 @@ bool ChmIMData::AttachShm(void)
 	void*	shmbase;
 	if(MAP_FAILED == (shmbase = mmap(NULL, total_shmsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0))){
 		ERR_CHMPRN("Could not mmap file(%s), errno = %d", shmpath.c_str(), errno);
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 		return false;
 	}
@@ -903,6 +923,8 @@ bool ChmIMData::AttachShm(void)
 	PCHMSHM	pTmpChmShm = reinterpret_cast<PCHMSHM>(shmbase);
 	if(!ChmIMData::IsSafeCHMINFO(&(pTmpChmShm->info))){
 		ERR_CHMPRN("Unsafe CHMINFO file(%s), probably this is created by old CHMPX version", shmpath.c_str());
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_MUMMAP(fd, shmbase, total_shmsize);
 		return false;
 	}
