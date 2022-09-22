@@ -56,7 +56,7 @@ class chm_lock_map
 		chm_lock_map(void) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(NULL), pbaseparam(NULL) {}
 
 	public:
-		chm_lock_map(const val_type& initval, chm_lock_map_erase_cb pfunc = NULL, void* pparam = NULL) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(pfunc), pbaseparam(pparam), emptyval(initval) {}
+		explicit chm_lock_map(const val_type& initval, chm_lock_map_erase_cb pfunc = NULL, void* pparam = NULL) : lockval(FLCK_NOSHARED_MUTEX_VAL_UNLOCKED), pbasefunc(pfunc), pbaseparam(pparam), emptyval(initval) {}
 		virtual ~chm_lock_map(void) { clear(); }
 
 		inline size_t count(void);

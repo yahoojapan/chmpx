@@ -35,7 +35,7 @@ class ChmOpts
 		std::string	sepchars;
 
 	public:
-		ChmOpts(int argc = 0, char** argv = NULL, const char* strsepchars = NULL);
+		explicit ChmOpts(int argc = 0, char** argv = NULL, const char* strsepchars = NULL);
 		virtual ~ChmOpts();
 
 		bool Initialize(int argc, char** argv);

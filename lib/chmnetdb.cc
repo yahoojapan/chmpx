@@ -962,7 +962,7 @@ bool ChmNetDb::InitializeLocalHostnames()
 				// add cache
 				if(!is_same_nodename || !fulllocalname.empty()){
 					memset(&ipaddr, 0, sizeof(ipaddr));
-					if(0 == (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST))){
+					if(0 == getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST)){
 						HostnammeAddCache(string(hostname), string(ipaddr), true);
 
 						if(is_same_nodename && !fulllocalname.empty()){
@@ -1328,7 +1328,7 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 
 			// add cache
 			bool	is_hostname = false;
-			if(0 != (result = getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV))){
+			if(0 != getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD | NI_NUMERICSERV)){
 				is_hostname = true;
 				IpAddressAddCache(string(ipaddr), string(hostname));
 			}

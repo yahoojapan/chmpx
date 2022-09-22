@@ -184,7 +184,7 @@ class ChmEventMq : public ChmEventBase
 	public:
 		static bool InitializeMaxMqSystemSize(long maxmsg);
 
-		ChmEventMq(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, chm_merge_get_cb mgetfp = NULL, chm_merge_set_cb msetfp = NULL, chm_merge_lastts_cb mlastfp = NULL);
+		explicit ChmEventMq(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, chm_merge_get_cb mgetfp = NULL, chm_merge_set_cb msetfp = NULL, chm_merge_lastts_cb mlastfp = NULL);
 		virtual ~ChmEventMq();
 
 		virtual bool Clean(void);

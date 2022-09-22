@@ -54,7 +54,7 @@ class ChmEventShm : public ChmEventBase
 	public:
 		static bool CheckProcessRunning(void* common_param, chmthparam_t wp_param);
 
-		ChmEventShm(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL);
+		explicit ChmEventShm(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL);
 		virtual ~ChmEventShm();
 
 		virtual bool Clean(void);

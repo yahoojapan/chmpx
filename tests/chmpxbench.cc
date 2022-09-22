@@ -157,7 +157,7 @@ static bool SetStringBytes(string& str, size_t totallength, char ch)
 			str += ch;
 		}
 	}else{	// (str.length() + 1) > totallength
-		str = str.substr(0, (totallength - 1));
+		str.resize(totallength - 1);
 	}
 	return true;
 }
@@ -691,7 +691,6 @@ static void* RunSlaveModeThread(void* param)
 		pthread_exit(NULL);
 	}
 	string	strbase = to_hexstring(gettid()) + "-";
-	string	strmessage;
 
 	// wait for start
 	// cppcheck-suppress unmatchedSuppression
@@ -715,6 +714,7 @@ static void* RunSlaveModeThread(void* param)
 	// Loop: Do read/write to k2hash
 	//---------------------------
 	for(int cnt = 0; 0 == pThParam->pexeccntl->opt.LoopCnt || cnt < pThParam->pexeccntl->opt.LoopCnt; ++cnt){
+		string			strmessage;
 		PCOMPKT			pComPkt	= NULL;
 		unsigned char*	pbody	= NULL;
 		size_t			length	= 0L;
