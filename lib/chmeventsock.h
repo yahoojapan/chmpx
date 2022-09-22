@@ -309,7 +309,7 @@ class ChmEventSock : public ChmEventBase
 		static void DenySelfSignedCert(void);
 		static int WaitForReady(int sock, int type, int retrycnt, bool is_check_so_error = false, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 
-		ChmEventSock(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, bool is_ssl = false);
+		explicit ChmEventSock(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, bool is_ssl = false);
 		virtual ~ChmEventSock();
 
 		bool InitialAllServerStatus(void);

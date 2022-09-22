@@ -584,7 +584,7 @@ class CHMConf : public ChmEventBase
 		PCHMCFGINFO			pchmcfginfo;
 
 	protected:
-		CHMConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
+		explicit CHMConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const = 0;
 
@@ -653,7 +653,7 @@ class CHMIniConf : public CHMConf
 	friend class CHMConf;
 
 	protected:
-		CHMIniConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
+		explicit CHMIniConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
 		bool LoadConfigurationRaw(CFGRAW& chmcfgraw) const;
@@ -671,7 +671,7 @@ class CHMYamlBaseConf : public CHMConf
 	friend class CHMConf;
 
 	protected:
-		CHMYamlBaseConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
+		explicit CHMYamlBaseConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL, const char* pJson = NULL);
 
 		virtual bool LoadConfiguration(CHMCFGINFO& chmcfginfo) const;
 
@@ -687,7 +687,7 @@ class CHMJsonConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMJsonConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
+		explicit CHMJsonConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMJsonConf();
@@ -701,7 +701,7 @@ class CHMJsonStringConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMJsonStringConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* pJson = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
+		explicit CHMJsonStringConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* pJson = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMJsonStringConf();
@@ -715,7 +715,7 @@ class CHMYamlConf : public CHMYamlBaseConf
 	friend class CHMConf;
 
 	protected:
-		CHMYamlConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
+		explicit CHMYamlConf(int eventqfd = CHM_INVALID_HANDLE, ChmCntrl* pcntrl = NULL, const char* file = NULL, short ctlport = CHM_INVALID_PORT, const char* cuk = NULL);
 
 	public:
 		virtual ~CHMYamlConf();

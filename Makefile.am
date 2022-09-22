@@ -31,7 +31,8 @@ CPPCHECK_OPT=	--quiet \
 				-j 4 \
 				--std=c++03 \
 				--xml-version=2 \
-				--enable=warning,style,information,missingInclude
+				--enable=warning,style,information,missingInclude \
+				--cppcheck-build-dir=/tmp/cppcheck
 CPPCHECK_DEF=	-D SO_REUSEPORT
 CPPCHECK_IGN=
 
@@ -53,18 +54,19 @@ CPPCHECK_IGN=
 # If the other will support 1.8x or later versions in the
 # future, this skipped process will be unnecessary.
 #
-CPPCHECK_NGVER=	-e 1\\.7 -e 1\\.6
+CPPCHECK_NGVER=	-e \^1\\.7 -e \^1\\.6
 
 cppcheck:
 	echo "$(CPPCHECK_CMD) $(CPPCHECK_OPT) $(CPPCHECK_DEF) $(CPPCHECK_IGN) $(SUBDIRS)"
-	if test "X$$CI" = "Xtrue"; then \
-		if ($(CPPCHECK_CMD) --version | grep $(CPPCHECK_NGVER)) >/dev/null 2>&1; then \
-			echo " --> Skip, because this old $(CPPCHECK_CMD) version is very poor performance on VM(CI)"; \
-		else \
-			$(CPPCHECK_CMD) $(CPPCHECK_OPT) $(CPPCHECK_DEF) $(CPPCHECK_IGN) $(SUBDIRS); \
-		fi; \
+	if ($(CPPCHECK_CMD) --version | sed -e 's|Cppcheck[[:space:]]*||gi' | grep -q $(CPPCHECK_NGVER)); then \
+		echo " --> Skip, because this old $(CPPCHECK_CMD) version is very poor performance on VM(CI)"; \
 	else \
+		if [ -d /tmp/cppcheck ]; then \
+			rm -rf /tmp/cppcheck; \
+		fi; \
+		mkdir /tmp/cppcheck; \
 		$(CPPCHECK_CMD) $(CPPCHECK_OPT) $(CPPCHECK_DEF) $(CPPCHECK_IGN) $(SUBDIRS); \
+		rm -rf /tmp/cppcheck; \
 	fi
 
 #

@@ -101,7 +101,7 @@ typedef struct chm_nss_ss_context{
 	CERTCertificate*	CERT_OBJ_slave;
 	SECKEYPrivateKey*	PKEY_OBJ_slave;
 
-	chm_nss_ss_context(const char* pServer = NULL, CERTCertificate* cert_server = NULL, SECKEYPrivateKey* pkey_server = NULL, const char* pSlave = NULL, CERTCertificate* cert_slave = NULL, SECKEYPrivateKey* pkey_slave = NULL) :
+	explicit chm_nss_ss_context(const char* pServer = NULL, CERTCertificate* cert_server = NULL, SECKEYPrivateKey* pkey_server = NULL, const char* pSlave = NULL, CERTCertificate* cert_slave = NULL, SECKEYPrivateKey* pkey_slave = NULL) :
 		strServerKey(CHMEMPTYSTR(pServer) ? "" : pServer), CERT_OBJ_server(cert_server), PKEY_OBJ_server(pkey_server), strSlaveKey(CHMEMPTYSTR(pSlave) ? "" : pSlave), CERT_OBJ_slave(cert_slave), PKEY_OBJ_slave(pkey_slave)
 	{
 	}
@@ -241,7 +241,7 @@ typedef struct chm_nss_session{
 	PRFileDesc*		SSSession;
 	chmpk11list_t	pk11objs;
 
-	chm_nss_session(ChmSSCtx ctx = NULL, PRFileDesc* session = NULL, chmpk11list_t* ppk11objs = NULL) : SSCtx(NULL), SSSession(session)
+	explicit chm_nss_session(ChmSSCtx ctx = NULL, PRFileDesc* session = NULL, chmpk11list_t* ppk11objs = NULL) : SSCtx(NULL), SSSession(session)
 	{
 		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress noOperatorEq

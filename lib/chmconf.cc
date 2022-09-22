@@ -504,17 +504,17 @@ bool CHMConf::Receive(int fd)
 	// get type
 	bool	is_check_file	= false;
 	bool	is_reload		= false;
-	uint	type			= CheckNotifyEvent();
-	if(type & IN_CLOSE_WRITE){
+	uint	chktype			= CheckNotifyEvent();
+	if(chktype & IN_CLOSE_WRITE){
 		is_reload = true;
 	}
-	if(type & IN_MODIFY){
+	if(chktype & IN_MODIFY){
 		is_reload = true;
 	}
-	if(type & IN_DELETE_SELF){
+	if(chktype & IN_DELETE_SELF){
 		is_check_file = true;
 	}
-	if(type & IN_MOVE_SELF){
+	if(chktype & IN_MOVE_SELF){
 		is_check_file = true;
 	}
 

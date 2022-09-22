@@ -39,6 +39,50 @@ fi
 export LD_LIBRARY_PATH
 export TESTPROGDIR
 
+##############################################################
+## Utility function
+##
+stop_process()
+{
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	_request_pids="$1"
+
+	for _one_pid in ${_request_pids}; do
+		_try_max_count=10
+
+		while [ "${_try_max_count}" -gt 0 ]; do
+			#
+			# Try HUP
+			#
+			kill -HUP "${_one_pid}" > /dev/null 2>&1
+			sleep 1
+			if ! ps -p "${_one_pid}" >/dev/null 2>&1; then
+				break
+			fi
+
+			#
+			# Try KILL
+			#
+			kill -9 "${_one_pid}" > /dev/null 2>&1
+			sleep 1
+			if ! ps -p "${_one_pid}" >/dev/null 2>&1; then
+				break
+			fi
+			echo "   Failed: kill -9 ${_one_pid}" >> /tmp/stop_log.log
+
+			_try_max_count=$((_try_max_count - 1))
+		done
+
+		if [ "${_try_max_count}" -le 0 ]; then
+			return 1
+		fi
+	done
+
+	return 0
+}
+
 ###########################################################
 # Initialize
 ###########################################################
@@ -395,24 +439,32 @@ sleep 2
 ###########################################################
 # Stop all process
 ###########################################################
-kill -HUP ${TESTSVRPID} > /dev/null 2>&1
-sleep 1
-kill -9 ${TESTSVRPID} > /dev/null 2>&1
-sleep 1
+_failed_stop_process=0
+TESTSVRPID="${TESTSVRPID} $(pgrep -a 'chmpxbench' | grep  '\-s' | awk '{print $1}')"
+if ! stop_process "${TESTSVRPID}"; then
+	_failed_stop_process=1
+fi
 
 TESTCLIENTPIDS=`ps w | grep chmpxbench | grep dummykey | grep ${PROCID} | grep -v grep | awk '{print $1}'`
 if [ "X$TESTCLIENTPIDS" != "X" ]; then
-	sleep 1
-	kill -HUP ${TESTCLIENTPIDS} > /dev/null 2>&1
-	sleep 1
-	kill -9 ${TESTCLIENTPIDS} > /dev/null 2>&1
+	if ! stop_process "${TESTCLIENTPIDS}"; then
+		_failed_stop_process=1
+	fi
 fi
 
-kill -HUP ${CHMPXSLVPID} > /dev/null 2>&1
-sleep 1
-kill -HUP ${CHMPXSVRPID} > /dev/null 2>&1
-sleep 1
-kill -9 ${CHMPXSLVPID} ${CHMPXSVRPID} > /dev/null 2>&1
+if ! stop_process "${CHMPXSLVPID}"; then
+	_failed_stop_process=1
+fi
+if ! stop_process "${CHMPXSVRPID}"; then
+	_failed_stop_process=1
+fi
+
+if [ "${_failed_stop_process}" -ne 0 ]; then
+	#
+	# Last challenge
+	#
+	kill -9 "${TESTSVRPID}" "${TESTCLIENTPIDS}" "${CHMPXSLVPID}" "${CHMPXSVRPID}" >/dev/null 2>&1
+fi
 
 ##############
 # Check
