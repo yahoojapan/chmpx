@@ -122,7 +122,7 @@ AM_CPPFLAGS			= $(k2hash_CFLAGS) $(fullock_CFLAGS) -Wno-address-of-packed-member
 .PHONY:	chmpxversion
 
 chmpxversion.cc:	chmpxversion
-	@../buildutils/make_commit_hash_source.sh chmpxversion.cc chmpx_commit_hash
+	@../buildutils/make_commit_hash_source.sh -dch @CURRENTREV@ chmpxversion.cc chmpx_commit_hash
 
 #
 # Local variables:
