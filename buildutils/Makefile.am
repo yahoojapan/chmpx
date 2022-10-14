@@ -30,7 +30,9 @@ EXTRA_DIST =make_variables.sh \
 			make_rpm_changelog.sh \
 			make_description.sh \
 			debian_build.sh \
+			debian_build_copy.conf \
 			rpm_build.sh \
+			chmpx.install \
 			chmpx.service \
 			chmpx-service-helper \
 			chmpx-service-helper.conf \
