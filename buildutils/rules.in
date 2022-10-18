@@ -1,0 +1,85 @@
+#!/usr/bin/make -f
+#
+# CHMPX
+#
+# Copyright 2021 Yahoo Japan Corporation.
+#
+# CHMPX is inprocess data exchange by MQ with consistent hashing.
+# CHMPX is made for the purpose of the construction of
+# original messaging system and the offer of the client
+# library.
+# CHMPX transfers messages between the client and the server/
+# slave. CHMPX based servers are dispersed by consistent
+# hashing and are automatically laid out. As a result, it
+# provides a high performance, a high scalability.
+#
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Mon, Aug 16 2021
+# REVISION:
+#
+
+#---------------------------------------------------------------
+# @PACKAGE_NAME@ / @PACKAGE_NAME@-dev packages
+#---------------------------------------------------------------
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/@PACKAGE_NAME@
+	dh_auto_install --destdir=debian/@PACKAGE_NAME@-dev
+	rm -rf debian/@PACKAGE_NAME@/usr/include
+	rm -rf debian/@PACKAGE_NAME@/usr/lib/x86_64-linux-gnu/pkgconfig
+	rm -rf debian/@PACKAGE_NAME@-dev/usr/bin
+	rm -rf debian/@PACKAGE_NAME@-dev/usr/share/man
+	rm -rf debian/@PACKAGE_NAME@/usr/lib/x86_64-linux-gnu/*.a
+	rm -rf debian/@PACKAGE_NAME@/usr/lib/x86_64-linux-gnu/*.la
+	rm -rf debian/@PACKAGE_NAME@/usr/lib/x86_64-linux-gnu/*.so
+	rm -rf debian/@PACKAGE_NAME@-dev/usr/lib/x86_64-linux-gnu/*.a
+	rm -rf debian/@PACKAGE_NAME@-dev/usr/lib/x86_64-linux-gnu/*.la
+	rm -rf debian/@PACKAGE_NAME@-dev/usr/lib/x86_64-linux-gnu/*.so.*
+
+#
+# Not enable by installing
+#
+override_dh_systemd_enable:
+	dh_systemd_enable
+	rm -f debian/@PACKAGE_NAME@.preinst.debhelper
+	rm -f debian/@PACKAGE_NAME@.postinst.debhelper
+
+#
+# Not support init.d
+#
+override_dh_installinit:
+	echo 'Not enable init.d'
+
+#
+# Not start by installing
+#
+override_dh_systemd_start:
+	dh_systemd_start
+	rm -f debian/@PACKAGE_NAME@.preinst.debhelper
+	rm -f debian/@PACKAGE_NAME@.postinst.debhelper
+
+#
+# Placefolder for configure options
+#
+# [NOTE]
+# If an option is required for running configure, the placeholder will be rewritten as follows.
+# -------------------------------------------------
+# override_dh_auto_configure:
+#     dh_auto_configure -- <configure options>
+# -------------------------------------------------
+#
+# [PLACEFOLDER CONFIGURE OPTION]
+
+#
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
+#
