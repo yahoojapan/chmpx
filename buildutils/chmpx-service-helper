@@ -515,8 +515,7 @@ start_process()
 	shift; shift; shift; shift; shift; shift
 	_STARTPROC_OSTIONS="-conf ${_STARTPROC_INIFILE} $@"
 
-	_STARTPROC_BIN=`which ${_STARTPROC_PROCNAME} 2>/dev/null`
-	if [ $? -ne 0 ]; then
+	if ! _STARTPROC_BIN=$(command -v "${_STARTPROC_PROCNAME}" 2>/dev/null); then
 		log_err "Not found execute file(${_STARTPROC_PROCNAME})."
 		return 1
 	fi
