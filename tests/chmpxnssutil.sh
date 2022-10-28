@@ -341,22 +341,19 @@ fi
 # Check programs
 #
 if [ "X${MODE}" = "XINIT" -o "X${MODE}" = "XIMPORT_PEMFILE" -o "X${MODE}" = "XIMPORT_PEMDIR" ]; then
-	which certutil >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if ! command -v  certutil >/dev/null 2>&1; then
 		echo "ERROR: not found \"certutil\" program, you can need to install nss util package." 1>&2
 		exit 1
 	fi
 
 elif [ "X${MODE}" = "XPKCS12" ]; then
-	which openssl >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if ! command -v openssl >/dev/null 2>&1; then
 		echo "ERROR: not found \"openssl\" program, you can need to install openssl util package." 1>&2
 		exit 1
 	fi
 
 elif [ "X${MODE}" = "XIMPORT_PKCS12" ]; then
-	which pk12util >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if ! command -v pk12util >/dev/null 2>&1; then
 		echo "ERROR: not found \"pk12util\" program, you can need to install nss util package." 1>&2
 		exit 1
 	fi
@@ -467,7 +464,10 @@ fi
 exit 0
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #

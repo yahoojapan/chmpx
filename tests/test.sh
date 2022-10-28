@@ -93,22 +93,12 @@ COUNT=10
 #
 # Base directory
 #
-RUNDIR=`pwd`
-TESTSCRIPTDIR=`dirname $0`
-if [ "X$TESTSCRIPTDIR" = "X" -o "X$TESTSCRIPTDIR" = "X." ]; then
-	TMP_BASENAME=`basename $0`
-	TMP_FIRSTWORD=`echo $0 | awk -F"/" '{print $1}'`
-
-	if [ "X$TMP_BASENAME" = "X$TMP_FIRSTWORD" ]; then
-		# search path
-		TESTSCRIPTDIR=`which $0`
-		TESTSCRIPTDIR=`dirname $TESTSCRIPTDIR`
-	else
-		TESTSCRIPTDIR=.
-	fi
-fi
-BASEDIR=`cd -P ${RUNDIR}/${TESTSCRIPTDIR}; pwd`
-CHMPXDIR=`cd -P ${BASEDIR}/../src; pwd`
+#SCRIPTNAME=$(basename "${0}")
+SCRIPTDIR=$(dirname "${0}")
+SCRIPTDIR=$(cd "${SCRIPTDIR}" || exit 1; pwd)
+SRCTOPDIR=$(cd "${SCRIPTDIR}/.." || exit 1; pwd)
+CHMPXDIR=$(cd "${SRCTOPDIR}/src" || exit 1; pwd)
+BASEDIR="${SCRIPTDIR}"
 
 #
 # Binary
@@ -508,7 +498,10 @@ fi
 exit $RESULT
 
 #
-# VIM modelines
-#
-# vim:set ts=4 fenc=utf-8:
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
 #
