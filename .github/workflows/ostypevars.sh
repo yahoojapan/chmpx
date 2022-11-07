@@ -91,7 +91,7 @@ elif [ "${CI_OSTYPE}" = "ubuntu:22.04" ] || [ "${CI_OSTYPE}" = "ubuntu:jammy" ];
 	PKG_EXT="deb"
 	IS_OS_UBUNTU=1
 
-elif [ "X${CI_OSTYPE}" = "Xubuntu:20.04" -o "X${CI_OSTYPE}" = "Xubuntu:focal" ]; then
+elif [ "${CI_OSTYPE}" = "ubuntu:20.04" ] || [ "${CI_OSTYPE}" = "ubuntu:focal" ]; then
 	DIST_TAG="ubuntu/focal"
 	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	INSTALLER_BIN="apt-get"
@@ -100,7 +100,7 @@ elif [ "X${CI_OSTYPE}" = "Xubuntu:20.04" -o "X${CI_OSTYPE}" = "Xubuntu:focal" ];
 	PKG_EXT="deb"
 	IS_OS_UBUNTU=1
 
-elif [ "X${CI_OSTYPE}" = "Xubuntu:18.04" -o "X${CI_OSTYPE}" = "Xubuntu:bionic" ]; then
+elif [ "${CI_OSTYPE}" = "ubuntu:18.04" ] || [ "${CI_OSTYPE}" = "ubuntu:bionic" ]; then
 	DIST_TAG="ubuntu/bionic"
 	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	INSTALLER_BIN="apt-get"
@@ -118,7 +118,7 @@ elif [ "${CI_OSTYPE}" = "debian:11" ] || [ "${CI_OSTYPE}" = "debian:bullseye" ];
 	PKG_EXT="deb"
 	IS_OS_DEBIAN=1
 
-elif [ "X${CI_OSTYPE}" = "Xdebian:10" -o "X${CI_OSTYPE}" = "Xdebian:buster" ]; then
+elif [ "${CI_OSTYPE}" = "debian:10" ] || [ "${CI_OSTYPE}" = "debian:buster" ]; then
 	DIST_TAG="debian/buster"
 	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	INSTALLER_BIN="apt-get"
@@ -145,7 +145,7 @@ elif [ "${CI_OSTYPE}" = "rockylinux:8.6" ] || [ "${CI_OSTYPE}" = "rockylinux:8" 
 	PKG_EXT="rpm"
 	IS_OS_ROCKY=1
 
-elif [ "X${CI_OSTYPE}" = "Xcentos:7" -o "X${CI_OSTYPE}" = "Xcentos:centos7" ]; then
+elif [ "${CI_OSTYPE}" = "centos:7" ] || [ "${CI_OSTYPE}" = "centos:centos7" ]; then
 	DIST_TAG="el/7"
 	INSTALL_PKG_LIST="git autoconf automake gcc gcc-c++ gdb make libtool pkgconfig redhat-rpm-config rpm-build ruby-devel rubygems procps libyaml-devel k2hash-devel nss-devel"
 	INSTALLER_BIN="yum"
@@ -177,7 +177,7 @@ elif [ "${CI_OSTYPE}" = "fedora:35" ]; then
 # The OS from here onwards will be used until a new version is created, but we will drop support for it soon.
 # Newer versions will only support the OSes mentioned before this line.
 #
-elif [ "X${CI_OSTYPE}" = "Xubuntu:16.04" -o "X${CI_OSTYPE}" = "Xubuntu:xenial" ]; then
+elif [ "${CI_OSTYPE}" = "ubuntu:16.04" ] || [ "${CI_OSTYPE}" = "ubuntu:xenial" ]; then
 	DIST_TAG="ubuntu/xenial"
 	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	INSTALLER_BIN="apt-get"
@@ -186,7 +186,7 @@ elif [ "X${CI_OSTYPE}" = "Xubuntu:16.04" -o "X${CI_OSTYPE}" = "Xubuntu:xenial" ]
 	PKG_EXT="deb"
 	IS_OS_UBUNTU=1
 
-elif [ "X${CI_OSTYPE}" = "Xdebian:9" -o "X${CI_OSTYPE}" = "Xdebian:stretch" ]; then
+elif [ "${CI_OSTYPE}" = "debian:9" ] || [ "${CI_OSTYPE}" = "debian:stretch" ]; then
 	DIST_TAG="debian/stretch"
 	INSTALL_PKG_LIST="git autoconf autotools-dev gcc g++ make gdb dh-make fakeroot dpkg-dev devscripts libtool pkg-config ruby-dev rubygems rubygems-integration procps libyaml-dev k2hash-dev gnutls-dev dh-systemd"
 	INSTALLER_BIN="apt-get"
@@ -195,7 +195,7 @@ elif [ "X${CI_OSTYPE}" = "Xdebian:9" -o "X${CI_OSTYPE}" = "Xdebian:stretch" ]; t
 	PKG_EXT="deb"
 	IS_OS_DEBIAN=1
 
-elif [ "X${CI_OSTYPE}" = "Xcentos:8" -o "X${CI_OSTYPE}" = "Xcentos:centos8" ]; then
+elif [ "${CI_OSTYPE}" = "centos:8" ] || [ "${CI_OSTYPE}" = "centos:centos8" ]; then
 	DIST_TAG="el/8"
 	INSTALL_PKG_LIST="git autoconf automake gcc gcc-c++ gdb make libtool pkgconfig redhat-rpm-config rpm-build ruby-devel rubygems procps k2hash-devel nss-devel"
 	INSTALLER_BIN="dnf"
@@ -215,7 +215,7 @@ elif [ "X${CI_OSTYPE}" = "Xcentos:8" -o "X${CI_OSTYPE}" = "Xcentos:centos8" ]; t
 	dnf update -y -qq
 	dnf --enablerepo=powertools install -y libyaml-devel
 
-elif [ "X${CI_OSTYPE}" = "Xfedora:32" ]; then
+elif [ "${CI_OSTYPE}" = "fedora:32" ]; then
 	DIST_TAG="fedora/32"
 	INSTALL_PKG_LIST="git autoconf automake gcc gcc-c++ gdb make libtool pkgconfig redhat-rpm-config rpm-build ruby-devel rubygems procps libyaml-devel k2hash-devel nss-devel"
 	INSTALLER_BIN="dnf"
@@ -224,7 +224,7 @@ elif [ "X${CI_OSTYPE}" = "Xfedora:32" ]; then
 	PKG_EXT="rpm"
 	IS_OS_FEDORA=1
 
-elif [ "X${CI_OSTYPE}" = "Xfedora:31" ]; then
+elif [ "${CI_OSTYPE}" = "fedora:31" ]; then
 	DIST_TAG="fedora/31"
 	INSTALL_PKG_LIST="git autoconf automake gcc gcc-c++ gdb make libtool pkgconfig redhat-rpm-config rpm-build ruby-devel rubygems procps libyaml-devel k2hash-devel nss-devel"
 	INSTALLER_BIN="dnf"
@@ -233,7 +233,7 @@ elif [ "X${CI_OSTYPE}" = "Xfedora:31" ]; then
 	PKG_EXT="rpm"
 	IS_OS_FEDORA=1
 
-elif [ "X${CI_OSTYPE}" = "Xfedora:30" ]; then
+elif [ "${CI_OSTYPE}" = "fedora:30" ]; then
 	DIST_TAG="fedora/30"
 	INSTALL_PKG_LIST="git autoconf automake gcc gcc-c++ gdb make libtool pkgconfig redhat-rpm-config rpm-build ruby-devel rubygems procps libyaml-devel k2hash-devel nss-devel"
 	INSTALLER_BIN="dnf"
