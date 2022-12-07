@@ -21,9 +21,17 @@
 # REVISION:
 #
 
-#
-# Utility for CHMPX with NSS
-#
+#--------------------------------------------------------------
+# Common Variables
+#--------------------------------------------------------------
+PRGNAME=$(basename "${0}")
+SCRIPTDIR=$(dirname "${0}")
+SCRIPTDIR=$(cd "${SCRIPTDIR}" || exit 1; pwd)
+#SRCTOP=$(cd "${SCRIPTDIR}/../.." || exit 1; pwd)
+
+#--------------------------------------------------------------
+# Usage
+#--------------------------------------------------------------
 func_usage()
 {
 	echo ""
@@ -61,16 +69,13 @@ func_usage()
 	echo ""
 }
 
+#--------------------------------------------------------------
+# Parse options
+#--------------------------------------------------------------
 #
-# Global
+# Variables
 #
-PRGNAME=`basename $0`
-MYSCRIPTDIR=`dirname $0`
-
-#
-# Load options
-#
-MODE=""
+SCRIPT_MODE=""
 PEMPATH=""
 PKEYFILE=""
 PCKS12FILE=""
@@ -80,149 +85,149 @@ PASSPHRASE=""
 CANOTRUSTED=""
 
 while [ $# -ne 0 ]; do
-	if [ "X$1" = "X" ]; then
+	if [ -z "$1" ]; then
 		break
 
-	elif [ "X$1" = "X-h" -o "X$1" = "X-help" ]; then
-		func_usage $PRGNAME
+	elif [ "$1" = "-h" ] || [ "$1" = "-H" ] || [ "$1" = "--help" ] || [ "$1" = "--HELP" ]; then
+		func_usage "${PRGNAME}"
 		exit 0
 
-	elif [ "X$1" = "Xinit" ]; then
-		if [ "X${MODE}" != "X" ]; then
-			echo "ERROR: already specified mode ${MODE}." 1>&2
+	elif [ "$1" = "init" ]; then
+		if [ -n "${SCRIPT_MODE}" ]; then
+			echo "[ERROR] Already specified init, pkcs12 or import option." 1>&2
 			exit 1
 		fi
-		MODE="INIT"
+		SCRIPT_MODE="INIT"
 
-	elif [ "X$1" = "Xpkcs12" ]; then
-		if [ "X${MODE}" != "X" ]; then
-			echo "ERROR: already specified mode ${MODE}." 1>&2
+	elif [ "$1" = "pkcs12" ]; then
+		if [ -n "${SCRIPT_MODE}" ]; then
+			echo "[ERROR] Already specified init, pkcs12 or import option." 1>&2
 			exit 1
 		fi
-		MODE="PKCS12"
+		SCRIPT_MODE="PKCS12"
 
-	elif [ "X$1" = "Ximport" ]; then
-		if [ "X${MODE}" != "X" ]; then
-			echo "ERROR: already specified mode ${MODE}." 1>&2
+	elif [ "$1" = "import" ]; then
+		if [ -n "${SCRIPT_MODE}" ]; then
+			echo "[ERROR] Already specified init, pkcs12 or import option." 1>&2
 			exit 1
 		fi
-		MODE="IMPORT"
+		SCRIPT_MODE="IMPORT"
 
-	elif [ "X$1" = "X-pem" ]; then
-		if [ "X${PEMPATH}" != "X" ]; then
-			echo "ERROR: already specified PEM file path." 1>&2
+	elif [ "$1" = "-pem" ]; then
+		if [ -n "${PEMPATH}" ]; then
+			echo "[ERROR] Already specified -pem option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -pem option needs parameter." 1>&2
+			echo "[ERROR] -pem option needs parameter." 1>&2
 			exit 1
 		fi
-		if [ ! -f $1 ]; then
-			if [ ! -d $1 ]; then
-				echo "ERROR: $1 file does not exist." 1>&2
+		if [ ! -f "$1" ]; then
+			if [ ! -d "$1" ]; then
+				echo "[ERROR] $1 file does not exist." 1>&2
 				exit 1
 			fi
 		fi
-		PEMPATH=$1
+		PEMPATH="$1"
 
-	elif [ "X$1" = "X-pkey" ]; then
-		if [ "X${PKEYFILE}" != "X" ]; then
-			echo "ERROR: already specified private key file path." 1>&2
+	elif [ "$1" = "-pkey" ]; then
+		if [ -n "${PKEYFILE}" ]; then
+			echo "[ERROR] Already specified -pkey option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -pkey option needs parameter." 1>&2
+			echo "[ERROR] -pkey option needs parameter." 1>&2
 			exit 1
 		fi
-		if [ ! -f $1 ]; then
-			echo "ERROR: $1 file does not exist." 1>&2
+		if [ ! -f "$1" ]; then
+			echo "[ERROR] $1 file does not exist." 1>&2
 			exit 1
 		fi
-		PKEYFILE=$1
+		PKEYFILE="$1"
 
-	elif [ "X$1" = "X-pkcs12" ]; then
-		if [ "X${PCKS12FILE}" != "X" ]; then
-			echo "ERROR: already specified pkcs#12 file path." 1>&2
+	elif [ "$1" = "-pkcs12" ]; then
+		if [ -n "${PCKS12FILE}" ]; then
+			echo "[ERROR] Already specified -pkcs12 option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -pkcs12 option needs parameter." 1>&2
+			echo "[ERROR] -pkcs12 option needs parameter." 1>&2
 			exit 1
 		fi
-		if [ ! -f $1 ]; then
-			echo "ERROR: $1 file does not exist." 1>&2
+		if [ ! -f "$1" ]; then
+			echo "[ERROR] $1 file does not exist." 1>&2
 			exit 1
 		fi
-		PCKS12FILE=$1
+		PCKS12FILE="$1"
 
-	elif [ "X$1" = "X-out" ]; then
-		if [ "X${PCKS12FILE}" != "X" ]; then
-			echo "ERROR: already specified output file path." 1>&2
+	elif [ "$1" = "-out" ]; then
+		if [ -n "${PCKS12FILE}" ]; then
+			echo "[ERROR] Already specified -out option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -out option needs parameter." 1>&2
+			echo "[ERROR] -out option needs parameter." 1>&2
 			exit 1
 		fi
-		if [ -f $1 ]; then
-			echo "ERROR: $1 file exists." 1>&2
+		if [ -f "$1" ]; then
+			echo "[ERROR] $1 file exists." 1>&2
 			exit 1
 		fi
-		PCKS12FILE=$1
+		PCKS12FILE="$1"
 
-	elif [ "X$1" = "X-nssdir" ]; then
-		if [ "X${NSSDB_DIR}" != "X" ]; then
-			echo "ERROR: already specified NSSDB directory path." 1>&2
+	elif [ "$1" = "-nssdir" ]; then
+		if [ -n "${NSSDB_DIR}" ]; then
+			echo "[ERROR] Already specified -nssdir option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -nssidr option needs parameter." 1>&2
+			echo "[ERROR] -nssidr option needs parameter." 1>&2
 			exit 1
 		fi
-		if [ ! -d $1 ]; then
-			echo "ERROR: $1 directory does not exist." 1>&2
+		if [ ! -d "$1" ]; then
+			echo "[ERROR] $1 directory does not exist." 1>&2
 			exit 1
 		fi
-		NSSDB_DIR=$1
+		NSSDB_DIR="$1"
 
-	elif [ "X$1" = "X-nickname" ]; then
-		if [ "X${NICKNAME}" != "X" ]; then
-			echo "ERROR: already specified nickname." 1>&2
+	elif [ "$1" = "-nickname" ]; then
+		if [ -n "${NICKNAME}" ]; then
+			echo "[ERROR] Already specified -nickname option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -nickname option needs parameter." 1>&2
+			echo "[ERROR] -nickname option needs parameter." 1>&2
 			exit 1
 		fi
-		NICKNAME=$1
+		NICKNAME="$1"
 
-	elif [ "X$1" = "X-pass" ]; then
-		if [ "X${PASSPHRASE}" != "X" ]; then
-			echo "ERROR: already specified passphrase." 1>&2
+	elif [ "$1" = "-pass" ]; then
+		if [ -n "${PASSPHRASE}" ]; then
+			echo "[ERROR] Already specified -pass option." 1>&2
 			exit 1
 		fi
 		shift
 		if [ $# -eq 0 ]; then
-			echo "ERROR: -pass option needs parameter." 1>&2
+			echo "[ERROR] -pass option needs parameter." 1>&2
 			exit 1
 		fi
-		PASSPHRASE=$1
+		PASSPHRASE="$1"
 
-	elif [ "X$1" = "X-notrusted" ]; then
-		if [ "X${CANOTRUSTED}" != "X" ]; then
-			echo "ERROR: already specified no CA trusted flag." 1>&2
+	elif [ "$1" = "-notrusted" ]; then
+		if [ -n "${CANOTRUSTED}" ]; then
+			echo "[ERROR] Already specified -notrusted option." 1>&2
 			exit 1
 		fi
 		CANOTRUSTED="YES"
 
 	else
-		echo "ERROR: unknown parameter $1" 1>&2
+		echo "[ERROR] Unknown parameter $1" 1>&2
 		exit 1
 	fi
 	shift
@@ -231,234 +236,239 @@ done
 #
 # Check options
 #
-if [ "X${MODE}" = "XINIT" ]; then
-	if [ "X${PEMPATH}" != "X" -o "X${PKEYFILE}" != "X" -o "X${PCKS12FILE}" != "X" -o "X${NICKNAME}" != "X" -o "X${CANOTRUSTED}" != "X" ]; then
-		echo "ERROR: unnecessary option is specified for \"init\" mode." 1>&2
+if [ -z "${SCRIPT_MODE}" ]; then
+	echo "[ERROR] Not specify mode(init, pkcs12 or import)." 1>&2
+	exit 1
+
+elif [ "${SCRIPT_MODE}" = "INIT" ]; then
+	if [ -n "${PEMPATH}" ] || [ -n "${PKEYFILE}" ] || [ -n "${PCKS12FILE}" ] || [ -n "${NICKNAME}" ] || [ -n "${CANOTRUSTED}" ]; then
+		echo "[ERROR] Unnecessary option is specified for \"init\" mode." 1>&2
 		exit 1
 	fi
-	if [ "X${NSSDB_DIR}" = "X" ]; then
-		NSSDB_DIR=${SSL_DIR}
-		if [ "X${NSSDB_DIR}" = "X" ]; then
-			echo "ERROR: not specify \"-nssdir\" option and \"SSL_DIR\" environment is not specified too." 1>&2
+	if [ -z "${NSSDB_DIR}" ]; then
+		NSSDB_DIR="${SSL_DIR}"
+		if [ -z "${NSSDB_DIR}" ]; then
+			echo "[ERROR] not specify \"-nssdir\" option and \"SSL_DIR\" environment is not specified too." 1>&2
 			exit 1
 		fi
-		if [ ! -d ${NSSDB_DIR} ]; then
-			echo "ERROR: nssdb directory ${NSSDB_DIR} is not directory." 1>&2
+		if [ ! -d "${NSSDB_DIR}" ]; then
+			echo "[ERROR] nssdb directory ${NSSDB_DIR} is not directory." 1>&2
 			exit 1
 		fi
 	fi
 
-elif [ "X${MODE}" = "XPKCS12" ]; then
-	if [ "X${NSSDB_DIR}" != "X" -o "X${CANOTRUSTED}" != "X" ]; then
-		echo "ERROR: unnecessary option is specified for \"pkcs12\" mode." 1>&2
+elif [ "${SCRIPT_MODE}" = "PKCS12" ]; then
+	if [ -n "${NSSDB_DIR}" ] || [ -n "${CANOTRUSTED}" ]; then
+		echo "[ERROR] Unnecessary option is specified for \"pkcs12\" mode." 1>&2
 		exit 1
 	fi
-	if [ "X${PEMPATH}" = "X" ]; then
-		echo "ERROR: \"-pem\" option is not specified." 1>&2
+	if [ -z "${PEMPATH}" ]; then
+		echo "[ERROR] \"-pem\" option is not specified." 1>&2
 		exit 1
 	fi
-	if [ ! -f ${PEMPATH} ]; then
-		echo "ERROR: ${PEMPATH} file dose not exist." 1>&2
+	if [ ! -f "${PEMPATH}" ]; then
+		echo "[ERROR] ${PEMPATH} file dose not exist." 1>&2
 		exit 1
 	fi
-	if [ "X${NICKNAME}" = "X" ]; then
-		NICKNAME=`basename ${PEMPATH} 2>/dev/null | sed 's/\.[0-9a-zA-Z]*$//g' 2>/dev/null`
+	if [ -z "${NICKNAME}" ]; then
+		NICKNAME=$(basename "${PEMPATH}" | sed -e 's/\.[0-9a-zA-Z]*$//g')
 	fi
-	if [ "X${PCKS12FILE}" = "X" ]; then
-		PCKS12FILE=`basename ${PEMPATH} 2>/dev/null | sed 's/\.[0-9a-zA-Z]*$//g' 2>/dev/null`
-		PCKS12FILE=${PCKS12FILE}.p12
+	if [ -z "${PCKS12FILE}" ]; then
+		PCKS12FILE=$(basename "${PEMPATH}" | sed -e 's/\.[0-9a-zA-Z]*$//g')
+		PCKS12FILE="${PCKS12FILE}.p12"
 	fi
-	if [ -f ${PCKS12FILE} ]; then
-		echo "ERROR: ${PCKS12FILE} file exists." 1>&2
+	if [ -f "${PCKS12FILE}" ]; then
+		echo "[ERROR] ${PCKS12FILE} file exists." 1>&2
 		exit 1
 	fi
 
-elif [ "X${MODE}" = "XIMPORT" ]; then
-	if [ "X${PEMPATH}" != "X" ]; then
-		if [ "X${PCKS12FILE}" != "X" ]; then
-			echo "ERROR: \"-pem\" or \"-pkcs12\" options can not be specified at the same time." 1>&2
+elif [ "${SCRIPT_MODE}" = "IMPORT" ]; then
+	if [ -n "${PEMPATH}" ]; then
+		if [ -n "${PCKS12FILE}" ]; then
+			echo "[ERROR] \"-pem\" or \"-pkcs12\" options can not be specified at the same time." 1>&2
 			exit 1
 		fi
-		if [ -f ${PEMPATH} ]; then
-			if [ "X${CANOTRUSTED}" != "X" ]; then
-				echo "ERROR: unnecessary option is specified for \"import\" mode with PEM file." 1>&2
+
+		if [ -f "${PEMPATH}" ]; then
+			if [ -n "${CANOTRUSTED}" ]; then
+				echo "[ERROR] Unnecessary option is specified for \"import\" mode with PEM file." 1>&2
 				exit 1
 			fi
-			if [ "X${NICKNAME}" = "X" ]; then
-				NICKNAME=`basename ${PEMPATH} 2>/dev/null | sed 's/\.[0-9a-zA-Z]*$//g' 2>/dev/null`
+			if [ -z "${NICKNAME}" ]; then
+				NICKNAME=$(basename "${PEMPATH}" | sed -e 's/\.[0-9a-zA-Z]*$//g')
 			fi
-			MODE="IMPORT_PEMFILE"
+			SCRIPT_MODE="IMPORT_PEMFILE"
 
-		elif [ -d ${PEMPATH} ]; then
-			if [ "X${PKEYFILE}" != "X" -o "X${NICKNAME}" != "X" -o "X${PASSPHRASE}" != "X" ]; then
-				echo "ERROR: unnecessary option is specified for \"import\" mode with PEM directory." 1>&2
+		elif [ -d "${PEMPATH}" ]; then
+			if [ -n "${PKEYFILE}" ] || [ -n "${NICKNAME}" ] || [ -n "${PASSPHRASE}" ]; then
+				echo "[ERROR] Unnecessary option is specified for \"import\" mode with PEM directory." 1>&2
 				exit 1
 			fi
-			MODE="IMPORT_PEMDIR"
+			SCRIPT_MODE="IMPORT_PEMDIR"
 
 		else
-			echo "ERROR: ${PEMPATH} is not file nor directory." 1>&2
+			echo "[ERROR] ${PEMPATH} is not file nor directory." 1>&2
 			exit 1
 		fi
 
-	elif [ "X${PCKS12FILE}" != "X" ]; then
-		if [ "X${PKEYFILE}" != "X" -o "X${NICKNAME}" != "X" -o "X${CANOTRUSTED}" != "X" ]; then
-			echo "ERROR: unnecessary option is specified for \"import\" mode with PKCS#12 file." 1>&2
+	elif [ -n "${PCKS12FILE}" ]; then
+		if [ -n "${PKEYFILE}" ] || [ -n "${NICKNAME}" ] || [ -n "${CANOTRUSTED}" ]; then
+			echo "[ERROR] Unnecessary option is specified for \"import\" mode with PKCS#12 file." 1>&2
 			exit 1
 		fi
-		if [ ! -f ${PCKS12FILE} ]; then
-			echo "ERROR: ${PCKS12FILE} file does not exists." 1>&2
+		if [ ! -f "${PCKS12FILE}" ]; then
+			echo "[ERROR] ${PCKS12FILE} file does not exists." 1>&2
 			exit 1
 		fi
-		MODE="IMPORT_PKCS12"
+		SCRIPT_MODE="IMPORT_PKCS12"
 
 	else
-		echo "ERROR: for \"import\" mode, you need to specify \"-pem\" or \"-pkcs12\" option." 1>&2
+		echo "[ERROR] For \"import\" mode, you need to specify \"-pem\" or \"-pkcs12\" option." 1>&2
 		exit 1
 	fi
 
-	if [ "X${NSSDB_DIR}" = "X" ]; then
-		NSSDB_DIR=${SSL_DIR}
-		if [ "X${NSSDB_DIR}" = "X" ]; then
-			echo "ERROR: not specify \"-nssdir\" option and \"SSL_DIR\" environment is not specified too." 1>&2
+	if [ -z "${NSSDB_DIR}" ]; then
+		NSSDB_DIR="${SSL_DIR}"
+		if [ -z "${NSSDB_DIR}" ]; then
+			echo "[ERROR] Not specify \"-nssdir\" option and \"SSL_DIR\" environment is not specified too." 1>&2
 			exit 1
 		fi
-		if [ ! -d ${NSSDB_DIR} ]; then
-			echo "ERROR: nssdb directory ${NSSDB_DIR} is not directory." 1>&2
+		if [ ! -d "${NSSDB_DIR}" ]; then
+			echo "[ERROR] nssdb directory ${NSSDB_DIR} is not directory." 1>&2
 			exit 1
 		fi
 	fi
-
-elif [ "X${MODE}" = "X" ]; then
-	echo "ERROR: not specify mode(init/pkcs12/import)." 1>&2
-	exit 1
 else
-	echo "ERROR: internal error(unknown mode is set)." 1>&2
+	echo "[ERROR] Internal error(unknown mode is set)." 1>&2
 	exit 1
 fi
 
 #
 # Check programs
 #
-if [ "X${MODE}" = "XINIT" -o "X${MODE}" = "XIMPORT_PEMFILE" -o "X${MODE}" = "XIMPORT_PEMDIR" ]; then
+if [ "${SCRIPT_MODE}" = "INIT" ] || [ "${SCRIPT_MODE}" = "IMPORT_PEMFILE" ] || [ "${SCRIPT_MODE}" = "IMPORT_PEMDIR" ]; then
 	if ! command -v  certutil >/dev/null 2>&1; then
-		echo "ERROR: not found \"certutil\" program, you can need to install nss util package." 1>&2
+		echo "[ERROR] Not found \"certutil\" program, you can need to install nss util package." 1>&2
 		exit 1
 	fi
 
-elif [ "X${MODE}" = "XPKCS12" ]; then
+elif [ "${SCRIPT_MODE}" = "PKCS12" ]; then
 	if ! command -v openssl >/dev/null 2>&1; then
-		echo "ERROR: not found \"openssl\" program, you can need to install openssl util package." 1>&2
+		echo "[ERROR] Not found \"openssl\" program, you can need to install openssl util package." 1>&2
 		exit 1
 	fi
 
-elif [ "X${MODE}" = "XIMPORT_PKCS12" ]; then
+elif [ "${SCRIPT_MODE}" = "IMPORT_PKCS12" ]; then
 	if ! command -v pk12util >/dev/null 2>&1; then
-		echo "ERROR: not found \"pk12util\" program, you can need to install nss util package." 1>&2
+		echo "[ERROR] Not found \"pk12util\" program, you can need to install nss util package." 1>&2
 		exit 1
 	fi
 fi
 
-#
-# Run
-#
-if [ "X${MODE}" = "XINIT" ]; then
-	ls ${NSSDB_DIR}/cert*.db >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		rm ${NSSDB_DIR}/cert*.db
+#==============================================================
+# Main
+#==============================================================
+if [ "${SCRIPT_MODE}" = "INIT" ]; then
+	if stat "${NSSDB_DIR}"/cert*.db >/dev/null 2>&1; then
+		rm -f "${NSSDB_DIR}"/cert*.db
 	fi
-	ls ${NSSDB_DIR}/key*.db >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		rm ${NSSDB_DIR}/key*.db
+	if stat "${NSSDB_DIR}"/key*.db >/dev/null 2>&1; then
+		rm -f "${NSSDB_DIR}"/key*.db
 	fi
-	ls ${NSSDB_DIR}/secmod*.db >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		rm ${NSSDB_DIR}/secmod*.db
+	if stat "${NSSDB_DIR}"/secmod*.db >/dev/null 2>&1; then
+		rm -f "${NSSDB_DIR}"/secmod*.db
 	fi
 
-	if [ "X${PASSPHRASE}" = "X" ]; then
-		certutil -N --empty-password -d ${NSSDB_DIR}
+	if [ -z "${PASSPHRASE}" ]; then
+		if ! certutil -N --empty-password -d "${NSSDB_DIR}"; then
+			echo "[ERROR] Failed to initialize nssdb with passphrase." 1>&2
+			rm -f "${PRGNAME}.$$.tmp"
+			exit 1
+		fi
 	else
-		echo ${PASSPHRASE} > ${PRGNAME}.$$.tmp
-		certutil -N -f ${PRGNAME}.$$.tmp -d ${NSSDB_DIR}
+		echo "${PASSPHRASE}" > "${PRGNAME}.$$.tmp"
+		if ! certutil -N -f "${PRGNAME}.$$.tmp" -d "${NSSDB_DIR}"; then
+			echo "[ERROR] Failed to initialize nssdb with passphrase." 1>&2
+			rm -f "${PRGNAME}.$$.tmp"
+			exit 1
+		fi
 	fi
-	if [ $? -ne 0 ]; then
-		echo "ERROR: failed to initialize nssdb with passphrase." 1>&2
-		rm -f ${PRGNAME}.$$.tmp
+	rm -f "${PRGNAME}.$$.tmp"
+
+	if ! chmod +r "${NSSDB_DIR}"/*.db; then
+		echo "[ERROR] Failed to change permission to ${NSSDB_DIR}/*.db files." 1>&2
 		exit 1
 	fi
-	rm -f ${PRGNAME}.$$.tmp
+	echo "[SUCCEED] Initialized nssdb with passphrase."
 
-	chmod +r ${NSSDB_DIR}/*.db
-
-	echo "SUCCEED: initialize nssdb with passphrase."
-
-elif [ "X${MODE}" = "XPKCS12" ]; then
-	if [ "X${PKEYFILE}" = "X" ]; then
-		openssl pkcs12 -export -in ${PEMPATH} -name "${NICKNAME}" -passout pass:${PASSPHRASE} -out ${PCKS12FILE}
+elif [ "${SCRIPT_MODE}" = "PKCS12" ]; then
+	if [ -z "${PKEYFILE}" ]; then
+		if ! openssl pkcs12 -export -in "${PEMPATH}" -name "${NICKNAME}" -passout pass:"${PASSPHRASE}" -out "${PCKS12FILE}"; then
+			echo "[ERROR] Failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
+			exit 1
+		fi
 	else
-		openssl pkcs12 -export -in ${PEMPATH} -inkey ${PKEYFILE} -name "${NICKNAME}" -passout pass:${PASSPHRASE} -out ${PCKS12FILE}
+		if ! openssl pkcs12 -export -in "${PEMPATH}" -inkey "${PKEYFILE}" -name "${NICKNAME}" -passout pass:"${PASSPHRASE}" -out "${PCKS12FILE}"; then
+			echo "[ERROR] Failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
+			exit 1
+		fi
 	fi
-	if [ $? -ne 0 ]; then
-		echo "ERROR: failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
-		exit 1
-	fi
+	echo "[SUCCEED] Converted PEM file(with private key file) to PKCS#12 file."
 
-	echo "SUCCEED: convert PEM file(with private key file) to PKCS#12 file."
-
-elif [ "X${MODE}" = "XIMPORT_PEMFILE" ]; then
-	if [ "X${PKEYFILE}" = "X" ]; then
-		openssl pkcs12 -export -in ${PEMPATH} -name "${NICKNAME}" -passout pass:${PASSPHRASE} -out ${PRGNAME}.$$.tmp.p12
+elif [ "${SCRIPT_MODE}" = "IMPORT_PEMFILE" ]; then
+	if [ -z "${PKEYFILE}" ]; then
+		if ! openssl pkcs12 -export -in "${PEMPATH}" -name "${NICKNAME}" -passout pass:"${PASSPHRASE}" -out "${PRGNAME}.$$.tmp.p12"; then
+			echo "[ERROR] Failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
+			rm -f "${PRGNAME}.$$.tmp.p12"
+			exit 1
+		fi
 	else
-		openssl pkcs12 -export -in ${PEMPATH} -inkey ${PKEYFILE} -name "${NICKNAME}" -passout pass:${PASSPHRASE} -out ${PRGNAME}.$$.tmp.p12
+		if ! openssl pkcs12 -export -in "${PEMPATH}" -inkey "${PKEYFILE}" -name "${NICKNAME}" -passout pass:"${PASSPHRASE}" -out "${PRGNAME}.$$.tmp.p12"; then
+			echo "[ERROR] Failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
+			rm -f "${PRGNAME}.$$.tmp.p12"
+			exit 1
+		fi
 	fi
-	if [ $? -ne 0 ]; then
-		echo "ERROR: failed to convert PEM file(with private key file) to PKCS#12 file." 1>&2
-		rm -f ${PRGNAME}.$$.tmp.p12
+
+	if ! pk12util -i "${PRGNAME}.$$.tmp.p12" -d "${NSSDB_DIR}" -W "${PASSPHRASE}"; then
+		echo "[ERROR] Failed to import PKCS#12 file converted from PEM file(with private key file)" 1>&2
+		rm -f "${PRGNAME}.$$.tmp.p12"
 		exit 1
 	fi
+	rm -f "${PRGNAME}.$$.tmp.p12"
 
-	pk12util -i ${PRGNAME}.$$.tmp.p12 -d ${NSSDB_DIR} -W "${PASSPHRASE}"
-	if [ $? -ne 0 ]; then
-		echo "ERROR: failed to import PKCS#12 file converted from PEM file(with private key file)" 1>&2
-		rm -f ${PRGNAME}.$$.tmp.p12
-		exit 1
-	fi
-	rm -f ${PRGNAME}.$$.tmp.p12
+	echo "[SUCCEED] Imported PKCS#12 file converted from PEM file(with private key file)."
 
-	echo "SUCCEED: import PKCS#12 file converted from PEM file(with private key file)."
-
-elif [ "X${MODE}" = "XIMPORT_PEMDIR" ]; then
+elif [ "${SCRIPT_MODE}" = "IMPORT_PEMDIR" ]; then
 	TOTAL=0
 	COUNT=0
-	PEMFILES=`cd ${PEMPATH}; ls -1 *.pem 2>/dev/null`
 	CATRUSTED="T"
-	if [ "X${CANOTRUSTED}" = "XYES" ]; then
+	if [ -n "${CANOTRUSTED}" ] && [ "${CANOTRUSTED}" = "YES" ]; then
 		CATRUSTED=""
 	fi
 
-	for pemfile in ${PEMFILES}; do
-		NICKNAME=`echo ${pemfile} | sed 's/\.pem$//g' 2>/dev/null`
+	for PEM_FILEPATH in "${PEMPATH}"/*.pem; do
+		PEM_FILENAME=$(basename "${PEM_FILEPATH}")
+		NICKNAME=$(echo "${PEM_FILENAME}" | sed -e 's/\.pem$//g' 2>/dev/null)
 
-		certutil -A -n "${NICKNAME}" -t "C${CATRUSTED},," -i ${PEMPATH}/${pemfile} -d ${NSSDB_DIR}
-		if [ $? -eq 0 ]; then
+		if certutil -A -n "${NICKNAME}" -t "C${CATRUSTED},," -i "${PEMPATH}/${PEM_FILENAME}" -d "${NSSDB_DIR}"; then
 			echo "Importing ${NICKNAME} ... done"
-			COUNT=`expr ${COUNT} + 1`
+			COUNT=$((COUNT + 1))
 		else
 			echo "Importing ${NICKNAME} ... failed"
 		fi
-		TOTAL=`expr ${TOTAL} + 1`
+		TOTAL=$((TOTAL + 1))
 	done
-	echo "FINISH: Imported PEM file(${COUNT}) / total file(${TOTAL})"
 
-elif [ "X${MODE}" = "XIMPORT_PKCS12" ]; then
-	pk12util -i ${PCKS12FILE} -d ${NSSDB_DIR} -W "${PASSPHRASE}"
-	if [ $? -ne 0 ]; then
-		echo "ERROR: failed to import PKCS#12 ${PCKS12FILE} file." 1>&2
+	echo "[FINISH] Imported PEM file(${COUNT}) / total file(${TOTAL})"
+
+elif [ "${SCRIPT_MODE}" = "IMPORT_PKCS12" ]; then
+	if ! pk12util -i "${PCKS12FILE}" -d "${NSSDB_DIR}" -W "${PASSPHRASE}"; then
+		echo "[ERROR] failed to import PKCS#12 ${PCKS12FILE} file." 1>&2
 		exit 1
 	fi
 
-	echo "SUCCEED: import PKCS#12 file."
+	echo "[SUCCEED] import PKCS#12 file."
 fi
 
 exit 0

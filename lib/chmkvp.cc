@@ -219,7 +219,6 @@ bool ChmBinData::Put(unsigned char* bydata, bool is_cvt_hton) const
 	unsigned char*	bylen	= reinterpret_cast<unsigned char*>(&tmplen);
 
 	for(size_t cnt = 0; cnt < datapos; ++cnt){
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress objectIndex
 		bydata[cnt] = bylen[cnt];
 	}

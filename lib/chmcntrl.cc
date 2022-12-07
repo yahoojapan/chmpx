@@ -510,7 +510,6 @@ bool ChmCntrl::EventLoop(void)
 				if(0L == ImData.GetUpServerCount()){
 					// Check any server up
 					if(pEventSock->InitialAllServerStatus()){
-						// cppcheck-suppress unmatchedSuppression
 						// cppcheck-suppress knownConditionTrueFalse
 						if(0L < ImData.GetUpServerCount()){
 							// Try to connect servers
@@ -532,7 +531,6 @@ bool ChmCntrl::EventLoop(void)
 						// [NOTE]
 						// This case is that there are no other server node up.
 						if(pEventSock->InitialAllServerStatus()){
-							// cppcheck-suppress unmatchedSuppression
 							// cppcheck-suppress knownConditionTrueFalse
 							if(1L < ImData.GetUpServerCount()){
 								// Try to connect servers

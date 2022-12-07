@@ -2098,7 +2098,6 @@ static bool ExecOptionParser(int argc, char** argv, option_t& opts, string& prgn
 		return false;
 	}
 	prgname = basename(argv[0]);
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	if(0 == prgname.find("lt-")){
 		// cut "lt-"
@@ -2941,7 +2940,6 @@ static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 
 	if(0 == nThreadCount){
 		// This case is no thread mode, then call function directly.
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		is_run = true;
 		SendDumpCommandThread(&pthparam[0]);
@@ -3017,7 +3015,6 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		string		strChmpxid;
@@ -3030,7 +3027,6 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 		string		custom_seed;
 
 		// "[XX]={\n"
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress stlIfStrFind
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			//MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
@@ -3174,7 +3170,6 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 			return strInput;
 		}
 	}
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
@@ -3233,7 +3228,6 @@ static bool AddNodesFromDumpResult(nodectrllist_t& nodes, string& strDump)
 		strParsed = strParsed.substr(pos + strlen(DUMP_KEY_CR));
 
 		// Parse slave chmpxs
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		strParsed = ParseChmpxListFromDumpResult(nodes, strParsed, false, is_error);
 		if(is_error){
@@ -3595,11 +3589,9 @@ static string ParseUnitDatasFromDumpResult(nodesunits_t& unitdatas, chmpxid_t ex
 	strInput = strInput.substr(pos + strlen(DUMP_KEY_START));
 
 	// Loop to "}\n"
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	while(0 != strInput.find(DUMP_KEY_END) && string::npos != strInput.find(DUMP_KEY_END)){
 		// "[XX]={\n"
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress stlIfStrFind
 		if(string::npos == strInput.find(DUMP_KEY_ARRAY_START) || 0 != strInput.find(DUMP_KEY_ARRAY_START)){
 			//MSG("Could not found \"[XX]={\" key or found invalid data in DUMP result.");
@@ -3627,7 +3619,6 @@ static string ParseUnitDatasFromDumpResult(nodesunits_t& unitdatas, chmpxid_t ex
 		string		mapkey	= MakeMapKeyFromAll(unitdata.hostname, unitdata.ctrlport, unitdata.cuk, unitdata.ctlendpoints, unitdata.custom_seed);
 		unitdatas[mapkey]	= unitdata;
 	}
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress stlIfStrFind
 	if(0 != strInput.find(DUMP_KEY_END)){
 		ERR("Could not found end of chmpx \"}\" key in DUMP result.");
@@ -3720,7 +3711,6 @@ static bool CreateStatusDetails(NODESTATUSDETAIL& detail, chmpxid_t chmpxid, con
 		strParsed		= strParsed.substr(pos + strlen(DUMP_KEY_CR));
 		if(strChmpxCount != "0"){
 			// Parse slave chmpxs
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			strParsed = ParseUnitDatasFromDumpResult(detail.slaves, exceptchmpxid, false, strParsed);
 		}
@@ -4640,7 +4630,6 @@ static string CvtAllStatusResult(const string& strResult, bool& is_error)
 
 		// Get Verify Peer as "VerifyPeer="
 		string	strIsVerify;
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress stlIfStrFind
 		if(isSSL && 0 == (pos = strInput.find(ALLSTATUS_KEY_ISVERIFY))){
 			strInput = strInput.substr(pos + strlen(ALLSTATUS_KEY_ISVERIFY));
@@ -6937,7 +6926,6 @@ int main(int argc, char** argv)
 			}
 			StartupLoopCommand.clear();
 
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress knownConditionTrueFalse
 		}else if(IsWelcomMsg){
 			// print message

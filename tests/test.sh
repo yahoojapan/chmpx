@@ -21,481 +21,654 @@
 # REVISION:
 #
 
-##############################################################
-## library path & programs path
-##
-MYSCRIPTDIR=`dirname $0`
-if [ "X${SRCTOP}" = "X" ]; then
-	SRCTOP=`cd ${MYSCRIPTDIR}/..; pwd`
-fi
-cd ${MYSCRIPTDIR}
-if [ "X${OBJDIR}" = "X" ]; then
-	LD_LIBRARY_PATH="${SRCTOP}/lib/.lib"
-	TESTPROGDIR=${MYSCRIPTDIR}
-else
-	LD_LIBRARY_PATH="${SRCTOP}/lib/${OBJDIR}"
-	TESTPROGDIR=${MYSCRIPTDIR}/${OBJDIR}
-fi
+#--------------------------------------------------------------
+# Common Variables
+#--------------------------------------------------------------
+PRGNAME=$(basename "${0}")
+SCRIPTDIR=$(dirname "${0}")
+SCRIPTDIR=$(cd "${SCRIPTDIR}" || exit 1; pwd)
+SRCTOP=$(cd "${SCRIPTDIR}/.." || exit 1; pwd)
+
+#
+# Directories / Files
+#
+SRCDIR="${SRCTOP}/src"
+TESTDIR="${SRCTOP}/tests"
+LIBOBJDIR="${SRCTOP}/lib/.libs"
+#TESTOBJDIR="${TESTDIR}/.libs"
+
+#
+# Test data/result files
+#
+TEST_SVR_INI_FILE="${TESTDIR}/test_server.ini"
+TEST_SLV_INI_FILE="${TESTDIR}/test_slave.ini"
+
+CFG_TEST_JSONSTRING_FILE="${TESTDIR}/cfg_test_json_string.data"
+CFG_TEST_SVR_INI_FILE="${TESTDIR}/cfg_test_server.ini"
+CFG_TEST_SVR_YAML_FILE="${TESTDIR}/cfg_test_server.yaml"
+CFG_TEST_SVR_JSON_FILE="${TESTDIR}/cfg_test_server.json"
+CFG_TEST_SLV_INI_FILE="${TESTDIR}/cfg_test_slave.ini"
+CFG_TEST_SLV_YAML_FILE="${TESTDIR}/cfg_test_slave.yaml"
+CFG_TEST_SLV_JSON_FILE="${TESTDIR}/cfg_test_slave.json"
+
+CONFTEST_SVR_RESULT_FILE="${TESTDIR}/cfg_test_server.result"
+CONFTEST_SLV_RESULT_FILE="${TESTDIR}/cfg_test_slave.result"
+
+#
+# Log files
+#
+STOP_PROC_LOGFILE="/tmp/.${PRGNAME}_stop_proc.log"
+
+CONFTEST_SVR_INI_LOGFILE="/tmp/conftest_svr_ini_${PROCID}.log"
+CONFTEST_SVR_YAML_LOGFILE="/tmp/conftest_svr_yaml_${PROCID}.log"
+CONFTEST_SVR_JSON_LOGFILE="/tmp/conftest_svr_json_${PROCID}.log"
+CONFTEST_SVR_SJSON_LOGFILE="/tmp/conftest_svr_sjson_${PROCID}.log"
+CONFTEST_SVR_INIENV_LOGFILE="/tmp/conftest_svr_inienv_${PROCID}.log"
+CONFTEST_SVR_JSONENV_LOGFILE="/tmp/conftest_svr_jsonenv_${PROCID}.log"
+CONFTEST_SLV_INI_LOGFILE="/tmp/conftest_slv_ini_${PROCID}.log"
+CONFTEST_SLV_YAML_LOGFILE="/tmp/conftest_slv_yaml_${PROCID}.log"
+CONFTEST_SLV_JSON_LOGFILE="/tmp/conftest_slv_json_${PROCID}.log"
+CONFTEST_SLV_SJON_LOGFILE="/tmp/conftest_slv_sjson_${PROCID}.log"
+CONFTEST_SLV_INIENV_LOGFILE="/tmp/conftest_slv_inienv_${PROCID}.log"
+CONFTEST_SLV_SJONENV_LOGFILE="/tmp/conftest_slv_jsonenv_${PROCID}.log"
+
+TEST_SVR_PROC_LOGFILE="/tmp/testsvr_${PROCID}.log"
+TEST_SLV_PROC_LOGFILE="/tmp/testslv_${PROCID}.log"
+
+#
+# LD_LIBRARY_PATH / TESTPROGDIR
+#
+LD_LIBRARY_PATH="${LIBOBJDIR}"
 export LD_LIBRARY_PATH
+
+TESTPROGDIR="${TESTDIR}"
 export TESTPROGDIR
 
-##############################################################
-## Utility function
-##
+#
+# Debug flag
+#
+CHMPX_DBG_FLAG="silent"
+
+#--------------------------------------------------------------
+# Variables and Utility functions
+#--------------------------------------------------------------
+#
+# Escape sequence
+#
+if [ -t 1 ]; then
+	CBLD=$(printf '\033[1m')
+	CREV=$(printf '\033[7m')
+	CRED=$(printf '\033[31m')
+	CYEL=$(printf '\033[33m')
+	CGRN=$(printf '\033[32m')
+	CDEF=$(printf '\033[0m')
+else
+	CBLD=""
+	CREV=""
+	CRED=""
+	CYEL=""
+	CGRN=""
+	CDEF=""
+fi
+
+#--------------------------------------------------------------
+# Message functions
+#--------------------------------------------------------------
+PRNTITLE()
+{
+	echo ""
+	echo "${CGRN}---------------------------------------------------------------------${CDEF}"
+	echo "${CGRN}${CREV}[TITLE]${CDEF} ${CGRN}$*${CDEF}"
+	echo "${CGRN}---------------------------------------------------------------------${CDEF}"
+}
+
+PRNERR()
+{
+	echo "${CBLD}${CRED}[ERROR]${CDEF} ${CRED}$*${CDEF}"
+}
+
+PRNWARN()
+{
+	echo "${CYEL}${CREV}[WARNING]${CDEF} $*"
+}
+
+PRNMSG()
+{
+	echo "${CYEL}${CREV}[MSG]${CDEF} ${CYEL}$*${CDEF}"
+}
+
+PRNINFO()
+{
+	echo "${CREV}[INFO]${CDEF} $*"
+}
+
+PRNSUCCEED()
+{
+	echo "${CREV}[SUCCEED]${CDEF} $*"
+}
+
+#--------------------------------------------------------------
+# Utilitiy functions
+#--------------------------------------------------------------
 stop_process()
 {
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	_request_pids="$1"
+	_STOP_PIDS="$1"
 
-	for _one_pid in ${_request_pids}; do
-		_try_max_count=10
+	for _ONE_PID in ${_STOP_PIDS}; do
+		_MAX_TRYCOUNT=10
 
-		while [ "${_try_max_count}" -gt 0 ]; do
+		while [ "${_MAX_TRYCOUNT}" -gt 0 ]; do
 			#
 			# Try HUP
 			#
-			kill -HUP "${_one_pid}" > /dev/null 2>&1
+			kill -HUP "${_ONE_PID}" > /dev/null 2>&1
 			sleep 1
-			if ! ps -p "${_one_pid}" >/dev/null 2>&1; then
+			if ! ps -p "${_ONE_PID}" >/dev/null 2>&1; then
 				break
 			fi
 
 			#
 			# Try KILL
 			#
-			kill -9 "${_one_pid}" > /dev/null 2>&1
+			kill -KILL "${_ONE_PID}" > /dev/null 2>&1
 			sleep 1
-			if ! ps -p "${_one_pid}" >/dev/null 2>&1; then
+			if ! ps -p "${_ONE_PID}" >/dev/null 2>&1; then
 				break
 			fi
-			echo "   Failed: kill -9 ${_one_pid}" >> /tmp/stop_log.log
+			echo "[FAILED] kill ${_ONE_PID} process" >> "${STOP_PROC_LOGFILE}"
 
-			_try_max_count=$((_try_max_count - 1))
+			_MAX_TRYCOUNT=$((_MAX_TRYCOUNT - 1))
 		done
 
-		if [ "${_try_max_count}" -le 0 ]; then
-			return 1
+		if [ "${_MAX_TRYCOUNT}" -le 0 ]; then
+			# shellcheck disable=SC2009
+			if ps -p "${_ONE_PID}" | grep -v PID | grep -q -i 'defunct'; then
+				PRNWARN "Could not stop ${_ONE_PID} process, because it has defunct status. So assume we were able to stop it."
+			else
+				return 1
+			fi
 		fi
 	done
 
 	return 0
 }
 
-###########################################################
-# Initialize
-###########################################################
-DATE=`date`
+cleanup_files()
+{
+	#
+	# Cleanup log files
+	#
+	rm -f "${CONFTEST_SVR_INI_LOGFILE}"
+	rm -f "${CONFTEST_SVR_YAML_LOGFILE}"
+	rm -f "${CONFTEST_SVR_JSON_LOGFILE}"
+	rm -f "${CONFTEST_SVR_SJSON_LOGFILE}"
+	rm -f "${CONFTEST_SVR_INIENV_LOGFILE}"
+	rm -f "${CONFTEST_SVR_JSONENV_LOGFILE}"
+	rm -f "${CONFTEST_SLV_INI_LOGFILE}"
+	rm -f "${CONFTEST_SLV_YAML_LOGFILE}"
+	rm -f "${CONFTEST_SLV_JSON_LOGFILE}"
+	rm -f "${CONFTEST_SLV_SJON_LOGFILE}"
+	rm -f "${CONFTEST_SLV_INIENV_LOGFILE}"
+	rm -f "${CONFTEST_SLV_SJONENV_LOGFILE}"
+	rm -f "${TEST_SVR_PROC_LOGFILE}"
+	rm -f "${TEST_SLV_PROC_LOGFILE}"
+
+	#
+	# Cleanup files created by processes
+	#
+	rm -f /tmp/TESTSCRPT-8021.chmpx
+	rm -f /tmp/TESTSCRPT-8021.k2h
+	rm -f /tmp/TESTSCRPT-8022.chmpx
+	rm -f /tmp/TESTSCRPT-8022.k2h
+	rm -f /tmp/.k2h_*
+	rm -f /tmp/chmpxbench-*.dat
+
+	return 0
+}
+
+#==============================================================
+# Set and Check variables for test
+#==============================================================
 PROCID=$$
-COUNT=10
+BENCH_COUNT=10
 
 #
-# Base directory
+# Check binary path
 #
-#SCRIPTNAME=$(basename "${0}")
-SCRIPTDIR=$(dirname "${0}")
-SCRIPTDIR=$(cd "${SCRIPTDIR}" || exit 1; pwd)
-SRCTOPDIR=$(cd "${SCRIPTDIR}/.." || exit 1; pwd)
-CHMPXDIR=$(cd "${SRCTOPDIR}/src" || exit 1; pwd)
-BASEDIR="${SCRIPTDIR}"
-
-#
-# Binary
-#
-if [ -f ${CHMPXDIR}/${PLATFORM_CURRENT}/chmpx ]; then
-	CHMPXBIN=${CHMPXDIR}/${PLATFORM_CURRENT}/chmpx
-elif [ -f ${CHMPXDIR}/${PLATFORM_CURRENT}/chmmain ]; then
-	CHMPXBIN=${CHMPXDIR}/${PLATFORM_CURRENT}/chmmain
+if [ -f "${SRCDIR}/chmpx" ]; then
+	CHMPXBIN="${SRCDIR}/chmpx"
+elif [ -f "${SRCDIR}/chmmain" ]; then
+	CHMPXBIN="${SRCDIR}/chmmain"
 else
-	echo "ERROR: there is no chmpx binary"
-	echo "RESULT --> FAILED"
+	PRNERR "Not found chmpx binary"
 	exit 1
 fi
-if [ -f ${BASEDIR}/${PLATFORM_CURRENT}/chmpxbench ]; then
-	CHMPXBENCHBIN=${BASEDIR}/${PLATFORM_CURRENT}/chmpxbench
+if [ -f "${TESTDIR}/chmpxbench" ]; then
+	CHMPXBENCHBIN="${TESTDIR}/chmpxbench"
 else
-	echo "ERROR: there is no chmpxbench binary"
-	echo "RESULT --> FAILED"
+	PRNERR "Not found chmpxbench binary"
 	exit 1
 fi
-if [ -f ${BASEDIR}/${PLATFORM_CURRENT}/chmpxconftest ]; then
-	CHMCONFTEST=${BASEDIR}/${PLATFORM_CURRENT}/chmpxconftest
+if [ -f "${TESTDIR}/chmpxconftest" ]; then
+	CHMCONFTEST="${TESTDIR}/chmpxconftest"
 else
-	echo "ERROR: there is no chmpxconftest binary"
-	echo "RESULT --> FAILED"
+	PRNERR "Not found chmpxconftest binary"
 	exit 1
 fi
 
-###########################################################
-# Start configuration test
-###########################################################
+#==============================================================
+# Configuration test
+#==============================================================
 #
 # make parameter for JSON
 #
-JSON_SERVER_PARAM=`grep 'SERVER=' ${BASEDIR}/cfg_test_json_string.data 2>/dev/null | sed 's/SERVER=//g' 2>/dev/null`
-JSON_SLAVE_PARAM=`grep 'SLAVE=' ${BASEDIR}/cfg_test_json_string.data 2>/dev/null | sed 's/SLAVE=//g' 2>/dev/null`
+JSON_SERVER_PARAM=$(grep 'SERVER=' "${CFG_TEST_JSONSTRING_FILE}" 2>/dev/null | sed -e 's/SERVER=//g')
+JSON_SLAVE_PARAM=$(grep 'SLAVE=' "${CFG_TEST_JSONSTRING_FILE}" 2>/dev/null | sed -e 's/SLAVE=//g')
 
-#
+#--------------------------------------------------------------
 # Test for conf loading
+#--------------------------------------------------------------
 #
-echo "------ LOAD INI file for server ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.ini -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_ini_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server INI."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_ini_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server INI."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
+# LOAD INI file for server
+#
+PRNTITLE "LOAD INI file for server"
 
-echo "------ LOAD INI file for slave -----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.ini -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_ini_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave INI."
-	echo "RESULT --> FAILED"
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SVR_INI_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_INI_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server INI."
+	cleanup_files
 	exit 1
 fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_ini_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave INI."
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_INI_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server INI."
+	cleanup_files
 	exit 1
 fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD YAML file for server ---------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.yaml -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_yaml_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server YAML."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_yaml_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server YAML."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD YAML file for slave ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.yaml -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_yaml_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave YAML."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_yaml_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave YAML."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON file for server ---------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_server.json -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_json_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_json_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON file for slave ----------------------------"
-${CHMCONFTEST} -conf ${BASEDIR}/cfg_test_slave.json -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_json_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_json_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON param for server --------------------------"
-${CHMCONFTEST} -json "${JSON_SERVER_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_sjson_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON param."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_sjson_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON param."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON param for slave ---------------------------"
-${CHMCONFTEST} -json "${JSON_SLAVE_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_sjson_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON param."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_sjson_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON param."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD INI conf by env for server ---------------------"
-CHMCONFFILE=${BASEDIR}/cfg_test_server.ini ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_inienv_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server INI on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_inienv_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server INI on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD INI conf by env for slave ---------------------"
-CHMCONFFILE=${BASEDIR}/cfg_test_slave.ini ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_inienv_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave INI on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_inienv_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave INI on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON param by env for server ------------------"
-CHMJSONCONF="${JSON_SERVER_PARAM}" ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_svr_jsonenv_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_server.result /tmp/conftest_svr_jsonenv_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for server JSON on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
-
-echo "------ LOAD JSON param by env for slave ------------------"
-CHMJSONCONF="${JSON_SLAVE_PARAM}" ${CHMCONFTEST} -no_check_update 2>&1 | grep -v NAME | grep -v DATE > /tmp/conftest_slv_jsonenv_${PROCID}.log 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-diff ${BASEDIR}/cfg_test_slave.result /tmp/conftest_slv_jsonenv_${PROCID}.log >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo "ERROR: Failed test configuration for slave JSON on ENV."
-	echo "RESULT --> FAILED"
-	exit 1
-fi
-echo "RESULT --> SUCCEED"
-echo ""
+PRNSUCCEED "LOAD INI file for server"
 
 #
+# LOAD INI file for slave
+#
+PRNTITLE "LOAD INI file for slave"
+
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SLV_INI_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_INI_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave INI."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_INI_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave INI."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD INI file for slave"
+
+#
+# LOAD YAML file for server
+#
+PRNTITLE "LOAD YAML file for server"
+
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SVR_YAML_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_YAML_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server YAML."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_YAML_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server YAML."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD YAML file for server"
+
+#
+# LOAD YAML file for slave
+#
+PRNTITLE "LOAD YAML file for slave"
+
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SLV_YAML_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_YAML_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave YAML."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_YAML_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave YAML."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD YAML file for slave"
+
+#
+# LOAD JSON file for server
+#
+PRNTITLE "LOAD JSON file for server"
+
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SVR_JSON_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_JSON_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server JSON."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_JSON_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server JSON."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON file for server"
+
+#
+# LOAD JSON file for slave
+#
+PRNTITLE "LOAD JSON file for slave"
+
+if ! "${CHMCONFTEST}" -conf "${CFG_TEST_SLV_JSON_FILE}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_JSON_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave JSON."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_JSON_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave JSON."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON file for slave"
+
+#
+# LOAD JSON param for server
+#
+PRNTITLE "LOAD JSON param for server"
+
+if ! "${CHMCONFTEST}" -json "${JSON_SERVER_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_SJSON_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server JSON param."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_SJSON_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server JSON param."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON param for server"
+
+#
+# LOAD JSON param for slave
+#
+PRNTITLE "LOAD JSON param for slave"
+
+if ! "${CHMCONFTEST}" -json "${JSON_SLAVE_PARAM}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_SJON_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave JSON param."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_SJON_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave JSON param."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON param for slave"
+
+#
+# LOAD INI conf by env for server
+#
+PRNTITLE "LOAD INI conf by env for server"
+
+if ! CHMCONFFILE="${CFG_TEST_SVR_INI_FILE}" "${CHMCONFTEST}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_INIENV_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server INI on ENV."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_INIENV_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server INI on ENV."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD INI conf by env for server"
+
+#
+# LOAD INI conf by env for slave
+#
+PRNTITLE "LOAD INI conf by env for slave"
+
+if ! CHMCONFFILE="${CFG_TEST_SLV_INI_FILE}" "${CHMCONFTEST}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_INIENV_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave INI on ENV."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_INIENV_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave INI on ENV."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD INI conf by env for slave"
+
+#
+# LOAD JSON param by env for server
+#
+PRNTITLE "LOAD JSON param by env for server"
+
+if ! CHMJSONCONF="${JSON_SERVER_PARAM}" "${CHMCONFTEST}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SVR_JSONENV_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for server JSON on ENV."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SVR_RESULT_FILE}" "${CONFTEST_SVR_JSONENV_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for server JSON on ENV."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON param by env for server"
+
+#
+# LOAD JSON param by env for slave
+#
+PRNTITLE "LOAD JSON param by env for slave"
+
+if ! CHMJSONCONF="${JSON_SLAVE_PARAM}" "${CHMCONFTEST}" -no_check_update 2>&1 | grep -v NAME | grep -v DATE > "${CONFTEST_SLV_SJONENV_LOGFILE}" 2>&1; then
+	PRNERR "Failed test configuration for slave JSON on ENV."
+	cleanup_files
+	exit 1
+fi
+if ! diff "${CONFTEST_SLV_RESULT_FILE}" "${CONFTEST_SLV_SJONENV_LOGFILE}" >/dev/null 2>&1; then
+	PRNERR "Failed test configuration for slave JSON on ENV."
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "LOAD JSON param by env for slave"
+
+#--------------------------------------------------------------
 # Compare result
+#--------------------------------------------------------------
 #
-echo "------ Compare LOAD result for server ----------------------"
-diff /tmp/conftest_svr_ini_${PROCID}.log /tmp/conftest_svr_yaml_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+# Server
+#
+PRNTITLE "Compare LOAD result for server"
+
+if ! diff "${CONFTEST_SVR_INI_LOGFILE}" "${CONFTEST_SVR_YAML_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SVR_INI_LOGFILE} and ${CONFTEST_SVR_YAML_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
 
-diff /tmp/conftest_svr_ini_${PROCID}.log /tmp/conftest_svr_json_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SVR_INI_LOGFILE}" "${CONFTEST_SVR_JSON_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SVR_INI_LOGFILE} and ${CONFTEST_SVR_JSON_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
 
-diff /tmp/conftest_svr_ini_${PROCID}.log /tmp/conftest_svr_sjson_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SVR_INI_LOGFILE}" "${CONFTEST_SVR_SJSON_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SVR_INI_LOGFILE} and ${CONFTEST_SVR_SJSON_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
 
-diff /tmp/conftest_svr_ini_${PROCID}.log /tmp/conftest_svr_inienv_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SVR_INI_LOGFILE}" "${CONFTEST_SVR_INIENV_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SVR_INI_LOGFILE} and ${CONFTEST_SVR_INIENV_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
 
-diff /tmp/conftest_svr_ini_${PROCID}.log /tmp/conftest_svr_jsonenv_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SVR_INI_LOGFILE}" "${CONFTEST_SVR_JSONENV_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SVR_INI_LOGFILE} and ${CONFTEST_SVR_JSONENV_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
-echo "RESULT --> SUCCEED"
-echo ""
+PRNSUCCEED "Compare LOAD result for server"
 
-echo "------ Compare LOAD result for slave -----------------------"
-diff /tmp/conftest_slv_ini_${PROCID}.log /tmp/conftest_slv_yaml_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
-	exit 1
-fi
+#
+# Slave
+#
+PRNTITLE "Compare LOAD result for slave"
 
-diff /tmp/conftest_slv_ini_${PROCID}.log /tmp/conftest_slv_json_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SLV_INI_LOGFILE}" "${CONFTEST_SLV_YAML_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SLV_INI_LOGFILE} and ${CONFTEST_SLV_YAML_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
 
-diff /tmp/conftest_slv_ini_${PROCID}.log /tmp/conftest_slv_sjson_${PROCID}.log
-if [ $? -ne 0 ]; then
-	echo "RESULT --> FAILED"
+if ! diff "${CONFTEST_SLV_INI_LOGFILE}" "${CONFTEST_SLV_JSON_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SLV_INI_LOGFILE} and ${CONFTEST_SLV_JSON_LOGFILE}"
+	cleanup_files
 	exit 1
 fi
-echo "RESULT --> SUCCEED"
-echo ""
 
-###########################################################
-# Start test
-###########################################################
+if ! diff "${CONFTEST_SLV_INI_LOGFILE}" "${CONFTEST_SLV_SJON_LOGFILE}"; then
+	PRNERR "Detected a difference ${CONFTEST_SLV_INI_LOGFILE} and ${CONFTEST_SLV_SJON_LOGFILE}"
+	cleanup_files
+	exit 1
+fi
+PRNSUCCEED "Compare LOAD result for slave"
+
+#==============================================================
+# Start Process test
+#==============================================================
+PRNTITLE "Start Process test"
+
 #
 # chmpx for server node
 #
-echo "------ RUN chmpx server node -------------------------------"
-${CHMPXBIN} -conf ${BASEDIR}/test_server.ini -d silent &
+PRNMSG "RUN chmpx server node"
+
+"${CHMPXBIN}" -conf "${TEST_SVR_INI_FILE}" -d "${CHMPX_DBG_FLAG}" &
 CHMPXSVRPID=$!
-echo "chmpx server node pid = ${CHMPXSVRPID}"
+PRNINFO "chmpx server node pid = ${CHMPXSVRPID}"
 sleep 2
 
 #
-# test client process on server node
+# Test client process on server node
 #
-echo "------ RUN test server process on server side --------------"
-${CHMPXBENCHBIN} -s -f ${BASEDIR}/test_server.ini -l 0 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey ${PROCID} > /tmp/testsvr_${PROCID}.log 2>&1 &
+PRNMSG "RUN test server process on server side"
+
+"${CHMPXBENCHBIN}" -s -f "${TEST_SVR_INI_FILE}" -l 0 -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey "${PROCID}" > "${TEST_SVR_PROC_LOGFILE}" 2>&1 &
 TESTSVRPID=$!
-echo "test client process pid(on server node) = ${TESTSVRPID}"
+PRNINFO "test client process pid(on server node) = ${TESTSVRPID}"
 sleep 2
 
 #
 # chmpx for slave node
 #
-echo "------ RUN chmpx slave node --------------------------------"
-${CHMPXBIN} -conf ${BASEDIR}/test_slave.ini -d silent &
+PRNMSG "RUN chmpx slave node"
+
+"${CHMPXBIN}" -conf "${TEST_SLV_INI_FILE}" -d "${CHMPX_DBG_FLAG}" &
 CHMPXSLVPID=$!
-echo "chmpx slave node pid = ${CHMPXSLVPID}"
+PRNINFO "chmpx slave node pid = ${CHMPXSLVPID}"
 sleep 2
 
 #
-# test client process on slave node
+# Test client process on slave node
 #
-echo "------ RUN client process on slave node & START test -------"
-${CHMPXBENCHBIN} -c -f ${BASEDIR}/test_slave.ini -l ${COUNT} -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey ${PROCID} > /tmp/testslv_${PROCID}.log 2>&1
-echo "finish test client process on slave node"
-sleep 2
+PRNMSG "RUN client process on slave node & START test"
 
-###########################################################
-# Stop all process
-###########################################################
-_failed_stop_process=0
-TESTSVRPID="${TESTSVRPID} $(pgrep -a 'chmpxbench' | grep  '\-s' | awk '{print $1}')"
-if ! stop_process "${TESTSVRPID}"; then
-	_failed_stop_process=1
+if ! "${CHMPXBENCHBIN}" -c -f "${TEST_SLV_INI_FILE}" -l "${BENCH_COUNT}" -proccnt 1 -threadcnt 1 -ta -dl 128 -pr -g err -dummykey "${PROCID}" > "${TEST_SLV_PROC_LOGFILE}" 2>&1; then
+	PRNERR "Failed to run chmpxbench, but need to stop processes so continue..."
+	IS_FAILURE_STARTING_PROCS=1
+else
+	PRNINFO "Finish test client process on slave node"
+	PRNSUCCEED "Start Process test"
+	IS_FAILURE_STARTING_PROCS=0
+	sleep 2
 fi
 
-TESTCLIENTPIDS=`ps w | grep chmpxbench | grep dummykey | grep ${PROCID} | grep -v grep | awk '{print $1}'`
-if [ "X$TESTCLIENTPIDS" != "X" ]; then
-	if ! stop_process "${TESTCLIENTPIDS}"; then
-		_failed_stop_process=1
+#==============================================================
+# Stop all processes
+#==============================================================
+PRNTITLE "Stop all processes"
+
+IS_FAILURE_STOPPING_PROCS=0
+
+# [NOTE]
+# The order in which processes are stopped is important.
+#
+if [ -n "${CHMPXSLVPID}" ]; then
+	if ! stop_process "${CHMPXSLVPID}"; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+fi
+if [ -n "${TESTSVRPID}" ]; then
+	if ! stop_process "${TESTSVRPID}"; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+fi
+OTHER_CHMPXBENCH_PIDS=$(pgrep -a 'chmpxbench' | grep  '\-s' | awk '{print $1}')
+if [ -n "${OTHER_CHMPXBENCH_PIDS}" ]; then
+	if ! stop_process "${OTHER_CHMPXBENCH_PIDS}"; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+fi
+if [ -n "${CHMPXSVRPID}" ]; then
+	if ! stop_process "${CHMPXSVRPID}"; then
+		IS_FAILURE_STOPPING_PROCS=1
 	fi
 fi
 
-if ! stop_process "${CHMPXSLVPID}"; then
-	_failed_stop_process=1
-fi
-if ! stop_process "${CHMPXSVRPID}"; then
-	_failed_stop_process=1
-fi
-
-if [ "${_failed_stop_process}" -ne 0 ]; then
+if [ "${IS_FAILURE_STOPPING_PROCS}" -ne 0 ]; then
 	#
-	# Last challenge
+	# Retry to stop
 	#
-	kill -9 "${TESTSVRPID}" "${TESTCLIENTPIDS}" "${CHMPXSLVPID}" "${CHMPXSVRPID}" >/dev/null 2>&1
+	kill -KILL "${TESTSVRPID}" "${TESTCLIENTPIDS}" "${CHMPXSLVPID}" "${CHMPXSVRPID}" >/dev/null 2>&1
+
+	PRNERR "Failed to stop all processes, but contiune..."
+else
+	PRNSUCCEED "Stop all processes"
 fi
 
-##############
-# Check
-##############
-echo "------ RESULT ----------------------------------------------"
-SVRRESULT=`cat /tmp/testsvr_${PROCID}.log | grep -v "^Receive : "`
-SLVRESULTERRCNT=`grep 'Total error count' /tmp/testslv_${PROCID}.log | awk '{print $4}'`
+#==============================================================
+# Confirmation of communication results
+#==============================================================
+PRNTITLE "Confirmation of communication results"
 
-RESULT=0
-if [ "X$SVRRESULT" != "X" -o "X$SLVRESULTERRCNT" != "X0" ]; then
-	RESULT=1
+SVRRESULT=$(grep -v "^Receive : " "${TEST_SVR_PROC_LOGFILE}")
+SLVRESULTERRCNT=$(grep 'Total error count' "${TEST_SLV_PROC_LOGFILE}" | awk '{print $4}')
+
+if [ -n "${SVRRESULT}" ] || [ "${SLVRESULTERRCNT}" != "0" ]; then
+	PRNERR "Failed to send/receive data, but contiune..."
+	IS_FAILURE_COMMUNICATION=1
+else
+	PRNSUCCEED "Confirmation of communication results"
+	IS_FAILURE_COMMUNICATION=0
 fi
 
+#==============================================================
+# Finish
+#==============================================================
 #
 # Cleanup files
 #
-rm -f /tmp/conftest_svr_ini_${PROCID}.log
-rm -f /tmp/conftest_svr_yaml_${PROCID}.log
-rm -f /tmp/conftest_svr_json_${PROCID}.log
-rm -f /tmp/conftest_svr_sjson_${PROCID}.log
-rm -f /tmp/conftest_svr_inienv_${PROCID}.log
-rm -f /tmp/conftest_svr_jsonenv_${PROCID}.log
-rm -f /tmp/conftest_slv_ini_${PROCID}.log
-rm -f /tmp/conftest_slv_yaml_${PROCID}.log
-rm -f /tmp/conftest_slv_json_${PROCID}.log
-rm -f /tmp/conftest_slv_sjson_${PROCID}.log
-rm -f /tmp/testsvr_${PROCID}.log
-rm -f /tmp/testslv_${PROCID}.log
-rm -f /tmp/TESTSCRPT-8021.chmpx
-rm -f /tmp/TESTSCRPT-8021.k2h
-rm -f /tmp/TESTSCRPT-8022.chmpx
-rm -f /tmp/TESTSCRPT-8022.k2h
-rm -f /tmp/.k2h_*
-rm -f /tmp/chmpxbench-*.dat
+cleanup_files
 
-if [ $RESULT -eq 1 ]; then
-	echo "RESULT --> FAILED"
+#
+# Result
+#
+PRNTITLE "Test summary"
+
+RESULT_CODE=0
+if [ "${IS_FAILURE_STARTING_PROCS}" -eq 1 ] || [ "${IS_FAILURE_STOPPING_PROCS}" -eq 1 ] || [ "${IS_FAILURE_COMMUNICATION}" -eq 1 ]; then
+	PRNERR "The test summary is a Failure"
+	RESULT_CODE=1
 else
-	echo "RESULT --> SUCCEED"
+	PRNSUCCEED "The test summary is a Success"
 fi
-exit $RESULT
+
+exit "${RESULT_CODE}"
 
 #
 # Local variables:
