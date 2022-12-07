@@ -573,7 +573,6 @@ unsigned char* cvt_kvp_bin(const PCHMKVP pkvp, size_t* plength)
 	size_t			tmplen	= htobe64(pkvp->key.length);			// To network byte order
 	unsigned char*	bylen	= reinterpret_cast<unsigned char*>(&tmplen);
 	for(size_t cnt = 0; cnt < sizeof(size_t); ++cnt){
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress objectIndex
 		pResult[setpos++] = bylen[cnt];
 	}
@@ -585,7 +584,6 @@ unsigned char* cvt_kvp_bin(const PCHMKVP pkvp, size_t* plength)
 	// set value
 	tmplen	= htobe64(pkvp->val.length);							// To network byte order
 	for(size_t cnt = 0; cnt < sizeof(size_t); ++cnt){
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress objectIndex
 		pResult[setpos++] = bylen[cnt];
 	}

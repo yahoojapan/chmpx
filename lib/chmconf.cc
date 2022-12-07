@@ -450,7 +450,6 @@ bool CHMConf::UnsetEventQueue(void)
 		}
 		CHM_CLOSE(inotifyfd);
 	}
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	inotifyfd	= CHM_INVALID_HANDLE;
 	watchfd		= CHM_INVALID_HANDLE;
@@ -745,7 +744,6 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 	if(pctlport){
 		is_strict = true;
 		if(!CHMEMPTYSTR(cuk)){
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress nullPointer
 			strcuk = cuk;
 		}
@@ -4304,7 +4302,6 @@ bool CHMYamlBaseConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		// open configuration file
 		if(NULL == (fp = fopen(cfgfile.c_str(), "r"))){
 			ERR_CHMPRN("Could not open configuration file(%s). errno = %d", cfgfile.c_str(), errno);
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress resourceLeak
 			return false;
 		}

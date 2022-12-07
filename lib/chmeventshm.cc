@@ -263,7 +263,6 @@ bool ChmEventShm::UnsetEventQueue(void)
 		}
 		CHM_CLOSE(inotifyfd);
 	}
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	inotifyfd	= CHM_INVALID_HANDLE;
 	watchfd		= CHM_INVALID_HANDLE;

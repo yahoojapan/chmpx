@@ -234,7 +234,6 @@ inline void move_pk11objlist(chmpk11list_t& srclist, chmpk11list_t& destlist)
 // [NOTE]
 // ChmSSSession is a pointer type casted void* to ChmSSSessionEnt structure.
 //
-// cppcheck-suppress unmatchedSuppression
 // cppcheck-suppress noCopyConstructor
 typedef struct chm_nss_session{
 	ChmSSCtx		SSCtx;
@@ -243,7 +242,6 @@ typedef struct chm_nss_session{
 
 	explicit chm_nss_session(ChmSSCtx ctx = NULL, PRFileDesc* session = NULL, chmpk11list_t* ppk11objs = NULL) : SSCtx(NULL), SSSession(session)
 	{
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress noOperatorEq
 		// cppcheck-suppress noCopyConstructor
 		SSCtx = new ChmSSCtxEnt(ctx);
@@ -1046,7 +1044,6 @@ bool ChmSecureSock::SetBlockingMode(PRFileDesc* SSSession, bool is_blocking)
 	return true;
 }
 
-// cppcheck-suppress unmatchedSuppression
 // cppcheck-suppress constParameter
 bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
 {
@@ -1843,7 +1840,6 @@ void ChmSecureSock::FreeSSLSessionEx(ChmSSSession sslsession)
 //------------------------------------------------------
 // Methods
 //------------------------------------------------------
-// cppcheck-suppress unmatchedSuppression
 // cppcheck-suppress uninitMemberVar
 ChmSecureSock::ChmSecureSock(const char* CApath, const char* CAfile, bool is_verify_peer) : nss_ctx(NULL)
 {

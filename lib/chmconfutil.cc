@@ -75,7 +75,6 @@ bool extract_conf_value(string& value)
 				result			+= *ptr;			// not comment
 			}else if('\\' == *ptr){
 				result			+= *ptr;			// not to escape
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress duplicateBranch
 			}else if(0 != isspace(*ptr)){
 				result			+= *ptr;
@@ -109,7 +108,6 @@ bool extract_conf_value(string& value)
 				}else{
 					is_escape_char	= true;
 				}
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress duplicateBranch
 			}else if(0 != isspace(*ptr)){
 				if(is_escape_char){
