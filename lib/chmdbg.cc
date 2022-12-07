@@ -179,7 +179,6 @@ bool CHMDbgControl::SetChmDbgCntlFile(const char* filepath)
 	FILE*	newfp;
 	if(NULL == (newfp = fopen(filepath, "a+"))){
 		ERR_CHMPRN("Could not open debug file(%s). errno = %d", filepath, errno);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress resourceLeak
 		return false;
 	}

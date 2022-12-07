@@ -910,7 +910,6 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 	if(!ChmEventSock::RawSend(ctlsock, NULL, pbydata, length, is_closed, false, retrycnt, waittime)){
 		ERR_CHMPRN("Could not send to %s:%d(sock:%d).", hostname, ctlport, ctlsock);
 		if(!is_closed){
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(ctlsock);
 		}
@@ -925,13 +924,11 @@ bool ChmEventSock::RawSendCtlPort(const char* hostname, short ctlport, const uns
 	if(!ChmEventSock::RawReceiveAny(ctlsock, is_closed, reinterpret_cast<unsigned char*>(szReceive), &RecLength, false, retrycnt * 10, waittime)){	// wait 10 times by normal
 		ERR_CHMPRN("Failed to receive data from ctlport ctlsock(%d), ctlsock is %s.", ctlsock, is_closed ? "closed" : "not closed");
 		if(!is_closed){
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(ctlsock);
 		}
 		return false;
 	}
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress unreadVariable
 	CHM_CLOSESOCK(ctlsock);
 
@@ -1460,7 +1457,6 @@ bool ChmEventSock::ReceiveWorkerProc(void* common_param, chmthparam_t wp_param)
 	// the socket is left. Thus we must read more until EAGAIN. Otherwise we lost data.
 	// So we checked socket for rest data here.
 	//
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress nullPointerRedundantCheck
 	suseconds_t	waittime = pSockObj->sock_wait_time;
 	bool		is_closed= false;
@@ -1867,7 +1863,6 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 		if(!pImData->GetSelfSsl(ssldata)){
 			ERR_CHMPRN("Failed to get SSL structure from self chmpx, but continue...");
 		}else{
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress noOperatorEq
 			// cppcheck-suppress noCopyConstructor
 			pSecureSock = new ChmSecureSock((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.verify_peer);
@@ -2123,7 +2118,6 @@ bool ChmEventSock::SetEventQueue(void)
 		eqevent.events	= EPOLLIN | EPOLLET | EPOLLRDHUP;			// EPOLLRDHUP is set
 		if(-1 == epoll_ctl(eqfd, EPOLL_CTL_ADD, sock, &eqevent)){
 			ERR_CHMPRN("Failed to add sock(port %d: sock %d) into epoll event(%d), errno=%d", port, sock, eqfd, errno);
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(sock);
 			return false;
@@ -2136,7 +2130,6 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != sock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL);
 		}
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
 		return false;
@@ -2151,10 +2144,8 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != sock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, sock, NULL);
 		}
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(ctlsock);
 		return false;
@@ -2169,10 +2160,8 @@ bool ChmEventSock::SetEventQueue(void)
 		if(CHM_INVALID_SOCK != ctlsock){
 			epoll_ctl(eqfd, EPOLL_CTL_DEL, ctlsock, NULL);
 		}
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(ctlsock);
 		return false;
@@ -2667,7 +2656,6 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 	bool	is_pack = false;
 	if(pbody && 0L < blength){
 		if(NULL == (pPacked = reinterpret_cast<PCOMPKT>(malloc(sizeof(COMPKT) + blength)))){
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress invalidPrintfArgType_sint
 			ERR_CHMPRN("Could not allocate memory as %zd length.", sizeof(COMPKT) + blength);
 			return false;
@@ -3576,7 +3564,6 @@ bool ChmEventSock::CloseSSL(int sock, bool with_sock)
 		sslmap.erase(sock);
 	}
 	if(with_sock){
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress uselessAssignmentPtrArg
 		// cppcheck-suppress uselessAssignmentArg
 		// cppcheck-suppress unreadVariable
@@ -4275,7 +4262,6 @@ bool ChmEventSock::Accept(int sock)
 	string	strhostname;
 	if(!ChmNetDb::CvtAddrInfoToIpAddress(&from, fromlen, stripaddress)){
 		ERR_CHMPRN("Failed to convert addrinfo(new sock=%d) to ipaddress.", newsock);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(newsock);
 		return false;
@@ -5579,12 +5565,10 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			if(cmdarray.empty()){
 				MSG_CHMPRN("%s command does not have parameter, so use default value(dir=all, dev=all, count=all trace count).", strCommand.c_str());
 			}else{
-				// cppcheck-suppress unmatchedSuppression
 				// cppcheck-suppress knownConditionTrueFalse
 				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
 
-					// cppcheck-suppress unmatchedSuppression
 					// cppcheck-suppress stlIfStrFind
 					if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DIR)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DIR));
@@ -5600,7 +5584,6 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 							isError	= true;
 							break;
 						}
-					// cppcheck-suppress unmatchedSuppression
 					// cppcheck-suppress stlIfStrFind
 					}else if(0 == strTmp.find(CTL_COMMAND_TRACE_VIEW_DEV)){
 						strTmp = strTmp.substr(strlen(CTL_COMMAND_TRACE_VIEW_DEV));
@@ -5984,7 +5967,6 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 			startup_servicein = false;
 
 			// re-get status
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			status = pImData->GetSelfStatus();
 		}else{
@@ -7554,7 +7536,6 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 		PPXCOM_ALL				pComAll		= CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 		PPXCOM_N2_STATUS_REQ	pStatusReq	= CVT_COMPTR_N2_STATUS_REQ(pComAll);
 
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress internalAstError
 		SET_PXCOMPKT(pComPkt, COM_VERSION_2, CHMPX_COM_N2_STATUS_REQ, pImData->GetSelfChmpxId(), chmpxid, true, 0L);
 
