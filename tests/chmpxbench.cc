@@ -580,7 +580,6 @@ static void* RunServerModeThread(void* param)
 	string	strbase = to_hexstring(gettid()) + "-";
 
 	// wait for start
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pThParam->pmycntl->is_ready	= true;
 	while(pThParam->pexeccntl->is_wait_doing && !pThParam->pexeccntl->is_exit){
@@ -644,7 +643,6 @@ static void* RunServerModeThread(void* param)
 
 	// set timespec and exit flag
 	get_nomotonic_time(pThParam->pmycntl->ts, start);
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pThParam->pmycntl->is_exit = true;
 
@@ -693,7 +691,6 @@ static void* RunSlaveModeThread(void* param)
 	string	strbase = to_hexstring(gettid()) + "-";
 
 	// wait for start
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pThParam->pmycntl->is_ready	= true;
 	while(pThParam->pexeccntl->is_wait_doing && !pThParam->pexeccntl->is_exit){
@@ -1077,7 +1074,6 @@ int main(int argc, char** argv)
 	}
 
 	// start children initializing
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pexeccntl->is_suspend	= false;
 
@@ -1103,7 +1099,6 @@ int main(int argc, char** argv)
 	get_nomotonic_time(realstart);
 
 	// start(no blocking) doing
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pexeccntl->is_wait_doing = false;
 

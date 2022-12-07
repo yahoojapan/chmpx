@@ -153,14 +153,12 @@ bool ChmEventMq::InitializeMaxMqSystemSize(long maxmsg)
 		size_t	length = 0L;
 		if(NULL == (pbuff = reinterpret_cast<char*>(chm_read(fd, &length)))){
 			ERR_CHMPRN("Could not read file %s", PROCFILE_FOR_MQ);
-			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
 			CHM_CLOSE(fd);
 			return false;
 		}
 		long	current = static_cast<long>(atoi(pbuff));
 		CHM_Free(pbuff);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(fd);
 
@@ -211,7 +209,6 @@ bool ChmEventMq::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 		}
 		// copy param
 		CHM_MERGE_GETPARAM	getparam;
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress unreadVariable
 		getparam.starthash			= 0;									// must be start position 0
 		getparam.startts.tv_nsec	= pUpdateDataParam->startts.tv_nsec;
@@ -1255,10 +1252,8 @@ bool ChmEventMq::Processing(PCOMPKT pComPkt)
 		// make packet for MQ
 		COMPKT	SendComPkt;
 		COPY_COMPKT(&SendComPkt, pComPkt);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress redundantAssignment
 		SendComPkt.length = sizeof(COMPKT);
-		// cppcheck-suppress unmatchedSuppression
 		// cppcheck-suppress redundantAssignment
 		SendComPkt.offset = static_cast<off_t>(sizeof(COMPKT));
 
@@ -1398,7 +1393,6 @@ bool ChmEventMq::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blengt
 	DUMPCOM_PXCLT("MQ::Send", CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt));
 
 	// Make priority
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress duplicateValueTernary
 	unsigned int	priority = ((COM_C2C == pComPkt->head.type) ? MQ_PRIORITY_MSG : MQ_PRIORITY_NOTICE);
 
@@ -2872,10 +2866,8 @@ bool ChmEventMq::PxCltSendJoinNotify(pid_t pid)
 	PPXCLT_JOIN_NOTIFY	pJoinNotify	= CVT_CLTPTR_JOIN_NOTIFY(pCltAll);
 	SET_PXCLTPKT(pComPkt, pChmCntrl->IsChmpxType(), CHMPX_CLT_JOIN_NOTIFY, dept_msgid, term_msgid, GetSerialNumber(), 0);
 
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pComPkt->head.dept_ids.chmpxid	= selfchmpxid;					// do not case for this value.
-	// cppcheck-suppress unmatchedSuppression
 	// cppcheck-suppress redundantAssignment
 	pComPkt->head.term_ids.chmpxid	= selfchmpxid;
 	pJoinNotify->head.type			= CHMPX_CLT_JOIN_NOTIFY;
