@@ -38,6 +38,11 @@ LIBOBJDIR="${SRCTOP}/lib/.libs"
 #TESTOBJDIR="${TESTDIR}/.libs"
 
 #
+# Process ID
+#
+PROCID=$$
+
+#
 # Test data/result files
 #
 TEST_SVR_INI_FILE="${TESTDIR}/test_server.ini"
@@ -232,7 +237,6 @@ cleanup_files()
 #==============================================================
 # Set and Check variables for test
 #==============================================================
-PROCID=$$
 BENCH_COUNT=10
 
 #
