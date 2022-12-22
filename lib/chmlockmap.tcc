@@ -241,7 +241,10 @@ inline bool chm_lock_map<key_type, val_type>::clear(chm_lock_map_erase_cb pfunc,
 #endif	// CHMLOCKMAP_TCC
 
 /*
- * VIM modelines
- *
- * vim:set ts=4 fenc=utf-8:
+ * Local variables:
+ * tab-width: 4
+ * c-basic-offset: 4
+ * End:
+ * vim600: noexpandtab sw=4 ts=4 fdm=marker
+ * vim<600: noexpandtab sw=4 ts=4
  */
