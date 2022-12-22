@@ -921,5 +921,3 @@ ChmCntrl* pchmpx = new ChmCntrl();
  cout << "Key: " << strKey << " Value: " << strVal << endl;
 }
 ```
-
-<!-- -----------------------------------------------------------　-->
