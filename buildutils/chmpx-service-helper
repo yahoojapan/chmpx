@@ -158,6 +158,7 @@ log_info()
 	print_message 1 "INFO" "$*"
 }
 
+# shellcheck disable=SC2317
 prn_err()
 {
 	print_message 2 "ERROR" "$*"
@@ -1061,6 +1062,8 @@ fi
 #
 # Signal handler
 #
+
+# shellcheck disable=SC2317
 SigHandle()
 {
 	CAUGHT_SIGNAL=1
