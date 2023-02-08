@@ -98,12 +98,12 @@ class basic_chmstreambuf : public std::basic_streambuf<CharT, Traits>
 // template basic_chmstreambuf
 //---------------------------------------------------------
 template<typename CharT, typename Traits>
-basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(reinterpret_cast<char_type*>(NULL)), output_buff(reinterpret_cast<char_type*>(NULL)), output_val_pos(reinterpret_cast<char_type*>(NULL))
+basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(static_cast<char_type*>(NULL)), output_buff(static_cast<char_type*>(NULL)), output_val_pos(static_cast<char_type*>(NULL))
 {
 }
 
 template<typename CharT, typename Traits>
-basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(reinterpret_cast<char_type*>(NULL)), output_buff(reinterpret_cast<char_type*>(NULL)), output_val_pos(reinterpret_cast<char_type*>(NULL))
+basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(static_cast<char_type*>(NULL)), output_buff(static_cast<char_type*>(NULL)), output_val_pos(static_cast<char_type*>(NULL))
 {
 	if(!pchmobj){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -116,7 +116,7 @@ basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, open_mo
 }
 
 template<typename CharT, typename Traits>
-basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, chmhash_t hash, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(hash), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(reinterpret_cast<char_type*>(NULL)), output_buff(reinterpret_cast<char_type*>(NULL)), output_val_pos(reinterpret_cast<char_type*>(NULL))
+basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, chmhash_t hash, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(hash), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(static_cast<char_type*>(NULL)), output_buff(static_cast<char_type*>(NULL)), output_val_pos(static_cast<char_type*>(NULL))
 {
 	if(!pchmobj){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -129,7 +129,7 @@ basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, chmhash
 }
 
 template<typename CharT, typename Traits>
-basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, const std::string& strkey, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(reinterpret_cast<char_type*>(NULL)), output_buff(reinterpret_cast<char_type*>(NULL)), output_val_pos(reinterpret_cast<char_type*>(NULL))
+basic_chmstreambuf<CharT, Traits>::basic_chmstreambuf(ChmCntrl* pchmobj, const std::string& strkey, open_mode opmode) : pchmcntrl(NULL), plastpkt(NULL), msgid(CHM_INVALID_MSGID), mode(opmode), init_hash(CHM_INVALID_HASHVAL), is_init_hash(false), is_init_key(false), input_buff_size(0), output_buff_size(0), input_buff(static_cast<char_type*>(NULL)), output_buff(static_cast<char_type*>(NULL)), output_val_pos(static_cast<char_type*>(NULL))
 {
 	if(!pchmobj){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -178,7 +178,7 @@ bool basic_chmstreambuf<CharT, Traits>::reset(void)
 	is_init_key		= false;
 	input_buff_size	= 0;
 	output_buff_size= 0;
-	output_val_pos	= reinterpret_cast<char_type*>(NULL);
+	output_val_pos	= static_cast<char_type*>(NULL);
 	read_timeout	= basic_chmstreambuf<CharT, Traits>::default_timeout;
 
 	CHM_Free(input_buff);
@@ -206,7 +206,7 @@ bool basic_chmstreambuf<CharT, Traits>::init(ChmCntrl* pchmobj, open_mode opmode
 	if(opmode & std::ios_base::out){
 		output_buff_size = basic_chmstreambuf<CharT, Traits>::pagesize;
 
-		if(reinterpret_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
+		if(static_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
 			ERR_CHMPRN("Could not allocate memory.");
 			reset();
 			return false;
@@ -244,7 +244,7 @@ bool basic_chmstreambuf<CharT, Traits>::init(ChmCntrl* pchmobj, chmhash_t hash, 
 	if(opmode & std::ios_base::out){
 		output_buff_size = basic_chmstreambuf<CharT, Traits>::pagesize;
 
-		if(reinterpret_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
+		if(static_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
 			ERR_CHMPRN("Could not allocate memory.");
 			reset();
 			return false;
@@ -281,7 +281,7 @@ bool basic_chmstreambuf<CharT, Traits>::init(ChmCntrl* pchmobj, const std::strin
 	if(opmode & std::ios_base::out){
 		output_buff_size = ((strkey.length() + 1/* for \0 */ + 1/* for new adding buffer */) / basic_chmstreambuf<CharT, Traits>::pagesize + 1) * basic_chmstreambuf<CharT, Traits>::pagesize;
 
-		if(reinterpret_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
+		if(static_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
 			ERR_CHMPRN("Could not allocate memory.");
 			reset();
 			return false;
@@ -324,14 +324,14 @@ bool basic_chmstreambuf<CharT, Traits>::init_output_buff(void)
 			CHM_Free(output_buff);
 
 			output_buff_size = basic_chmstreambuf<CharT, Traits>::pagesize;
-			if(reinterpret_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
+			if(static_cast<char_type*>(NULL) == (output_buff = reinterpret_cast<char_type*>(calloc(output_buff_size, sizeof(char_type))))){
 				ERR_CHMPRN("Could not allocate memory.");
 				reset();
 				return false;
 			}
 		}
 		*output_buff	= static_cast<char_type>('\0');
-		output_val_pos	= reinterpret_cast<char_type*>(NULL);
+		output_val_pos	= static_cast<char_type*>(NULL);
 
 		streambuf_type::setp(output_buff, reinterpret_cast<char_type*>(reinterpret_cast<off_type>(output_buff) + static_cast<off_type>(output_buff_size)));
 	}
@@ -476,7 +476,7 @@ bool basic_chmstreambuf<CharT, Traits>::receive_sync(void)
 	const char*	pval	= chmkvp.GetValue();
 	size_t		newsize = (pkey ? (strlen(pkey) + 1) : 1) + (pval ? (strlen(pval) + 1) : 1);
 	char_type*	newbuff;
-	if(reinterpret_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(calloc(newsize, sizeof(char_type))))){
+	if(static_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(calloc(newsize, sizeof(char_type))))){
 		ERR_CHMPRN("Could not allocate memory.");
 		CHM_Free(pComPkt);
 		CHM_Free(pbody);
@@ -539,7 +539,7 @@ int basic_chmstreambuf<CharT, Traits>::sync(void)
 		ERR_CHMPRN("This object did not initialized.");
 		return -1;
 	}
-	if(reinterpret_cast<char_type*>(NULL) == streambuf_type::pptr()){
+	if(static_cast<char_type*>(NULL) == streambuf_type::pptr()){
 		MSG_CHMPRN("There is no current put pointer.");
 		return -1;
 	}
@@ -548,7 +548,7 @@ int basic_chmstreambuf<CharT, Traits>::sync(void)
 	// If on slave chmpx and does not have default hash value and has not put key data.
 	// Thus this sync means for putting key data, and waiting value data after this sync.
 	//
-	if(pchmcntrl->IsClientOnSlvType() && !is_init_hash && reinterpret_cast<char_type*>(NULL) == output_val_pos){
+	if(pchmcntrl->IsClientOnSlvType() && !is_init_hash && static_cast<char_type*>(NULL) == output_val_pos){
 		// check key length
 		if(streambuf_type::pbase() == streambuf_type::pptr()){
 			ERR_CHMPRN("There is no key value.");
@@ -596,7 +596,7 @@ int basic_chmstreambuf<CharT, Traits>::sync(void)
 template<typename CharT, typename Traits>
 typename basic_chmstreambuf<CharT, Traits>::int_type basic_chmstreambuf<CharT, Traits>::underflow(void)
 {
-	if(reinterpret_cast<char_type*>(NULL) == streambuf_type::eback() || streambuf_type::egptr() <= streambuf_type::gptr()){
+	if(static_cast<char_type*>(NULL) == streambuf_type::eback() || streambuf_type::egptr() <= streambuf_type::gptr()){
 		// reached end of input buffer or nothing read data, so it means EOF.
 		// try to read new data.
 		if(!receive_sync()){
@@ -609,7 +609,7 @@ typename basic_chmstreambuf<CharT, Traits>::int_type basic_chmstreambuf<CharT, T
 		}
 	}
 	// Check EOF
-	if(reinterpret_cast<char_type*>(NULL) == streambuf_type::eback() || reinterpret_cast<char_type*>(NULL) == streambuf_type::egptr()){
+	if(static_cast<char_type*>(NULL) == streambuf_type::eback() || static_cast<char_type*>(NULL) == streambuf_type::egptr()){
 		return traits_type::eof();
 	}
 
@@ -625,12 +625,12 @@ typename basic_chmstreambuf<CharT, Traits>::int_type basic_chmstreambuf<CharT, T
 	}
 
 	// for value position
-	off_type	val_offset = (reinterpret_cast<char_type*>(NULL) == output_val_pos || output_val_pos < output_buff) ? static_cast<off_type>(-1) : (output_val_pos - output_buff);
+	off_type	val_offset = (static_cast<char_type*>(NULL) == output_val_pos || output_val_pos < output_buff) ? static_cast<off_type>(-1) : (output_val_pos - output_buff);
 
 	// expand buffer area
 	size_t		newsize	= output_buff_size + basic_chmstreambuf<CharT, Traits>::pagesize;
 	char_type*	newbuff;
-	if(reinterpret_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(realloc(output_buff, newsize)))){
+	if(static_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(realloc(output_buff, newsize)))){
 		ERR_CHMPRN("Could not allocate memory.");
 		return traits_type::eof();
 	}
@@ -646,7 +646,7 @@ typename basic_chmstreambuf<CharT, Traits>::int_type basic_chmstreambuf<CharT, T
 	// set internal data
 	output_buff_size	= newsize;
 	output_buff			= newbuff;
-	output_val_pos		= (static_cast<off_type>(-1) == val_offset) ? reinterpret_cast<char_type*>(NULL) : (output_buff + val_offset);
+	output_val_pos		= (static_cast<off_type>(-1) == val_offset) ? static_cast<char_type*>(NULL) : (output_buff + val_offset);
 
 	return traits_type::to_int_type(ch);
 }
@@ -698,14 +698,14 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 		// Following codes works good when it is NULL.
 		//
 		// make new current
-		char_type*	newcur		= reinterpret_cast<char_type*>(NULL);
+		char_type*	newcur		= static_cast<char_type*>(NULL);
 		off_type	newoffset	= offset;
 		if(std::ios_base::beg == bpostype){
 			newcur		= streambuf_type::pbase() + offset;
 			newoffset	-= (streambuf_type::pptr() - streambuf_type::pbase());
 		}else if(std::ios_base::end == bpostype){
 			char_type*	endpos;
-			if(reinterpret_cast<char_type*>(NULL) != output_val_pos){
+			if(static_cast<char_type*>(NULL) != output_val_pos){
 				endpos	= &output_val_pos[strlen(output_val_pos)];
 			}else{
 				endpos	= &output_buff[strlen(output_buff)];
@@ -717,7 +717,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 		}
 
 		// check key value
-		if(pchmcntrl->IsClientOnSlvType() && reinterpret_cast<char_type*>(NULL) != output_val_pos){
+		if(pchmcntrl->IsClientOnSlvType() && static_cast<char_type*>(NULL) != output_val_pos){
 			if(is_init_key){
 				// do not erase key area
 				if(newcur < output_val_pos){
@@ -727,7 +727,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 			}else{
 				if(newcur < output_val_pos){
 					// This case is seek backward to over key value separator.
-					output_val_pos = reinterpret_cast<char_type*>(NULL);
+					output_val_pos = static_cast<char_type*>(NULL);
 				}
 			}
 		}
@@ -740,7 +740,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 			// buffer overflow -> expand
 			size_t		newsize	= ((newcur - streambuf_type::pbase() + 1) / basic_chmstreambuf<CharT, Traits>::pagesize + 1) * basic_chmstreambuf<CharT, Traits>::pagesize;
 			char_type*	newbuff;
-			if(reinterpret_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(realloc(output_buff, newsize)))){
+			if(static_cast<char_type*>(NULL) == (newbuff = reinterpret_cast<char_type*>(realloc(output_buff, newsize)))){
 				ERR_CHMPRN("Could not allocate memory.");
 				return pos_type(off_type(-1));
 			}
@@ -758,7 +758,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 
 	// seekg()
 	if(opmode & std::ios_base::in){
-		if(reinterpret_cast<char_type*>(NULL) == input_buff){
+		if(static_cast<char_type*>(NULL) == input_buff){
 			// Now have not loaded yet, so try to receiving.
 			if(!receive_sync()){
 				WAN_CHMPRN("There is no receiving data, and failed to receiving, thus could not seek.");
@@ -767,7 +767,7 @@ typename basic_chmstreambuf<CharT, Traits>::pos_type basic_chmstreambuf<CharT, T
 		}
 
 		// make new current
-		char_type*	newcur		= reinterpret_cast<char_type*>(NULL);
+		char_type*	newcur		= static_cast<char_type*>(NULL);
 		off_type	newoffset	= offset;								// offset from current
 		if(std::ios_base::end == bpostype){
 			WAN_CHMPRN("Over end of receiving data, thus could not seek.");
