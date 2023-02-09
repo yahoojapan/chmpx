@@ -1,3 +1,24 @@
+chmpx (1.0.97) unstable; urgency=low
+
+  * Changed CI process flow/OSs and added Alpine OS - #119
+  * Updated header and footer in comment lines - #118
+  * Updated issue/pullrequest templates - #116
+  * Fixed a bug in test.sh - #115
+  * Added ShellCheck processing and reviewed cppcheck - #114
+  * Eliminated unnecessary copies in build_helper.sh - #113
+  * Updated docker/login-action from v1 to v2 - #112
+  * Shared Docker image build logic with other products - #111
+  * Fixed ostypevars.sh script - #110
+  * Updated github actions process and support os, and fixed bugs - #109
+  * Updated scripts for adding grep params and replacing which to command - #108
+  * Updated common build scripts - #107
+  * Updated Antpickax common scripts and tools under the buildutils directory - #106
+  * Fixed errors reported by cppcheck 2.9 - #105
+  * Fixed packaging process and files for debian/ubuntu - #104
+  * Enabled external customization of configure.ac and fixed for building - #103
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 09 Feb 2023 13:16:00 +0900
+
 chmpx (1.0.96) unstable; urgency=low
 
   * Fixed a bug that a case of registered multi-FQDNs in DNS - #101
