@@ -1,0 +1,112 @@
+#
+# CHMPX
+#
+# Copyright 2022 Yahoo Japan Corporation.
+#
+# CHMPX is inprocess data exchange by MQ with consistent hashing.
+# CHMPX is made for the purpose of the construction of
+# original messaging system and the offer of the client
+# library.
+# CHMPX transfers messages between the client and the server/
+# slave. CHMPX based servers are dispersed by consistent
+# hashing and are automatically laid out. As a result, it
+# provides a high performance, a high scalability.
+#
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Wed, 8 Feb 2023
+# REVISION:
+#
+
+#---------------------------------------------------------------
+# Local varibales as antpickax template
+#---------------------------------------------------------------
+#
+# Set variables by configure
+#
+_git_domain="@GIT_DOMAIN@"
+_organization_name="@GIT_ORG@"
+_repository_name="@GIT_REPO@"
+
+#
+# Set variables by apk_build.sh
+#
+_package_revision=%%BUILD_NUMBER%%
+_configure_option=%%CONFIGUREOPT%%
+_source_archive_url=%%SOURCE_ARCHIVE_URL%%
+
+#---------------------------------------------------------------
+# Main variables for APKBUILD
+#---------------------------------------------------------------
+# Contributor: @DEV_NAME@ <@DEV_EMAIL@>
+# Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
+
+pkgname="$_repository_name"
+pkgver=@PKG_VERSION@
+pkgrel=$_package_revision
+pkgdesc="@SHORTDESC@"
+
+url="https://chmpx.antpick.ax/"
+arch="x86_64"
+license="MIT"
+
+depends=""
+depends_dev="
+	k2hash-dev
+"
+makedepends="
+	$depends_dev
+	autoconf
+	automake
+	libtool
+	groff
+	util-linux-misc
+	musl-locales
+	procps
+	yaml-dev
+	openssl-dev
+"
+
+install=""
+subpackages="
+	$pkgname-dev
+	$pkgname-doc
+"
+
+source="$_repository_name-$pkgver.tar.gz%%SOURCE_ARCHIVE_URL%%"
+
+builddir="$srcdir/$_repository_name-$pkgver"
+
+#---------------------------------------------------------------
+# Build functions for APKBUILD
+#---------------------------------------------------------------
+prepare() {
+	default_prepare
+	# this function can be omitted if no extra steps are needed
+}
+
+unpack() {
+	default_unpack
+}
+
+build() {
+	if [ ! -f configure ]; then
+		./autogen.sh
+	fi
+	./configure --prefix=/usr $_configure_option
+	make
+}
+
+check() {
+	make check
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}
+
+# [NOTE]
+# Subsequent lines print the checksum of the source archive.
+#
