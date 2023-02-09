@@ -4184,7 +4184,7 @@ bool mqmsgheadlist_lap<T>::GetMsgidListByPid(pid_t pid, msgidlist_t& list, bool 
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PMQMSGHEADLIST does not set.");
-		return NULL;
+		return false;
 	}
 	if(basic_type::pAbsPtr->prev){
 		ToFirst();
@@ -4210,7 +4210,7 @@ bool mqmsgheadlist_lap<T>::GetMsgidListByUniqPid(msgidlist_t& list, bool is_clea
 {
 	if(!basic_type::pAbsPtr || !basic_type::pShmBase){
 		ERR_CHMPRN("PMQMSGHEADLIST does not set.");
-		return NULL;
+		return false;
 	}
 	if(basic_type::pAbsPtr->prev){
 		ToFirst();

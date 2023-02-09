@@ -133,7 +133,10 @@ bool ChmEventMq::InitializeMaxMqSystemSize(long maxmsg)
 				ERR_CHMPRN("Could not get rlimit. errno=%d", errno);
 				return false;
 			}
-			MSG_CHMPRN("NEW: hard limit = %zd, soft limit = %zd", mylimit.rlim_max, mylimit.rlim_cur);
+			// [NOTE]
+			// Depending on the OS, rlim_t type is "long long unsigned int" or "long unsigned int".
+			//
+			MSG_CHMPRN("NEW: hard limit = %" PRIuMAX ", soft limit = %" PRIuMAX, static_cast<uintmax_t>(mylimit.rlim_max), static_cast<uintmax_t>(mylimit.rlim_cur));
 
 			// check new value
 			if(mylimit.rlim_cur < (maxmsg * (sizeof(struct msg_msg*) + 8/*mqattr.mq_msgsize*/))){
