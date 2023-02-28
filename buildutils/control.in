@@ -11,8 +11,6 @@ Vcs-Browser: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
 Package: @PACKAGE_NAME@-dev
 Section: devel
 Architecture: amd64
-Conflicts: chmproxy-dev
-Replaces: chmproxy-dev
 Depends: ${misc:Depends}, @PACKAGE_NAME@ (= ${binary:Version}), k2hash-dev (>= 1.0.74), libfullock-dev (>= 1.0.36), libyaml-dev, gnutls-dev
 Description: @SHORTDESC@ (development)
  Development package for building with @PACKAGE_NAME@ shared library.
@@ -21,8 +19,6 @@ Description: @SHORTDESC@ (development)
 Package: @PACKAGE_NAME@
 Section: net
 Architecture: amd64
-Conflicts: chmproxy
-Replaces: chmproxy
 Depends: ${shlibs:Depends}, ${misc:Depends}, init-system-helpers (>= 1.14), k2hash (>= 1.0.74), libfullock (>= 1.0.36)
 Description: @SHORTDESC@
 @DEBLONGDESC@
