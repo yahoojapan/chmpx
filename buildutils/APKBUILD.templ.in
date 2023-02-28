@@ -105,6 +105,11 @@ check() {
 
 package() {
 	make DESTDIR="$pkgdir" install
+
+	#
+	# Create /var/run/antpickax directory
+	#
+	install -v -m 0777 -d "$pkgdir"/var/run/antpickax
 }
 
 # [NOTE]
