@@ -377,15 +377,21 @@ bool ChmSecureSock::SetExtValue(const char* key, const char* value)
 
 bool ChmSecureSock::LoadCACerts(gnutls_certificate_credentials_t& cert_cred)
 {
-	int	resgnutls = GNUTLS_E_SUCCESS;
+	int	resgnutls;
 
 	// set default system trusted CA certs
 	if(ChmSecureSock::GetCAPath().empty() && ChmSecureSock::GetCAFile().empty()){
-		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_system_trust(cert_cred))){
+		if(0 > (resgnutls = gnutls_certificate_set_x509_system_trust(cert_cred))){
 			if(GNUTLS_E_UNIMPLEMENTED_FEATURE == resgnutls){
 				MSG_CHMPRN("Not support gnutls_certificate_set_x509_system_trust" CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 			}else{
 				WAN_CHMPRN("Failed to load system trusted CA" CHM_GNUTLS_ERR_PRN_FORM ", but continue...", CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+			}
+		}else{
+			if(0 == resgnutls){
+				WAN_CHMPRN("No CA certification is loaded.");
+			}else{
+				MSG_CHMPRN("CA certifications(%d) are loaded.", resgnutls);
 			}
 		}
 	}else{
@@ -407,8 +413,14 @@ bool ChmSecureSock::LoadCACerts(gnutls_certificate_credentials_t& cert_cred)
 				}
 				string	certfile = ChmSecureSock::GetCAPath() + string("/") + dent->d_name;
 
-				if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_trust_file(cert_cred, certfile.c_str(), GNUTLS_X509_FMT_PEM))){
+				if(0 > (resgnutls = gnutls_certificate_set_x509_trust_file(cert_cred, certfile.c_str(), GNUTLS_X509_FMT_PEM))){
 					WAN_CHMPRN("Failed to load CA file(%s) in CA directory(%s)" CHM_GNUTLS_ERR_PRN_FORM ", but continue...", dent->d_name, ChmSecureSock::GetCAPath().c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+				}else{
+					if(0 == resgnutls){
+						WAN_CHMPRN("No CA certification is loaded from CA file(%s) in CA directory(%s).", dent->d_name, ChmSecureSock::GetCAPath().c_str());
+					}else{
+						MSG_CHMPRN("CA certifications(%d) are loaded from CA file(%s) in CA directory(%s).", resgnutls, dent->d_name, ChmSecureSock::GetCAPath().c_str());
+					}
 				}
 			}
 			if(0 != closedir(pdir)){
@@ -416,10 +428,15 @@ bool ChmSecureSock::LoadCACerts(gnutls_certificate_credentials_t& cert_cred)
 			}
 		}
 		if(!ChmSecureSock::GetCAFile().empty()){
-			if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_trust_file(cert_cred, ChmSecureSock::GetCAFile().c_str(), GNUTLS_X509_FMT_PEM))){
+			if(0 > (resgnutls = gnutls_certificate_set_x509_trust_file(cert_cred, ChmSecureSock::GetCAFile().c_str(), GNUTLS_X509_FMT_PEM))){
 				ERR_CHMPRN("Failed to load CA file(%s)" CHM_GNUTLS_ERR_PRN_FORM, ChmSecureSock::GetCAFile().c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 				return false;
 			}
+			if(0 == resgnutls){
+				ERR_CHMPRN("No CA certification is loaded from CA file(%s).", ChmSecureSock::GetCAPath().c_str());
+				return false;
+			}
+			MSG_CHMPRN("CA certifications(%d) are loaded from CA file(%s).", resgnutls, ChmSecureSock::GetCAPath().c_str());
 		}
 	}
 	return true;
@@ -567,16 +584,26 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 
 	// Load server cert
 	if(ctx->strServerPKey.empty()){
-		resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strServerCert.c_str(), GNUTLS_X509_FMT_PEM);
-	}else{
-		resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strServerCert.c_str(), ctx->strServerPKey.c_str(), GNUTLS_X509_FMT_PEM);
-	}
-	if(GNUTLS_E_SUCCESS != resgnutls){
-		ERR_CHMPRN("Failed to load server cert(cert file=%s, key file=%s)allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strServerCert.c_str(), ctx->strServerPKey.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
-		gnutls_certificate_free_credentials(cert_cred);
-		return NULL;
-	}
+		if(0 > (resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strServerCert.c_str(), GNUTLS_X509_FMT_PEM))){
+			ERR_CHMPRN("Failed to load server cert(cert file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strServerCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+		if(0 == resgnutls){
+			ERR_CHMPRN("No server cert is loaded from cert file(%s).", ctx->strServerCert.c_str());
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+		MSG_CHMPRN("Server certs(%d) are loaded from cert file(%s).", resgnutls, ctx->strServerCert.c_str());
 
+	}else{
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strServerCert.c_str(), ctx->strServerPKey.c_str(), GNUTLS_X509_FMT_PEM))){
+			ERR_CHMPRN("Failed to load server cert(cert file=%s, key file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strServerCert.c_str(), ctx->strServerPKey.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+		MSG_CHMPRN("Server cert is loaded from cert file(%s) and key file(%s).", ctx->strServerCert.c_str(), ctx->strServerPKey.c_str());
+	}
 
 	// initialize session
 	if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_init(&session, GNUTLS_SERVER | GNUTLS_NONBLOCK))){
@@ -621,12 +648,12 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 	gnutls_transport_set_int(session, sock);
 
 	// handshake
-	for(bool isLoop = true; isLoop; isLoop = (0 > resgnutls && 0 == gnutls_error_is_fatal(resgnutls))){
-		if(0 > (resgnutls = gnutls_handshake(session))){
+	for(bool isLoop = true; isLoop; isLoop = (GNUTLS_E_SUCCESS != resgnutls && 0 == gnutls_error_is_fatal(resgnutls))){
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_handshake(session))){
 			WAN_CHMPRN("Failed to handshake on server session" CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 		}
 	}
-	if(0 > resgnutls){
+	if(GNUTLS_E_SUCCESS != resgnutls){
 		ERR_CHMPRN("Fatal failed to handshake on server session" CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 		gnutls_deinit(session);
 		gnutls_certificate_free_credentials(cert_cred);
@@ -673,14 +700,25 @@ ChmSSSession ChmSecureSock::ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt,
 	// Load slave cert
 	if(ChmSecureSock::is_verify_peer && !ctx->strSlaveCert.empty()){
 		if(ctx->strSlavePKey.empty()){
-			resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strSlaveCert.c_str(), GNUTLS_X509_FMT_PEM);
+			if(0 > (resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strSlaveCert.c_str(), GNUTLS_X509_FMT_PEM))){
+				ERR_CHMPRN("Failed to load slave cert(cert file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strSlaveCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+				gnutls_certificate_free_credentials(cert_cred);
+				return NULL;
+			}
+			if(0 == resgnutls){
+				ERR_CHMPRN("No slave cert is loaded from cert file(%s).", ctx->strSlaveCert.c_str());
+				gnutls_certificate_free_credentials(cert_cred);
+				return NULL;
+			}
+			MSG_CHMPRN("Server certs(%d) are loaded from cert file(%s).", resgnutls, ctx->strSlaveCert.c_str());
+
 		}else{
-			resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strSlaveCert.c_str(), ctx->strSlavePKey.c_str(), GNUTLS_X509_FMT_PEM);
-		}
-		if(GNUTLS_E_SUCCESS != resgnutls){
-			ERR_CHMPRN("Failed to load slave cert(cert file=%s, key file=%s)allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strSlaveCert.c_str(), ctx->strSlavePKey.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
-			gnutls_certificate_free_credentials(cert_cred);
-			return NULL;
+			if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strSlaveCert.c_str(), ctx->strSlavePKey.c_str(), GNUTLS_X509_FMT_PEM))){
+				ERR_CHMPRN("Failed to load slave cert(cert file=%s, key file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strSlaveCert.c_str(), ctx->strSlavePKey.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+				gnutls_certificate_free_credentials(cert_cred);
+				return NULL;
+			}
+			MSG_CHMPRN("Slave cert is loaded from cert file(%s) and key file(%s).", ctx->strSlaveCert.c_str(), ctx->strSlavePKey.c_str());
 		}
 	}else if(ChmSecureSock::is_verify_peer && ctx->strSlaveCert.empty()){
 		ERR_CHMPRN("Slave cert file path is empty even though verify peer is true");
@@ -725,12 +763,12 @@ ChmSSSession ChmSecureSock::ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt,
 	gnutls_transport_set_int(session, sock);
 
 	// handshake
-	for(bool isLoop = true; isLoop; isLoop = (0 > resgnutls && 0 == gnutls_error_is_fatal(resgnutls))){
-		if(0 > (resgnutls = gnutls_handshake(session))){
+	for(bool isLoop = true; isLoop; isLoop = (GNUTLS_E_SUCCESS != resgnutls && 0 == gnutls_error_is_fatal(resgnutls))){
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_handshake(session))){
 			WAN_CHMPRN("Failed to handshake on slave session" CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 		}
 	}
-	if(0 > resgnutls){
+	if(GNUTLS_E_SUCCESS != resgnutls){
 		ERR_CHMPRN("Fatal failed to handshake on slave session" CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 		gnutls_deinit(session);
 		gnutls_certificate_free_credentials(cert_cred);
