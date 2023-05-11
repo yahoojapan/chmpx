@@ -1,3 +1,9 @@
+chmpx (1.0.99) unstable; urgency=low
+
+  * Fixed bugs about connecting with SSL by gnuTLS - #123
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 11 May 2023 16:32:27 +0900
+
 chmpx (1.0.98) unstable; urgency=low
 
   * Updated building/packaging logic for ALPINE - #121
