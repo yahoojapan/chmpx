@@ -410,7 +410,7 @@ wait_process_up()
 	if [ -z "$2" ]; then
 		echo "The second argument is empty."
 		return 1
-	elif echo "$1" | grep -q '[^0-9]'; then
+	elif echo "$2" | grep -q '[^0-9]'; then
 		echo "The second argument($2) must be number."
 		return 1
 	fi
