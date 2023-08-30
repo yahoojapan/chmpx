@@ -87,8 +87,8 @@ elif [ "${CI_DOCKER_IMAGE_OSTYPE}" = "alpine" ]; then
 	PKGMGR_INSTALL_OPT="add -q --no-progress --no-cache"
 	PKGMGR_UNINSTALL_OPT="del -q --purge --no-progress --no-cache"
 	PKG_INSTALL_CURL="curl"
-	PKG_INSTALL_BASE="chmpx"
-	PKG_INSTALL_DEV="chmpx-dev"
+	PKG_INSTALL_BASE="chmpx bind-tools"
+	PKG_INSTALL_DEV="chmpx-dev bind-tools"
 
 elif [ "${CI_DOCKER_IMAGE_OSTYPE}" = "ubuntu" ]; then
 	PKGMGR_NAME="apt-get"
@@ -96,8 +96,8 @@ elif [ "${CI_DOCKER_IMAGE_OSTYPE}" = "ubuntu" ]; then
 	PKGMGR_INSTALL_OPT="install -qq -y"
 	PKGMGR_UNINSTALL_OPT="purge --auto-remove -q -y"
 	PKG_INSTALL_CURL="curl"
-	PKG_INSTALL_BASE="chmpx"
-	PKG_INSTALL_DEV="chmpx-dev"
+	PKG_INSTALL_BASE="chmpx dnsutils"
+	PKG_INSTALL_DEV="chmpx-dev dnsutils"
 	UPDATE_LIBPATH="ldconfig"
 
 	#
