@@ -628,9 +628,35 @@ if [ "${IS_FAILURE_STOPPING_PROCS}" -ne 0 ]; then
 	#
 	# Retry to stop
 	#
+	PRNWARN "Failed to stop all processes, retry to force stop."
 	kill -KILL "${TESTSVRPID}" "${TESTCLIENTPIDS}" "${CHMPXSLVPID}" "${CHMPXSVRPID}" >/dev/null 2>&1
 
-	PRNERR "Failed to stop all processes, but contiune..."
+	#
+	# Re-check processes
+	#
+	sleep 2
+	IS_FAILURE_STOPPING_PROCS=0
+
+	if ps -p "${TESTSVRPID}" >/dev/null 2>&1; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+	if ps -p "${CHMPXSLVPID}" >/dev/null 2>&1; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+	if ps -p "${CHMPXSVRPID}" >/dev/null 2>&1; then
+		IS_FAILURE_STOPPING_PROCS=1
+	fi
+	for _ONE_PID in ${TESTCLIENTPIDS}; do
+		if ps -p "${_ONE_PID}" >/dev/null 2>&1; then
+			IS_FAILURE_STOPPING_PROCS=1
+		fi
+	done
+
+	if [ "${IS_FAILURE_STOPPING_PROCS}" -ne 0 ]; then
+		PRNERR "Failed to stop all processes, but contiune..."
+	else
+		PRNSUCCEED "Stop all processes"
+	fi
 else
 	PRNSUCCEED "Stop all processes"
 fi
