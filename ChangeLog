@@ -1,3 +1,10 @@
+chmpx (1.0.101) unstable; urgency=low
+
+  * Updated tool scripts and support OSs - #128
+  * Fixed .gitignore to exclude APKBUILD.templ - #127
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 30 Aug 2023 19:10:54 +0900
+
 chmpx (1.0.100) unstable; urgency=low
 
   * Fixed a bug in script for systemd - #125
