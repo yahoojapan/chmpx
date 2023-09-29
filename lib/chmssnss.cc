@@ -65,6 +65,11 @@ using namespace	std;
 //
 // Symbols
 //
+// [NOTE]
+// CHM_NSS_CERT_PRIKEY_SLOT_STR is the Slot name used when the PEM module
+// is loaded and dynamically generated.
+// The existing Slot name is usually "NSS Certificate DB".
+//
 #define	CHM_NSS_ENV_CERT_DIR			"SSL_DIR"
 #define	CHM_NSS_DEFAULT_CERT_DIR		"/etc/pki/nssdb"
 #define	CHM_NSS_PKCS11_MODULE_CONF		"library=libnssckbi.so name=\"Root Certs\""				// or "library=libnssckbi.so name=trust"
@@ -721,7 +726,7 @@ bool ChmSecureSock::SetExtValue(const char* key, const char* value)
 bool ChmSecureSock::LoadCACerts(chmpk11list_t& pk11objlist)
 {
 	if(!ChmSecureSock::PEM_LoadedModule){
-		MSG_CHMPRN("CHMPX does not load PEM load module, then we could not load CA cert files(directory), but continue...");
+		DMP_CHMPRN("PEM load module is not loaded, so CA certs are not loaded dynamically and are used in NSSDB as default.");
 		return true;
 	}
 	PK11GenericObject*	pPk11Obj = NULL;
@@ -841,17 +846,23 @@ bool ChmSecureSock::MakeNickname(const char* pCertFile, string& strNickname)
 	if(CHMEMPTYSTR(pCertFile)){
 		return false;
 	}
-	if(is_file_safe_exist_ex(pCertFile, false)){
-		strNickname	= CHM_NSS_CERT_PRIKEY_SLOT_STR;
-		strNickname	+= ':';
 
-		const char*	filename = strrchr(pCertFile, '/');
-		if(!filename){
-			strNickname	+= pCertFile;
+	if(ChmSecureSock::PEM_LoadedModule){
+		if(is_file_safe_exist_ex(pCertFile, false)){
+			strNickname	= CHM_NSS_CERT_PRIKEY_SLOT_STR;
+			strNickname	+= ':';
+
+			const char*	filename = strrchr(pCertFile, '/');
+			if(!filename){
+				strNickname	+= pCertFile;
+			}else{
+				strNickname	+= ++filename;
+			}
 		}else{
-			strNickname	+= ++filename;
+			strNickname	= pCertFile;
 		}
 	}else{
+		DMP_CHMPRN("CHMPX does not load PEM load module, so do not use nickname.");
 		strNickname	= pCertFile;
 	}
 	return true;
@@ -899,6 +910,12 @@ bool ChmSecureSock::LoadCertPrivateKey(const char* pCertFile, const char* pPriva
 		return false;
 	}
 
+	// [NOTE]
+	// We will differentiate between cases where Nickname is available(PEM module is loaded)
+	// and cases where Nickname is not available.
+	// If a certificate is specified and the PEM module is present, you can dynamically create
+	// the certificate. This is mainly the case for CentOS7.
+	//
 	if(0 != strcmp(strNickName.c_str(), pCertFile)){
 		// Case: pCertFile is existed file.
 		//
@@ -932,7 +949,7 @@ bool ChmSecureSock::LoadCertPrivateKey(const char* pCertFile, const char* pPriva
 		}
 
 	}else{
-		// Case: pCertFile is nickname
+		// Case: pCertFile is CN(common name)
 		//
 		if(CHMEMPTYSTR(pPrivateKeyFile)){
 			// This case is only cert for nickname in nssdb.
@@ -951,61 +968,89 @@ bool ChmSecureSock::LoadCertPrivateKey(const char* pCertFile, const char* pPriva
 				return false;
 			}
 		}else{
-			// This case is some certs for nickname in nssdb.
-			// Then need to search cert by private key buffer as "issuer:CN" from cert list.
+			// [NOTE]
+			// Find the certificate with the target CN(in Subject) from all user certificates.
 			//
 			CERTCertList*	pCertList;
-			if(NULL == (pCertList = PK11_FindCertsFromNickname(strNickName.c_str(), NULL))){
-				ERR_CHMPRN("Failed to call PK11_FindCertsFromNickname" CHM_NSS_ERR_PRN_FORM, CHM_NSS_ERR_PRN_ARGS);
+
+			// Debug message for default slot information
+			if(chm_debug_mode >= CHMDBG_DUMP){
+				PK11SlotInfo* slot = PK11_GetInternalKeySlot();
+				if(slot){
+					DMP_CHMPRN("Found default slot : token name=\"%s\", can use=%s", PK11_GetTokenName(slot), (PK11_IsPresent(slot) ? "yes" : "no"));
+					PK11_FreeSlot(slot);
+				}else{
+					DMP_CHMPRN("Not found default slot");
+				}
+			}
+
+			// Get user cert list
+			if(NULL == (pCertList = PK11_ListCerts(PK11CertListAll, NULL))){
+				ERR_CHMPRN("Failed to call PK11_ListCerts" CHM_NSS_ERR_PRN_FORM, CHM_NSS_ERR_PRN_ARGS);
 				return false;
 			}
 
-			// search target cert
+			// Search target cert in list
 			for(CERTCertListNode* node = CERT_LIST_HEAD(pCertList); !CERT_LIST_END(node, pCertList); node = CERT_LIST_NEXT(node)){
 				CERTCertificate*	pTmpCert = node->cert;
+				char*				pTmpPos;
 				char*				pIssuer;
-				char*				pCN;
+				char*				pSubject;
+				char*				pIssuerCN;
+				char*				pSubjectCN;
+
 				if(!pTmpCert){
 					WAN_CHMPRN("The cert object in cert list is NULL, thus skip it.");
 					continue;
 				}
 
-				// get "issuer" as Ascii
+				// Get Issuer's CN (only for debug messages)
 				if(NULL == (pIssuer = CERT_NameToAscii(&(pTmpCert->issuer)))){
 					MSG_CHMPRN("The cert object's issuer string in cert list is NULL, thus skip it.");
 					continue;
 				}
+				if(NULL == (pIssuerCN = strstr(pIssuer, CHM_NSS_CN_KEY_IN_ISSUER))){
+					MSG_CHMPRN("Not found %s key in the cert object's issuer string(%s), thus skip it.", CHM_NSS_CN_KEY_IN_ISSUER, pIssuer);
+					PR_Free(pIssuer);
+					continue;
+				}
+				pIssuerCN += strlen(CHM_NSS_CN_KEY_IN_ISSUER);
 
-				// check "CN="
-				if(NULL != (pCN = strstr(pIssuer, CHM_NSS_CN_KEY_IN_ISSUER))){
-					pCN += strlen(CHM_NSS_CN_KEY_IN_ISSUER);
+				// Get Subject's CN
+				if(NULL == (pSubject = CERT_NameToAscii(&(pTmpCert->subject)))){
+					MSG_CHMPRN("The cert object's subject string in cert list is NULL, thus skip it.");
+					PR_Free(pIssuer);
+					continue;
+				}
+				if(NULL == (pSubjectCN = strstr(pSubject, CHM_NSS_CN_KEY_IN_ISSUER))){
+					MSG_CHMPRN("Not found %s key in the cert object's subject string(%s), thus skip it.", CHM_NSS_CN_KEY_IN_ISSUER, pSubject);
+					PR_Free(pIssuer);
+					PR_Free(pSubject);
+					continue;
+				}
+				pSubjectCN += strlen(CHM_NSS_CN_KEY_IN_ISSUER);
+				if(NULL != (pTmpPos = strchr(pSubjectCN, ','))){	// Cut after ','
+					*pTmpPos = '\0';
+				}
 
-					// compare CN string
-					if(0 == strncmp(pCN, pPrivateKeyFile, strlen(pPrivateKeyFile))){
-						pCN += strlen(pPrivateKeyFile);
-
-						// check end of string
-						if('\0' == pCN[0] || ',' == pCN[0]){
-							// found
-							pCert = CERT_DupCertificate(pTmpCert);
-							PR_Free(pIssuer);
-							break;
-						}else{
-							MSG_CHMPRN("The cert object's issuer:CN string in cert list is not as same as \"%s\" key, thus skip it.", pPrivateKeyFile);
-						}
-					}else{
-						MSG_CHMPRN("The cert object's issuer:CN string in cert list is not as same as \"%s\" key, thus skip it.", pPrivateKeyFile);
-					}
-				}else{
-					MSG_CHMPRN("The cert object's issuer string in cert list does not have \"%s\" key, thus skip it.", CHM_NSS_CN_KEY_IN_ISSUER);
+				// compare Subject's CN string and target name
+				if(0 == strcmp(pSubjectCN, pPrivateKeyFile)){
+					// found target cert
+					MSG_CHMPRN("Found the cert(%s) which has issuer CN(%s) and Subject CN(%s).", pPrivateKeyFile, pIssuerCN, pSubjectCN);
+					pCert = CERT_DupCertificate(pTmpCert);
+					PR_Free(pIssuer);
+					PR_Free(pSubject);
+					break;
 				}
 				PR_Free(pIssuer);
+				PR_Free(pSubject);
 			}
+
 			// free
 			CERT_DestroyCertList(pCertList);
 
 			if(!pCert){
-				ERR_CHMPRN("Could not find cert in cert list by nickname.");
+				ERR_CHMPRN("Could not find target cert in cert list.");
 				return false;
 			}
 
