@@ -1,3 +1,9 @@
+chmpx (1.0.102) unstable; urgency=low
+
+  * Changed handling certificates for NSS and updated dependencies - #130
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 29 Sep 2023 14:43:37 +0900
+
 chmpx (1.0.101) unstable; urgency=low
 
   * Updated tool scripts and support OSs - #128
