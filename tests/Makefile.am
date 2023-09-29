@@ -61,6 +61,8 @@ EXTRA_DIST =	test.sh \
 				cfg_test_slave.yaml \
 				cfg_test_json_string.data
 
+dist_bin_SCRIPTS = chmpxnssutil.sh
+
 #
 # Local variables:
 # tab-width: 4

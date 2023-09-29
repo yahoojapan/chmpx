@@ -1863,6 +1863,11 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 		if(!pImData->GetSelfSsl(ssldata)){
 			ERR_CHMPRN("Failed to get SSL structure from self chmpx, but continue...");
 		}else{
+			// For only NSS now
+			if(pImData->GetNssdbDir() && !ChmSecureSock::SetExtValue(CHM_NSS_NSSDB_DIR_KEY, pImData->GetNssdbDir())){
+				ERR_CHMPRN("Failed to set %s to ChmSecureSock class variable, but continue...", CHM_NSS_NSSDB_DIR_KEY);
+			}
+
 			// cppcheck-suppress noOperatorEq
 			// cppcheck-suppress noCopyConstructor
 			pSecureSock = new ChmSecureSock((!ssldata.is_ca_file ? ssldata.capath : NULL), (ssldata.is_ca_file ? ssldata.capath : NULL), ssldata.verify_peer);
@@ -1870,11 +1875,6 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 			// Set SSL/TLS minimum version
 			if(!ChmSecureSock::SetSslMinVersion(pImData->GetSslMinVersion())){
 				ERR_CHMPRN("Failed to set SSL/TLS minimum version to ChmSecureSock class variable, but continue...");
-			}
-
-			// For only NSS now
-			if(pImData->GetNssdbDir() && !ChmSecureSock::SetExtValue(CHM_NSS_NSSDB_DIR_KEY, pImData->GetNssdbDir())){
-				ERR_CHMPRN("Failed to set %s to ChmSecureSock class variable, but continue...", CHM_NSS_NSSDB_DIR_KEY);
 			}
 		}
 	}
