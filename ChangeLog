@@ -1,3 +1,9 @@
+chmpx (1.0.103) unstable; urgency=low
+
+  * Changed support OS (fedora and ubuntu) and updated tool - #132
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 27 Oct 2023 17:58:32 +0900
+
 chmpx (1.0.102) unstable; urgency=low
 
   * Changed handling certificates for NSS and updated dependencies - #130
