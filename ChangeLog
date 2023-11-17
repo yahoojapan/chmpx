@@ -1,3 +1,9 @@
+chmpx (1.0.104) unstable; urgency=low
+
+  * Updated build_helper.sh for fixing a bug and installing ruby - #134
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 17 Nov 2023 09:06:23 +0900
+
 chmpx (1.0.103) unstable; urgency=low
 
   * Changed support OS (fedora and ubuntu) and updated tool - #132
