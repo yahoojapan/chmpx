@@ -1,3 +1,9 @@
+chmpx (1.0.105) unstable; urgency=low
+
+  * Changed support OS and Fixed about cppcheck, etc - #136
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 11 Mar 2024 11:03:05 +0900
+
 chmpx (1.0.104) unstable; urgency=low
 
   * Updated build_helper.sh for fixing a bug and installing ruby - #134
