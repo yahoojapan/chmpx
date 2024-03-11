@@ -37,7 +37,7 @@ using namespace	std;
 //---------------------------------------------------------
 // Constructor/Destructor
 //---------------------------------------------------------
-ChmOpts::ChmOpts(int argc, char** argv, const char* strsepchars) : sepchars(CHMEMPTYSTR(strsepchars) ? OPT_PARAM_SEP : strsepchars)
+ChmOpts::ChmOpts(int argc, const char** argv, const char* strsepchars) : sepchars(CHMEMPTYSTR(strsepchars) ? OPT_PARAM_SEP : strsepchars)
 {
 	if(argv && 0 < argc){
 		Initialize(argc, argv);
@@ -51,7 +51,7 @@ ChmOpts::~ChmOpts(void)
 //---------------------------------------------------------
 // Methods
 //---------------------------------------------------------
-bool ChmOpts::Initialize(int argc, char** argv)
+bool ChmOpts::Initialize(int argc, const char** argv)
 {
 	if(!argv || 0 == argc){
 		ERR_CHMPRN("Parameters are wrong.");

@@ -128,6 +128,8 @@ bool ChmIMData::CompareChmpxNameAndCustomSeed(const CHMPXSVR& src1, const CHMPXS
 	ChmNetDb::Get()->GetHostnameList(src2.name, hostnames2, true);
 	for(strlst_t::const_iterator iter1 = hostnames1.begin(); iter1 != hostnames1.end(); ++iter1){
 		for(strlst_t::const_iterator iter2 = hostnames2.begin(); iter2 != hostnames2.end(); ++iter2){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if(0 == strcmp(iter1->c_str(), iter2->c_str())){
 				return true;
 			}
@@ -1893,6 +1895,8 @@ long ChmIMData::GetServerChmpxIdByBaseHash(chmhash_t basehash, chmpxidlist_t& ch
 		bool	found;
 		found = false;
 		for(chmpxidlist_t::const_iterator iter2 = chmpxids.begin(); iter2 != chmpxids.end(); ++iter2){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if((*iter1) == (*iter2)){
 				found = true;
 				break;

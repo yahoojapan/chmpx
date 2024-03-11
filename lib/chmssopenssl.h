@@ -37,6 +37,8 @@ typedef	SSL_CTX*					ChmSSCtx;
 //---------------------------------------------------------
 // ChmSecureSock Class for OpenSSL
 //---------------------------------------------------------
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress ctuOneDefinitionRuleViolation
 class ChmSecureSock
 {
 	protected:

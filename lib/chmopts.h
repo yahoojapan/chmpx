@@ -35,10 +35,10 @@ class ChmOpts
 		std::string	sepchars;
 
 	public:
-		explicit ChmOpts(int argc = 0, char** argv = NULL, const char* strsepchars = NULL);
+		explicit ChmOpts(int argc = 0, const char** argv = NULL, const char* strsepchars = NULL);
 		virtual ~ChmOpts();
 
-		bool Initialize(int argc, char** argv);
+		bool Initialize(int argc, const char** argv);
 		bool Get(const char* popt, std::string& param);
 		bool Get(const char* popt, strlst_t& params);
 		bool Find(const char* popt) const;

@@ -162,7 +162,7 @@ static bool SetStringBytes(string& str, size_t totallength, char ch)
 	return true;
 }
 
-inline string to_short(string& base)
+inline string to_short(const string& base)
 {
 	return base.substr(0, MINIMUM_DATA_LENGTH);
 }
@@ -385,6 +385,9 @@ static int OpenBenchFile(const string& filepath, size_t& totalsize, bool is_crea
 		// truncate & clean up
 		if(0 != ftruncate(fd, totalsize)){
 			ERR("Could not truncate file(%s) to %zu, errno = %d", filepath.c_str(), totalsize, errno);
+
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSE(fd);
 			return -1;
 		}
@@ -394,6 +397,9 @@ static int OpenBenchFile(const string& filepath, size_t& totalsize, bool is_crea
 			onewrote = min(static_cast<size_t>(sizeof(unsigned char) * 1024), (totalsize - static_cast<size_t>(wrote)));
 			if(-1 == (onewrote = pwrite(fd, szBuff, static_cast<size_t>(onewrote), static_cast<off_t>(wrote)))){
 				ERR("Failed to write initializing file(%s), errno = %d", filepath.c_str(), errno);
+
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSE(fd);
 				return -1;
 			}
@@ -802,6 +808,9 @@ static int RunChild(string cntlfile)
 	if(pexeccntl->is_exit){
 		ERR("Exit process ASSAP.");
 		munmap(pShmBase, totalsize);
+
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(cntlfd);
 		return EXIT_FAILURE;
 	}
@@ -817,6 +826,9 @@ static int RunChild(string cntlfile)
 	if(!pmycntl){
 		ERR("Could not find my procid in PCHLDCNTL.");
 		munmap(pShmBase, totalsize);
+
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(cntlfd);
 		return EXIT_FAILURE;
 	}
@@ -833,6 +845,9 @@ static int RunChild(string cntlfile)
 		ERR("Could not initialize internal object/data/etc.");
 		CHM_Delete(pCntlObj);
 		munmap(pShmBase, totalsize);
+
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSE(cntlfd);
 		return EXIT_FAILURE;
 	}
@@ -966,7 +981,7 @@ static void PrintResult(const PEXECCNTL pexeccntl, const PCHLDCNTL pchldcntl, co
 int main(int argc, char** argv)
 {
 	// parse parameters
-	ChmOpts	opts((argc - 1), &argv[1]);
+	ChmOpts	opts((argc - 1), const_cast<const char**>(&argv[1]));
 
 	// help
 	if(opts.Find("h") || opts.Find("help")){
@@ -1124,6 +1139,9 @@ int main(int argc, char** argv)
 
 	// cleanup
 	munmap(pShmBase, totalsize);
+
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress unreadVariable
 	CHM_CLOSE(cntlfd);
 	unlink(cntlfile.c_str());
 

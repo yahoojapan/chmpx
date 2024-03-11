@@ -164,7 +164,7 @@ int main(int argc, char** argv)
 		}
 	}
 
-	ChmOpts	opts((argc - 1), &argv[1]);
+	ChmOpts	opts((argc - 1), const_cast<const char**>(&argv[1]));
 
 	// help
 	if(opts.Find(OPT_HELP1) || opts.Find(OPT_HELP2)){

@@ -441,8 +441,8 @@ inline std::string CvtUpdateTimeToString(time_t updatetime)
 	long		nsec= 0;
 	ParseUpdateTime(updatetime, sec, nsec);
 
-	char		buf[128];
-	struct tm*	tm = localtime(&sec);
+	char				buf[128];
+	const struct tm*	tm = localtime(&sec);
 	strftime(buf, sizeof(buf), "%Y-%m-%d %Hh %Mm %Ss ", tm);
 
 	std::string	result = std::string(buf) + to_string(nsec / (1000 * 1000)) + std::string("ms ") + to_string((nsec / 1000) % 1000)  + std::string("us");

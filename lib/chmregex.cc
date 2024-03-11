@@ -382,6 +382,8 @@ bool IsInHostnameList(const char* target, strlst_t& hostname_list, string& found
 			}
 			// compare each host in expand host
 			for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress useStlAlgorithm
 				if((*expand_hostname_list_iter) == (*one_target_list_iter)){
 					// found!
 					foundname = *expand_hostname_list_iter;
@@ -441,6 +443,8 @@ bool IsMatchHostname(const char* target, strlst_t& regex_lst, string& foundname)
 			}
 			// compare each host in expand host
 			for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress useStlAlgorithm
 				if(0 == regexec(&regex_obj, one_target_list_iter->c_str(), 0, NULL, 0)){
 					// match!
 					foundname = (*one_target_list_iter);
