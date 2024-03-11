@@ -45,7 +45,7 @@ string str_rfcdate(time_t date)
 	if(-1 == date){
 		date = time(NULL);
 	}
-	char*	oldlocale = setlocale(LC_TIME, "C");
+	const char*	oldlocale = setlocale(LC_TIME, "C");
 
 	char	buff[128];
 	strftime(buff, sizeof(buff), "%a, %d %b %Y %T %z", gmtime(&date));
@@ -60,7 +60,7 @@ time_t rfcdate_time(const char* rfcdate)
 	if(CHMEMPTYSTR(rfcdate)){
 		return 0L;		// ...
 	}
-	char*	oldlocale = setlocale(LC_TIME, "C");
+	const char*	oldlocale = setlocale(LC_TIME, "C");
 
 	struct tm	tmdate;
 	strptime(rfcdate, "%a, %d %b %Y %T %z", &tmdate);

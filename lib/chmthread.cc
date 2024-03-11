@@ -450,6 +450,8 @@ bool ChmThread::WaitExitThread(PCHMTHWP_PARAM thread_param)
 	}
 	// check sleeping list
 	for(chmthlist_t::iterator iter = chmthsleeps.begin(); iter != chmthsleeps.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(thread_param == (*iter)){
 			chmthsleeps.erase(iter);
 			break;
@@ -457,6 +459,8 @@ bool ChmThread::WaitExitThread(PCHMTHWP_PARAM thread_param)
 	}
 	// remove from all list
 	for(chmthlist_t::iterator iter = chmthlist.begin(); iter != chmthlist.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(thread_param == (*iter)){
 			chmthlist.erase(iter);
 			break;
@@ -466,6 +470,8 @@ bool ChmThread::WaitExitThread(PCHMTHWP_PARAM thread_param)
 
 	// clear parameter
 	if(free_proc){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress knownPointerToBool
 		if(!free_proc(thread_param->common_param, thread_param->wp_param)){
 			MSG_CHMPRN("Failed to free parameter for thread, but continue...");
 		}

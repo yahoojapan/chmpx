@@ -51,31 +51,37 @@ bool UnsetChmDbgFile(void);
 //---------------------------------------------------------
 // Debugging Macros
 //---------------------------------------------------------
-#define	ChmDbgMode_STR(mode)	CHMDBG_SILENT	== mode ? "SLT" : \
-								CHMDBG_ERR		== mode ? "ERR" : \
-								CHMDBG_WARN		== mode ? "WAN" : \
-								CHMDBG_MSG		== mode ? "MSG" : \
-								CHMDBG_DUMP		== mode ? "DMP" : ""
+#define	STR_CHMDBG_SILENT	"SLT"
+#define	STR_CHMDBG_ERR		"ERR"
+#define	STR_CHMDBG_WARN		"WAN"
+#define	STR_CHMDBG_MSG		"MSG"
+#define	STR_CHMDBG_DUMP		"DMP"
 
-#define	LOW_CHMPRINT(mode, fmt, ...) \
-		fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "[CHMPX-%s] %s(%d) : " fmt "%s\n", ChmDbgMode_STR(mode), __func__, __LINE__, __VA_ARGS__);
+#define	ChmDbgMode_STR(mode)	CHMDBG_SILENT	== mode ? STR_CHMDBG_SILENT	: \
+								CHMDBG_ERR		== mode ? STR_CHMDBG_ERR	: \
+								CHMDBG_WARN		== mode ? STR_CHMDBG_WARN	: \
+								CHMDBG_MSG		== mode ? STR_CHMDBG_MSG	: \
+								CHMDBG_DUMP		== mode ? STR_CHMDBG_DUMP	: ""
 
-#define	CHMPRINT(mode, ...) \
-		if((chm_debug_mode & mode) == mode){ \
-			LOW_CHMPRINT(mode, __VA_ARGS__); \
+#define	LOW_CHMPRINT(strmode, fmt, ...) \
+		fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "[CHMPX-%s] %s(%d) : " fmt "%s\n", strmode, __func__, __LINE__, __VA_ARGS__);
+
+#define	CHMPRINT(mode, strmode, ...) \
+		if((static_cast<int>(chm_debug_mode) & static_cast<int>(mode)) == static_cast<int>(mode)){ \
+			LOW_CHMPRINT(strmode, __VA_ARGS__); \
 		}
 
-#define	SLT_CHMPRN(...)			CHMPRINT(CHMDBG_SILENT,	##__VA_ARGS__, "")	// This means nothing...
-#define	ERR_CHMPRN(...)			CHMPRINT(CHMDBG_ERR,	##__VA_ARGS__, "")
-#define	WAN_CHMPRN(...)			CHMPRINT(CHMDBG_WARN,	##__VA_ARGS__, "")
-#define	MSG_CHMPRN(...)			CHMPRINT(CHMDBG_MSG,	##__VA_ARGS__, "")
-#define	DMP_CHMPRN(...)			CHMPRINT(CHMDBG_DUMP,	##__VA_ARGS__, "")
+#define	SLT_CHMPRN(...)			CHMPRINT(CHMDBG_SILENT,	STR_CHMDBG_SILENT,	##__VA_ARGS__, "")	// This means nothing...
+#define	ERR_CHMPRN(...)			CHMPRINT(CHMDBG_ERR,	STR_CHMDBG_ERR,		##__VA_ARGS__, "")
+#define	WAN_CHMPRN(...)			CHMPRINT(CHMDBG_WARN,	STR_CHMDBG_WARN,	##__VA_ARGS__, "")
+#define	MSG_CHMPRN(...)			CHMPRINT(CHMDBG_MSG,	STR_CHMDBG_MSG,		##__VA_ARGS__, "")
+#define	DMP_CHMPRN(...)			CHMPRINT(CHMDBG_DUMP,	STR_CHMDBG_DUMP,	##__VA_ARGS__, "")
 
 //
 // If using following macro, need to specify include time.h.
 //
 #define	CLOCKTIME_CHMPRN(phead)	\
-		if((chm_debug_mode & CHMDBG_DUMP) == CHMDBG_DUMP){ \
+		if(((static_cast<int>(chm_debug_mode) & (static_cast<int>(CHMDBG_DUMP)) == (static_cast<int>(CHMDBG_DUMP)){ \
 			struct timespec	reqtime; \
 			if(-1 == clock_gettime(CLOCK_REALTIME_COARSE, &reqtime)){ \
 				fprintf((chm_dbg_fp ? chm_dbg_fp : stderr), "[CHMPX-TIME-%s] ---s ---ms ---us ---ns\n", (phead ? phead : "DBG")); \

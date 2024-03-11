@@ -140,6 +140,8 @@ static inline bool merge_chostinfolist(chostinfolist_t& baselist, const chostinf
 		bool	found;
 		found = false;
 		for(chostinfolist_t::iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if(biter->hostname == aiter->hostname){
 				found = true;
 				if(!biter->confirmed && aiter->confirmed){
@@ -162,6 +164,8 @@ static inline bool add_chostinfolist(chostinfolist_t& baselist, const string& ho
 {
 	bool	found = false;
 	for(chostinfolist_t::iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(biter->hostname == hostname){
 			found = true;
 			if(!biter->confirmed && confirmed){
@@ -283,6 +287,8 @@ bool HostnameMap::MakeHostnamesMap(const strlst_t& hostnames, bool confirmed)
 		if(plist){
 			bool	found	= false;
 			for(hpiter = existedhostlist.begin(); hpiter != existedhostlist.end(); ++hpiter){
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress useStlAlgorithm
 				if(plist == (*hpiter)){
 					found	= true;
 					break;
@@ -381,7 +387,7 @@ bool HostnameMap::GetHostnames(const char* target, chostinfolist_t& chostinfolis
 		return false;
 	}
 	// search cache
-	chostinfolist_t*	pchostinfolist = HostnameMap::FindHostnamesPtr(target);
+	const chostinfolist_t*	pchostinfolist = HostnameMap::FindHostnamesPtr(target);
 	if(pchostinfolist){
 		chostinfolist = *pchostinfolist;
 	}else{
@@ -653,13 +659,14 @@ bool NodeCtrlInfo::GetMaximumChmpxidList(chmpxidlist_t& chmpxidlist) const
 
 	strlst_t::iterator	siter;
 	strlst_t			hostnames;
-	chmpxid_t			tmpchmpxid;
 	if(HostnameMap::GetHostnames(hostname.c_str(), hostnames) && !hostnames.empty()){
 		for(siter = hostnames.begin(); siter != hostnames.end(); ++siter){
-			tmpchmpxid = MakeChmpxId(NodeCtrlInfo::groupName.c_str(), NodeCtrlInfo::chmpxidType, siter->c_str(), ctrlport, cuk.c_str(), ctlendpoints.c_str(), custom_seed.c_str());
+			chmpxid_t	tmpchmpxid = MakeChmpxId(NodeCtrlInfo::groupName.c_str(), NodeCtrlInfo::chmpxidType, siter->c_str(), ctrlport, cuk.c_str(), ctlendpoints.c_str(), custom_seed.c_str());
 			if(CHM_INVALID_CHMPXID != tmpchmpxid){
 				bool	found = false;
 				for(chmpxidlist_t::const_iterator iter = chmpxidlist.begin(); iter != chmpxidlist.end(); ++iter){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress useStlAlgorithm
 					if(*iter == tmpchmpxid){
 						found = true;
 						break;
@@ -689,6 +696,8 @@ int NodeCtrlInfo::compare(const NodeCtrlInfo& other) const
 	// compare chmpxid
 	for(chmpxidlist_t::const_iterator biter = baselist.begin(); biter != baselist.end(); ++biter){
 		for(chmpxidlist_t::const_iterator oiter = otherlist.begin(); oiter != otherlist.end(); ++oiter){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if((*biter) == (*oiter)){
 				// found
 				return 0;
@@ -727,6 +736,8 @@ bool NodeCtrlInfo::IsConfirmHostname(void) const
 		return false;
 	}
 	for(strlst_t::iterator siter = hostnames.begin(); siter != hostnames.end(); ++siter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if((*siter) == hostname){
 			// found hostname in confirm hostname list
 			return true;
@@ -1008,6 +1019,8 @@ static size_t get_chmpx_nodes_count(const nodectrllist_t& nodes, bool is_server)
 	size_t	rescnt = 0;
 	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
 		if(is_server == iter->IsServerNode()){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			++rescnt;
 		}
 	}
@@ -1066,6 +1079,8 @@ static bool find_chmpx_node_by_hostname(const nodectrllist_t& nodes, const strin
 			true);				// do not care this value, because compare does not look this.
 
 	for(nodectrllist_t::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(0 == iter->compare(node)){
 			// found
 			node = *iter;
@@ -2397,6 +2412,8 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 	ssize_t	pos			= 0;
 	if(NULL == (pTotalBuff = reinterpret_cast<char*>(malloc(totallength)))){
 		ERR("Could not allocate memory.");
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress unreadVariable
 		CHM_CLOSESOCK(sock);
 		return false;
 	}
@@ -2415,12 +2432,16 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 
 			}else if(EBADF == errno || ECONNREFUSED == errno || ENOTCONN == errno || ENOTSOCK == errno){
 				WAN("There are no received data on sock(%d), errno=%d(EBADF or ECONNREFUSED or ENOTCONN or ENOTSOCK).", sock, errno);
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSESOCK(sock);
 				CHM_Free(pTotalBuff);
 				return false;
 
 			}else{
 				WAN("Failed to receive from sock(%d), errno=%d, then closing this socket.", sock, errno);
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSESOCK(sock);
 				CHM_Free(pTotalBuff);
 				return false;
@@ -2439,6 +2460,8 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 				char*	pTmp;
 				if(NULL == (pTmp = reinterpret_cast<char*>(realloc(pTotalBuff, totallength + RECEIVE_LENGTH)))){
 					ERR("Could not allocate memory.");
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress unreadVariable
 					CHM_CLOSESOCK(sock);
 					CHM_Free(pTotalBuff);
 					return false;
@@ -2449,6 +2472,8 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 		}
 	}
 	// close sock at first
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress unreadVariable
 	CHM_CLOSESOCK(sock);
 
 	if(0 < pos && '\0' != pTotalBuff[pos - 1]){
@@ -2456,6 +2481,9 @@ static bool ReceiveControlSocket(int sock, string& strReceive)
 			char*	pTmp;
 			if(NULL == (pTmp = reinterpret_cast<char*>(realloc(pTotalBuff, static_cast<size_t>(pos + 1))))){
 				ERR("Could not allocate memory.");
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress uselessAssignmentArg
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSESOCK(sock);
 				CHM_Free(pTotalBuff);
 				return false;
@@ -2561,6 +2589,8 @@ static int OneConnectControlPort(const char* hostname, short port)
 			// connect
 			if(-1 == connect(sockfd, ptmpaddrinfo->ai_addr, ptmpaddrinfo->ai_addrlen)){
 				MSG("Failed to connect for %s:%d by errno=%d, but continue to make next addrinfo...", hostname, port, errno);
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSESOCK(sockfd);
 				continue;
 			}
@@ -2632,6 +2662,8 @@ static bool SendCommandToControlPort(const char* hostname, short ctrlport, const
 	if(!SendControlSocket(ctlsock, pCommand, is_closed)){
 		WAN("Could not send to %s:%d(sock:%d).", hostname, ctrlport, ctlsock);
 		if(!is_closed){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSESOCK(ctlsock);
 		}
 		return false;
@@ -3181,7 +3213,7 @@ static string ParseChmpxListFromDumpResult(nodectrllist_t& nodes, const string& 
 	return strInput;
 }
 
-static bool AddNodesFromDumpResult(nodectrllist_t& nodes, string& strDump)
+static bool AddNodesFromDumpResult(nodectrllist_t& nodes, const string& strDump)
 {
 	string				strParsed;
 	string::size_type	pos;
@@ -6214,7 +6246,7 @@ static bool LoopCommand(ConsoleInput& InputIF, params_t& params, bool& is_exit)
 
 		CommandList.push_back(strLine);
 	}
-	if(0 == CommandList.size()){
+	if(CommandList.empty()){
 		return true;
 	}
 
@@ -6271,16 +6303,22 @@ static bool SaveCommand(const ConsoleInput& InputIF, params_t& params)
 		for(pHistory = iter->c_str(), wrote_byte = 0, one_wrote_byte = 0L; wrote_byte < iter->length(); wrote_byte += one_wrote_byte){
 			if(-1 == (one_wrote_byte = write(fd, &pHistory[wrote_byte], (iter->length() - wrote_byte)))){
 				ERR("Failed writing history to file(%s). errno(%d)", params[0].c_str(), errno);
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress unreadVariable
 				CHM_CLOSE(fd);
 				return true;	// for continue
 			}
 		}
 		if(-1 == write(fd, "\n", 1)){
 			ERR("Failed writing history to file(%s). errno(%d)", params[0].c_str(), errno);
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress unreadVariable
 			CHM_CLOSE(fd);
 			return true;	// for continue
 		}
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress unreadVariable
 	CHM_CLOSE(fd);
 	return true;
 }
@@ -6311,6 +6349,8 @@ static bool LoadCommand(ConsoleInput& InputIF, params_t& params, bool& is_exit)
 		}
 		CommandList.push_back(CommandLine);
 	}
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress unreadVariable
 	CHM_CLOSE(fd);
 
 	// run
@@ -6812,7 +6852,7 @@ int main(int argc, char** argv)
 	}
 	// -status
 	if(opts.end() != opts.find("-status")){
-		if(0 < StartupLoopCommand.size()){
+		if(!StartupLoopCommand.empty()){
 			ERR("Option \"-run\" and \"-check\" and \"-status\" are exclusive specifications.");
 			exit(EXIT_FAILURE);
 		}
@@ -6854,7 +6894,7 @@ int main(int argc, char** argv)
 	//
 	// check conflict option
 	//
-	if(0 < StartupLoopCommand.size() && !CommandFile.empty()){
+	if(!StartupLoopCommand.empty() && !CommandFile.empty()){
 		ERR("Option \"-run\" and \"-check\" and \"-status\" are exclusive specifications.");
 		exit(EXIT_FAILURE);
 	}
@@ -6918,7 +6958,7 @@ int main(int argc, char** argv)
 			}
 			CommandFile.clear();
 
-		}else if(0 < StartupLoopCommand.size()){
+		}else if(!StartupLoopCommand.empty()){
 			// command check or status at starting
 			bool	is_exit = false;
 			if(!ConsecutiveCommands(InputIF, StartupLoopCommand, nTmpIntervalSec, 0, false, is_exit) || is_exit){
@@ -6926,7 +6966,6 @@ int main(int argc, char** argv)
 			}
 			StartupLoopCommand.clear();
 
-		// cppcheck-suppress knownConditionTrueFalse
 		}else if(IsWelcomMsg){
 			// print message
 			PRN("-------------------------------------------------------");

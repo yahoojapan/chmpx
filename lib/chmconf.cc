@@ -1236,6 +1236,8 @@ bool CHMConf::IsSsl(void) const
 	while(!fullock::flck_trylock_noshared_mutex(&CHMConf::lockval));	// LOCK
 
 	for(chmnode_cfginfos_t::const_iterator iter = pchmcfginfo->servers.begin(); iter != pchmcfginfo->servers.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(iter->is_ssl){
 			fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);		// UNLOCK
 			return true;
@@ -1288,6 +1290,8 @@ bool CHMIniConf::ReadFileContents(const string& filename, strlst_t& linelst, str
 				// found include.
 				bool	found_same_file = false;
 				for(strlst_t::const_iterator iter = allfiles.begin(); iter != allfiles.end(); ++iter){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress useStlAlgorithm
 					if(value == (*iter)){
 						found_same_file = true;
 						break;
@@ -1825,7 +1829,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			}
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_CAPATH_STR].length()){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_CAPATH_STR].length());
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, chmcfgraw.global[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_CAPATH_STR].length());
 			return false;
 		}
 		ccvals.capath = chmcfgraw.global[INICFG_CAPATH_STR];
@@ -1847,7 +1851,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SERVER_CERT_STR].length()){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].length());
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_CERT_STR].length());
 			return false;
 		}
 		ccvals.server_cert = chmcfgraw.global[INICFG_SERVER_CERT_STR];
@@ -1869,7 +1873,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].length()){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].length());
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SERVER_PRIKEY_STR].length());
 			return false;
 		}
 		ccvals.server_prikey = chmcfgraw.global[INICFG_SERVER_PRIKEY_STR];
@@ -1888,7 +1892,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SLAVE_CERT_STR].length()){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].length());
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_CERT_STR].length());
 			return false;
 		}
 		ccvals.slave_cert = chmcfgraw.global[INICFG_SLAVE_CERT_STR];
@@ -1907,7 +1911,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 			// allow any string
 		}
 		if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].length()){
-			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].length());
+			ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR].length());
 			return false;
 		}
 		ccvals.slave_prikey = chmcfgraw.global[INICFG_SLAVE_PRIKEY_STR];
@@ -1940,7 +1944,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 				return false;
 			}
 			if(CHM_MAX_PATH_LEN <= chmcfgraw.global[INICFG_NSSDB_DIR_STR].length()){
-				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].length());
+				ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_NSSDB_DIR_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].c_str(), INICFG_GLOBAL_SEC_STR, chmcfgraw.global[INICFG_NSSDB_DIR_STR].length());
 				return false;
 			}
 			chmcfginfo.nssdb_dir = chmcfgraw.global[INICFG_NSSDB_DIR_STR];
@@ -2163,7 +2167,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					}
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_CAPATH_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_CAPATH_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_CAPATH_STR].length());
 					return false;
 				}
 				svrnode.capath = (*iter)[INICFG_CAPATH_STR].c_str();
@@ -2187,7 +2191,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SERVER_CERT_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, (*iter)[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_CERT_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_CERT_STR, (*iter)[INICFG_SERVER_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_CERT_STR].length());
 					return false;
 				}
 				svrnode.server_cert = (*iter)[INICFG_SERVER_CERT_STR].c_str();
@@ -2212,7 +2216,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SERVER_PRIKEY_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SERVER_PRIKEY_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SERVER_PRIKEY_STR].length());
 					return false;
 				}
 				svrnode.server_prikey = (*iter)[INICFG_SERVER_PRIKEY_STR].c_str();
@@ -2242,7 +2246,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_CERT_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
 					return false;
 				}
 				svrnode.slave_cert = (*iter)[INICFG_SLAVE_CERT_STR].c_str();
@@ -2264,7 +2268,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_PRIKEY_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_GLOBAL_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
 					return false;
 				}
 				svrnode.slave_prikey = (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str();
@@ -2486,7 +2490,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					}
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_CAPATH_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_CAPATH_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_CAPATH_STR, (*iter)[INICFG_CAPATH_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_CAPATH_STR].length());
 					return false;
 				}
 				slvnode.capath = (*iter)[INICFG_CAPATH_STR].c_str();
@@ -2515,7 +2519,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// allow any string
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_CERT_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_CERT_STR, (*iter)[INICFG_SLAVE_CERT_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_CERT_STR].length());
 					return false;
 				}
 				slvnode.slave_cert = (*iter)[INICFG_SLAVE_CERT_STR].c_str();
@@ -2544,7 +2548,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					// check private key in ssl class.
 				}
 				if(CHM_MAX_PATH_LEN <= (*iter)[INICFG_SLAVE_PRIKEY_STR].length()){
-					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zd) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
+					ERR_CHMPRN("configuration file(%s) have \"%s\" value(%s) in %s section, but it is length(%zu) is over max length(1024).", cfgfile.c_str(), INICFG_SLAVE_PRIKEY_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str(), INICFG_SLVNODE_SEC_STR, (*iter)[INICFG_SLAVE_PRIKEY_STR].length());
 					return false;
 				}
 				slvnode.slave_prikey = (*iter)[INICFG_SLAVE_PRIKEY_STR].c_str();

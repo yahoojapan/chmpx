@@ -36,6 +36,8 @@ typedef	struct chm_gnutls_ss_context*		ChmSSCtx;						// this type is opaque
 //---------------------------------------------------------
 // ChmSecureSock Class for OpenSSL
 //---------------------------------------------------------
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress ctuOneDefinitionRuleViolation
 class ChmSecureSock
 {
 	protected:

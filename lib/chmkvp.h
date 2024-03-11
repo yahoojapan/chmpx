@@ -78,7 +78,7 @@ class ChmKVPair
 
 	public:
 		explicit ChmKVPair(unsigned char* bykey = NULL, size_t keylen = 0L, unsigned char* byval = NULL, size_t vallen = 0L, bool is_duplicate = false);
-		ChmKVPair(ChmBinData* pKey, ChmBinData* pValue, bool is_duplicate = false);
+		ChmKVPair(const ChmBinData* pKey, const ChmBinData* pValue, bool is_duplicate = false);
 		ChmKVPair(PCHMKVP pkvp, bool is_duplicate);
 		virtual ~ChmKVPair();
 

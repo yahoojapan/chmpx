@@ -562,7 +562,7 @@ bool ChmEventSock::RawSend(int sock, ChmSSSession ssl, PCOMPKT pComPkt, bool& is
 		ERR_CHMPRN("Length(%zu) in PCOMPKT is wrong.", length);
 		return false;
 	}
-	unsigned char*	pbydata = reinterpret_cast<unsigned char*>(pComPkt);
+	const unsigned char*	pbydata = reinterpret_cast<unsigned char*>(pComPkt);
 
 	// send
 	return ChmEventSock::RawSend(sock, ssl, pbydata, length, is_closed, is_blocking, retrycnt, waittime);
@@ -1430,8 +1430,8 @@ PCOMPKT ChmEventSock::DuplicateComPkt(PCOMPKT pComPkt)
 
 	// copy after compkt
 	if(sizeof(COMPKT) < pComPkt->length){
-		unsigned char*	psrc	= reinterpret_cast<unsigned char*>(pComPkt) + sizeof(COMPKT);
-		unsigned char*	pdest	= reinterpret_cast<unsigned char*>(pDupPkt) + sizeof(COMPKT);
+		const unsigned char*	psrc	= reinterpret_cast<unsigned char*>(pComPkt) + sizeof(COMPKT);
+		unsigned char*			pdest	= reinterpret_cast<unsigned char*>(pDupPkt) + sizeof(COMPKT);
 		memcpy(pdest, psrc, (pComPkt->length - sizeof(COMPKT)));
 	}
 	return pDupPkt;
@@ -1647,6 +1647,8 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 
 		while(!fullock::flck_trylock_noshared_mutex(&(pThis->mergeidmap_lockval)));	// LOCK
 		for(mergeidmap_t::const_iterator iter = pThis->mergeidmap.begin(); iter != pThis->mergeidmap.end(); ++iter){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if(!IS_PXCOM_REQ_UPDATE_RESULT(iter->second)){
 				is_all_finish = false;
 				break;
@@ -2524,6 +2526,8 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 
 			// try to lock existed socket
 			for(socklist_t::const_iterator iter = socklist.begin(); iter != socklist.end(); ++iter){
+				// cppcheck-suppress unmatchedSuppression
+				// cppcheck-suppress useStlAlgorithm
 				if(TryLockSendSock(*iter)){												// try to lock socket
 					// Succeed to lock socket!
 					sock = *iter;
@@ -2547,6 +2551,8 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 						}
 						if(TryLockSendSock(*iter)){										// try to lock socket
 							// get locked sock status.
+							// cppcheck-suppress unmatchedSuppression
+							// cppcheck-suppress constVariablePointer
 							const PCHMSSSTAT	pssstat = sendlockmap.get(*iter);
 							if(pssstat && (pssstat->last_time + sock_pool_timeout) < nowtime){
 								// timeouted socket.
@@ -3611,7 +3617,7 @@ bool ChmEventSock::ConnectServer(chmpxid_t chmpxid, int& sock, bool without_set_
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// [NOTE]
 	// This method checks only existing socket to chmpxid. Do not check lock
@@ -5565,6 +5571,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 			if(cmdarray.empty()){
 				MSG_CHMPRN("%s command does not have parameter, so use default value(dir=all, dev=all, count=all trace count).", strCommand.c_str());
 			}else{
+				// cppcheck-suppress unmatchedSuppression
 				// cppcheck-suppress knownConditionTrueFalse
 				for(string strTmp = ""; !cmdarray.empty(); cmdarray.pop_front()){
 					strTmp = cmdarray.front();
@@ -5913,13 +5920,13 @@ bool ChmEventSock::MergeDone(void)
 
 bool ChmEventSock::IsAutoMerge(void)
 {
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 	return pImData->IsAutoMerge();
 }
 
 bool ChmEventSock::IsDoMerge(void)
 {
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 	return pImData->IsDoMerge();
 }
 
@@ -6464,7 +6471,7 @@ bool ChmEventSock::RequestMergeSuspend(string* pstring)
 			*pstring = CTL_RES_ERROR_COULD_NOT_SUSPEND;
 		}
 		return false;
-	}else if(startup_servicein){
+	}else{
 		startup_servicein = false;
 	}
 
@@ -7094,9 +7101,9 @@ bool ChmEventSock::CtlComDump(string& strResponse)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	stringstream		sstream;
 
-	stringstream	sstream;
 	pImData->Dump(sstream);
 	strResponse = sstream.str();
 
@@ -7911,7 +7918,9 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 			// old version
 			comver = pComHead->version;
 
-			PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress constVariablePointer
+			const PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
 
 			name.clear();
 			from_chmpxid= pConinitReq->chmpxid;
@@ -9792,7 +9801,7 @@ bool ChmEventSock::PxComReceiveMergeSuspend(PCOMHEAD pComHead, PPXCOM_ALL pComAl
 				if(!pImData->SuspendAutoMerge()){
 					WAN_CHMPRN("Could not change auto merging flag to suspend.");
 					pResMergeSuspend->head.result = CHMPX_COM_RES_ERROR;
-				}else if(startup_servicein){
+				}else{
 					startup_servicein = false;
 				}
 			}
@@ -10548,7 +10557,7 @@ bool ChmEventSock::PxComReceiveResUpdateData(const PCOMHEAD pComHead, PPXCOM_ALL
 		ERR_CHMPRN("Received CHMPX_COM_RES_UPDATEDATA command is something wrong.");
 		return false;
 	}
-	unsigned char*	pdata = CHM_OFFSET(pResUpdateData, pResUpdateData->pdata_offset, unsigned char*);
+	const unsigned char*	pdata = CHM_OFFSET(pResUpdateData, pResUpdateData->pdata_offset, unsigned char*);
 
 	// transfer client
 	return pChmCntrl->MergeSetUpdateData(pResUpdateData->length, pdata, &(pResUpdateData->ts));

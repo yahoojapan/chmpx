@@ -455,6 +455,7 @@ ChmSSCtx ChmSecureSock::MakeSSLContext(const char* server_cert, const char* serv
 		ERR_CHMPRN("Could not make SSL Context.");
 		return NULL;
 	}
+
 	// Restrict the protocol according to the setting.
 	if(!ChmSecureSock::SetMinVersion(ctx)){
 		ERR_CHMPRN("Setting of minimum SSL/TLS version failed.");

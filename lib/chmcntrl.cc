@@ -142,6 +142,8 @@ ChmEventBase* ChmCntrl::FindEventBaseObj(int fd)
 
 	ChmEventBase*	pEvObj = NULL;
 	for(evobj_map_t::const_iterator iter = evobjmap.begin(); iter != evobjmap.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if((iter->second)->IsEventQueueFd(fd)){
 			pEvObj = iter->second;
 			break;
@@ -158,6 +160,8 @@ bool ChmCntrl::GetEventBaseObjType(const ChmEventBase* pEvObj, EVOBJTYPE& type)
 
 	bool	result = false;
 	for(evobj_map_t::const_iterator iter = evobjmap.begin(); iter != evobjmap.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if(iter->second == pEvObj){
 			type = CVT_EVMAP_TO_EVOBJTYPE(iter->first);
 			result = true;
@@ -510,7 +514,6 @@ bool ChmCntrl::EventLoop(void)
 				if(0L == ImData.GetUpServerCount()){
 					// Check any server up
 					if(pEventSock->InitialAllServerStatus()){
-						// cppcheck-suppress knownConditionTrueFalse
 						if(0L < ImData.GetUpServerCount()){
 							// Try to connect servers
 							//MSG_CHMPRN("Try to connect servers on RING(mode is SLAVE).");
@@ -531,7 +534,6 @@ bool ChmCntrl::EventLoop(void)
 						// [NOTE]
 						// This case is that there are no other server node up.
 						if(pEventSock->InitialAllServerStatus()){
-							// cppcheck-suppress knownConditionTrueFalse
 							if(1L < ImData.GetUpServerCount()){
 								// Try to connect servers
 								//MSG_CHMPRN("Try to connect servers on RING(mode is SERVER).");
@@ -642,7 +644,7 @@ bool ChmCntrl::Processing(PCOMPKT pComPkt, EVOBJTYPE call_ev_type)
 	}else if(COM_C2PX == pComPkt->head.type || COM_PX2C == pComPkt->head.type){
 		// Input from MQ, so processing do on MQ
 		//
-		PPXCLT_ALL pCltAll = CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
+		const PPXCLT_ALL pCltAll = CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
 		if(IS_PXCLT_TYPE(pCltAll, CHMPX_CLT_JOIN_NOTIFY)){
 			// CHMPX_CLT_JOIN_NOTIFY type is processing by ChmEventSock.
 			pProcessObj = GetEventBaseObj(EVOBJ_TYPE_EVSOCK);
