@@ -562,7 +562,7 @@ static bool StatusWait(ChmCntrl* pchmobj, chmpxsts_t targetsts, time_t timeout)
 int main(int argc, char** argv)
 {
 	// parse parameters
-	ChmOpts	opts((argc - 1), &argv[1]);
+	ChmOpts	opts((argc - 1), const_cast<const char**>(&argv[1]));
 
 	// help
 	if(opts.Find("h") || opts.Find("help")){

@@ -425,7 +425,7 @@ msgid_t ChmEventMq::ComposeSerialMsgid(const msgid_t msgid, const serial_t seria
 	if(IsEmpty()){
 		return CHM_INVALID_MSGID;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	return COMPOSE64(static_cast<msgid_t>(serial | (is_ack ? (ack_success ? MQ_ACK_SUCCESS : MQ_ACK_FAILURE) : 0L)), (msgid - pImData->GetBaseMsgId()));
 }
@@ -438,7 +438,7 @@ bool ChmEventMq::DecomposeSerialMsgid(const msgid_t msgid, COMPOSEDMSGID& compos
 	if(CHM_INVALID_MSGID == msgid){
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	serial_t	tmp		= (static_cast<serial_t>(msgid) & MASK64_HIBIT) >> 32;
 	composed.msgid		= pImData->GetBaseMsgId() + (msgid & MASK64_LOWBIT);
@@ -2068,6 +2068,9 @@ bool ChmEventMq::PxCltReceiveMergeGetLastTime(PCOMHEAD pComHead, PPXCLT_ALL pClt
 	struct timespec	updatets = {0, 0};
 	if(mlastfunc){
 		chmpx_h	handle = reinterpret_cast<chmpx_h>(pChmCntrl);
+
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress knownPointerToBool
 		if(!mlastfunc(handle, &updatets)){
 			ERR_CHMPRN("Failed to get lastest update time, but continue with zero value for merging.");
 			INIT_TIMESPEC(&updatets);
@@ -2291,9 +2294,7 @@ bool ChmEventMq::PxCltReceiveRequestUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCl
 	// stack merge parameter
 	while(!fullock::flck_trylock_noshared_mutex(&mparam_list_lockval));	// LOCK
 	merge_param_list.push_back(pUpdateDataParam);
-	if(!notify_merge_update){
-		notify_merge_update = true;
-	}
+	notify_merge_update = true;											// Force to set
 	fullock::flck_unlock_noshared_mutex(&mparam_list_lockval);			// UNLOCK
 
 	// run thread
@@ -2412,7 +2413,7 @@ bool ChmEventMq::PxCltReceiveResponseUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pC
 		ERR_CHMPRN("Received CHMPX_CLT_RES_UPDATEDATA is wrong.");
 		return false;
 	}
-	unsigned char*	pbindata = CHM_ABS(pResUpdateData, pResUpdateData->byptr, unsigned char*);
+	const unsigned char*	pbindata = CHM_ABS(pResUpdateData, pResUpdateData->byptr, unsigned char*);
 
 	// transfer
 	return pChmCntrl->MergeResponseUpdateData(pResUpdateData->chmpxid, pResUpdateData->length, pbindata, &(pResUpdateData->ts));
@@ -2519,6 +2520,8 @@ bool ChmEventMq::PxCltReceiveSetUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll
 	unsigned char*	pbindata = CHM_ABS(pSetUpdateData, pSetUpdateData->byptr, unsigned char*);
 
 	// run callback function
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress knownPointerToBool
 	return msetfunc(reinterpret_cast<chmpx_h>(pChmCntrl), pSetUpdateData->length, pbindata, &(pSetUpdateData->ts));
 }
 

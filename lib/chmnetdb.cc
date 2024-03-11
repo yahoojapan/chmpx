@@ -56,6 +56,8 @@ static void AddUniqueStringToList(const string& str, strlst_t& list, bool is_cle
 		return;
 	}
 	for(strlst_t::const_iterator iter = list.begin(); iter != list.end(); ++iter){
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress useStlAlgorithm
 		if((*iter) == str){
 			// already has same string.
 			return;
@@ -75,6 +77,8 @@ static void AddUniqueStringListToList(const strlst_t& addlist, strlst_t& list, b
 		}
 		bool	found = false;
 		for(strlst_t::const_iterator iter2 = list.begin(); iter2 != list.end(); ++iter2){
+			// cppcheck-suppress unmatchedSuppression
+			// cppcheck-suppress useStlAlgorithm
 			if((*iter1) == (*iter2)){
 				found = true;
 				break;

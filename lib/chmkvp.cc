@@ -214,9 +214,9 @@ bool ChmBinData::Put(unsigned char* bydata, bool is_cvt_hton) const
 		return false;
 	}
 
-	size_t			datapos	= sizeof(size_t);
-	size_t			tmplen	= (is_cvt_hton ? htobe64(length) : length);
-	unsigned char*	bylen	= reinterpret_cast<unsigned char*>(&tmplen);
+	size_t					datapos	= sizeof(size_t);
+	size_t					tmplen	= (is_cvt_hton ? htobe64(length) : length);
+	const unsigned char*	bylen	= reinterpret_cast<unsigned char*>(&tmplen);
 
 	for(size_t cnt = 0; cnt < datapos; ++cnt){
 		// cppcheck-suppress objectIndex
@@ -271,7 +271,7 @@ ChmKVPair::ChmKVPair(unsigned char* bykey, size_t keylen, unsigned char* byval, 
 {
 }
 
-ChmKVPair::ChmKVPair(ChmBinData* pKey, ChmBinData* pValue, bool is_duplicate)
+ChmKVPair::ChmKVPair(const ChmBinData* pKey, const ChmBinData* pValue, bool is_duplicate)
 {
 	if(pKey){
 		Set(*pKey, true, is_duplicate);
