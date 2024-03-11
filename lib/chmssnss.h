@@ -47,6 +47,8 @@ typedef std::list<PK11GenericObject*>			chmpk11list_t;
 //---------------------------------------------------------
 // ChmSecureSock Class for OpenSSL
 //---------------------------------------------------------
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress ctuOneDefinitionRuleViolation
 class ChmSecureSock
 {
 	protected:

@@ -66,7 +66,7 @@ struct merge_map
 	typedef typename std::map<T1, T2>					merge_map_t;
 	typedef typename std::map<T1, T2>::const_iterator	merge_map_iterator;
 
-	merge_map(merge_map_t& map1, merge_map_t& map2)
+	merge_map(merge_map_t& map1, const merge_map_t& map2)
 	{
 		for(merge_map_iterator iter = map2.begin(); iter != map2.end(); ++iter){
 			map1[iter->first] = iter->second;
@@ -203,7 +203,7 @@ template<typename T> inline void FIN_MATE_TIMESPEC(T* ptr)
 	SUB_TIMESPEC(&ts, ptr);
 	COPY_TIMESPEC(ptr, &ts);
 }
-template<typename T> inline void FIN_MATE_TIMESPEC2(T* start, T* fin, T* elapsed)
+template<typename T> inline void FIN_MATE_TIMESPEC2(const T* start, T* fin, T* elapsed)
 {
 	if(!RT_TIMESPEC(fin)){
 		INIT_TIMESPEC(fin);

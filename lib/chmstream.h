@@ -80,8 +80,8 @@ class basic_chmstreambuf : public std::basic_streambuf<CharT, Traits>
 		bool receive_sync(void);
 
 	public:
-		basic_chmstreambuf(open_mode opmode = std::ios_base::in | std::ios_base::out);							// Do not call this
-		basic_chmstreambuf(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::in | std::ios_base::out);
+		explicit basic_chmstreambuf(open_mode opmode = std::ios_base::in | std::ios_base::out);							// Do not call this
+		explicit basic_chmstreambuf(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::in | std::ios_base::out);
 		basic_chmstreambuf(ChmCntrl* pchmobj, chmhash_t hash, open_mode opmode = std::ios_base::in | std::ios_base::out);
 		basic_chmstreambuf(ChmCntrl* pchmobj, const std::string& strkey, open_mode opmode = std::ios_base::in | std::ios_base::out);
 		virtual ~basic_chmstreambuf();
@@ -818,10 +818,10 @@ class basic_ichmstream : public std::basic_istream<CharT, Traits>
 		chmstreambuf_type	chmstreambuf;
 
 	protected:
-		basic_ichmstream(open_mode opmode = std::ios_base::in) : istream_type(), chmstreambuf(opmode | std::ios_base::in) { ios_type::init(&chmstreambuf); }
+		explicit basic_ichmstream(open_mode opmode = std::ios_base::in) : istream_type(), chmstreambuf(opmode | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 
 	public:
-		basic_ichmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::in) : istream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::in) { ios_type::init(&chmstreambuf); }
+		explicit basic_ichmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::in) : istream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 		~basic_ichmstream() { }
 
 		chmstreambuf_type* rdbuf() const { return const_cast<chmstreambuf_type*>(&chmstreambuf); }
@@ -850,10 +850,10 @@ class basic_ochmstream : public std::basic_ostream<CharT, Traits>
 		chmstreambuf_type	chmstreambuf;
 
 	protected:
-		basic_ochmstream(open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
+		explicit basic_ochmstream(open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
 
 	public:
-		basic_ochmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
+		explicit basic_ochmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
 		basic_ochmstream(ChmCntrl* pchmobj, chmhash_t hash, open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(pchmobj, hash, opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
 		basic_ochmstream(ChmCntrl* pchmobj, const std::string& strkey, open_mode opmode = std::ios_base::out) : ostream_type(), chmstreambuf(pchmobj, strkey, opmode | std::ios_base::out) { ios_type::init(&chmstreambuf); }
 		~basic_ochmstream() { }
@@ -884,10 +884,10 @@ class basic_chmstream : public std::basic_iostream<CharT, Traits>
 		chmstreambuf_type	chmstreambuf;
 
 	protected:
-		basic_chmstream(open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
+		explicit basic_chmstream(open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 
 	public:
-		basic_chmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
+		explicit basic_chmstream(ChmCntrl* pchmobj, open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(pchmobj, opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 		basic_chmstream(ChmCntrl* pchmobj, chmhash_t hash, open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(pchmobj, hash, opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 		basic_chmstream(ChmCntrl* pchmobj, const std::string& strkey, open_mode opmode = std::ios_base::out | std::ios_base::in) : iostream_type(), chmstreambuf(pchmobj, strkey, opmode | std::ios_base::out | std::ios_base::in) { ios_type::init(&chmstreambuf); }
 		~basic_chmstream() { }

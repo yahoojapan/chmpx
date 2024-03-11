@@ -45,7 +45,7 @@ using namespace std;
 //---------------------------------------------------------
 // Parse parameters
 //
-static void Help(char* progname)
+static void Help(const char* progname)
 {
 	printf("Usage: %s [options]\n", progname ? progname : "program");
 	printf("Option  -conf [file name]       Configuration file( .ini / .json / .yaml ) path\n");
@@ -281,11 +281,11 @@ void print_initial_datas(void)
 //---------------------------------------------------------
 int main(int argc, char** argv)
 {
-	ChmOpts	opts((argc - 1), &argv[1]);
+	ChmOpts	opts((argc - 1), const_cast<const char**>(&argv[1]));
 
 	// help
 	if(opts.Find("h") || opts.Find("help")){
-		char*	pprgname = basename(argv[0]);
+		const char*	pprgname = basename(argv[0]);
 		Help(pprgname);
 		exit(EXIT_SUCCESS);
 	}

@@ -578,7 +578,7 @@ static bool TestSlaveSide(ChmCntrl& chmobj)
 // -d [debug level]  "ERR" / "WAN" / "INF" / "DUMP"
 // -h                display help
 //
-static void Help(char* progname)
+static void Help(const char* progname)
 {
 	printf("Usage: %s [options]\n", progname ? progname : "program");
 	printf("Option  -s|-c                   Specify server side or slave side process.\n");
@@ -593,12 +593,12 @@ static void Help(char* progname)
 //---------------------------------------------------------
 int main(int argc, char** argv)
 {
-	ChmOpts		opts((argc - 1), &argv[1]);
+	ChmOpts		opts((argc - 1), const_cast<const char**>(&argv[1]));
 	ChmCntrl	chmobj;
 
 	// help
 	if(opts.Find("h") || opts.Find("help")){
-		char*	pprgname = basename(argv[0]);
+		const char*	pprgname = basename(argv[0]);
 		Help(pprgname);
 		exit(EXIT_SUCCESS);
 	}
