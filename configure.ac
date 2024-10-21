@@ -146,6 +146,7 @@ AS_IF([test "$PKG_CONFIG" = "no"], [AC_MSG_ERROR(You have to install pkg-config 
 # Option for SSL/TLS libraries
 #
 ssl_lib=openssl
+is_openssl3=no
 
 AC_MSG_CHECKING([for SSL/TLS library option with GnuTLS])
 AC_ARG_WITH(gnutls,
@@ -194,6 +195,30 @@ case "${ssl_lib}" in
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssopenssl.h")
 		AC_SUBST([CONFIGUREWITHOPT], "--with-openssl")
 		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
+
+		#
+		# Check openssl 3
+		#
+		AC_MSG_CHECKING([openssl 3.0 or later])
+		AC_COMPILE_IFELSE([
+			AC_LANG_PROGRAM([[
+				#include <openssl/opensslv.h>
+				#if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x30000000L
+				#error "found openssl is 3.0 or later(so compiling is stopped with error)"
+				#endif
+			]], [[]])],
+			[AC_MSG_RESULT(no)],
+			[AC_MSG_RESULT(yes); is_openssl3=yes])
+
+		#
+		# Depends TLS library for packaging
+		#
+		AC_SUBST([DEB_DEPS_TLS_PKG],     "libssl3")
+		AC_SUBST([DEB_DEPS_TLS_DEV_PKG], "libssl-dev")
+		AC_SUBST([RPM_DEPS_TLS_PKG],     "openssl-libs")
+		AC_SUBST([RPM_DEPS_TLS_DEV_PKG], "openssl-devel")
+		AC_SUBST([ALP_DEPS_TLS_DEV_PKG], "openssl-dev")
+
 		;;
 	nss)
 		AC_MSG_RESULT(NSS)
@@ -203,6 +228,13 @@ case "${ssl_lib}" in
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssnss.h")
 		AC_SUBST([CONFIGUREWITHOPT], "--with-nss")
 		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
+
+		#
+		# Depends TLS library for packaging
+		#
+		AC_SUBST([RPM_DEPS_TLS_PKG],     "nss")
+		AC_SUBST([RPM_DEPS_TLS_DEV_PKG], "nss-devel")
+
 		;;
 	gnutls)
 		AC_MSG_RESULT(gnutls)
@@ -212,6 +244,13 @@ case "${ssl_lib}" in
 		AC_SUBST([SSL_TLS_LIB_CHEADER], "chmssgnutls.h")
 		AC_SUBST([CONFIGUREWITHOPT], "--with-gnutls")
 		AM_SUBST_NOTMAKE([CONFIGUREWITHOPT])
+
+		#
+		# Depends TLS library for packaging
+		#
+		AC_SUBST([DEB_DEPS_TLS_PKG],     "libgnutls30")
+		AC_SUBST([DEB_DEPS_TLS_DEV_PKG], "gnutls-dev")
+
 		;;
 	*)
 		AC_MSG_ERROR([unknown SSL/TLS library type.])
@@ -221,6 +260,13 @@ esac
 AM_CONDITIONAL([SSL_TLS_LIB_OPENSSL],	[test "$ssl_lib" = openssl])
 AM_CONDITIONAL([SSL_TLS_LIB_NSS],		[test "$ssl_lib" = nss])
 AM_CONDITIONAL([SSL_TLS_LIB_GNUTLS],	[test "$ssl_lib" = gnutls])
+AM_CONDITIONAL([IS_OPENSSL3],			[test "$is_openssl3" = yes])
+
+#
+# Version list for Libraries
+#
+AC_SUBST([LIB_MINVER_LIBK2HASH], "1.0.97")
+AC_SUBST([LIB_MINVER_LIBFULLOCK], "1.0.61")
 
 #
 # Check for k2hash + libfullock
@@ -235,8 +281,8 @@ AC_ARG_ENABLE(check-depend-libs,
 	esac]
 )
 AS_IF([test ${check_depend_libs} = 1], [AC_MSG_RESULT(yes)], [AC_MSG_RESULT(no)])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.93], [], [AC_MSG_ERROR(not found k2hash package)])])
-AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.59], [], [AC_MSG_ERROR(not found libfullock package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([k2hash], [libk2hash >= 1.0.97], [], [AC_MSG_ERROR(not found k2hash package)])])
+AS_IF([test ${check_depend_libs} = 1], [PKG_CHECK_MODULES([fullock], [libfullock >= 1.0.61], [], [AC_MSG_ERROR(not found libfullock package)])])
 
 #
 # CFLAGS/CXXFLAGS

@@ -2658,8 +2658,7 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 	}
 
 	// check & build packet
-	PCOMPKT	pPacked = pComPkt;
-	bool	is_pack = false;
+	PCOMPKT	pPacked = NULL;
 	if(pbody && 0L < blength){
 		if(NULL == (pPacked = reinterpret_cast<PCOMPKT>(malloc(sizeof(COMPKT) + blength)))){
 			// cppcheck-suppress invalidPrintfArgType_sint
@@ -2672,25 +2671,21 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 
 		unsigned char*	pdest = reinterpret_cast<unsigned char*>(pPacked) + sizeof(COMPKT);
 		memcpy(pdest, pbody, blength);
-
-		is_pack = true;
 	}
 	// for stat
-	size_t	stat_length = pPacked->length;
+	size_t	stat_length = (pPacked ? pPacked->length : pComPkt->length);
 
 	// get socket
 	int	sock = CHM_INVALID_SOCK;
 	if(!GetLockedSendSock(pComPkt->head.term_ids.chmpxid, sock, true) || CHM_INVALID_SOCK == sock){		// LOCK SOCKET
 		WAN_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ") sock.", pComPkt->head.term_ids.chmpxid);
-		if(is_pack){
-			CHM_Free(pPacked);
-		}
+		CHM_Free(pPacked);
 		return false;
 	}
 
 	// send
 	bool	is_closed = false;
-	if(!ChmEventSock::RawSend(sock, GetSSL(sock), pPacked, is_closed, false, sock_retry_count, sock_wait_time)){
+	if(!ChmEventSock::RawSend(sock, GetSSL(sock), (pPacked ? pPacked : pComPkt), is_closed, false, sock_retry_count, sock_wait_time)){
 		ERR_CHMPRN("Failed to send COMPKT to sock(%d).", sock);
 		UnlockSendSock(sock);			// UNLOCK SOCKET
 		if(is_closed){
@@ -2698,9 +2693,7 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 				ERR_CHMPRN("Failed to closing socket(%d), but continue...", sock);
 			}
 		}
-		if(is_pack){
-			CHM_Free(pPacked);
-		}
+		CHM_Free(pPacked);
 		return false;
 	}
 	UnlockSendSock(sock);				// UNLOCK SOCKET
@@ -2719,9 +2712,7 @@ bool ChmEventSock::Send(PCOMPKT pComPkt, const unsigned char* pbody, size_t blen
 		}
 	}
 
-	if(is_pack){
-		CHM_Free(pPacked);
-	}
+	CHM_Free(pPacked);
 	return true;
 }
 
