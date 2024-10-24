@@ -498,7 +498,7 @@ class NodeCtrlInfo
 
 	public:
 		static CHMPXID_SEED_TYPE GetType(void) { return chmpxidType; }
-		static string GetGroup(void) { return groupName; }
+		static const string& GetGroup(void) { return groupName; }
 		static bool SetType(const char* ptype);
 		static void SetType(CHMPXID_SEED_TYPE type);
 		static bool SetGroup(const char* group);
@@ -514,11 +514,11 @@ class NodeCtrlInfo
 		bool Set(const char* target, short port, const char* pcuk = NULL, const char* pendpoints = NULL, const char* pseed = NULL, bool is_server_mode = false);
 
 		chmpxid_t GetChmpxId(void) const { return chmpxid; }
-		string GetHostname(void) const { return hostname; }
+		const string& GetHostname(void) const { return hostname; }
 		short GetCtrlport(void) const { return ctrlport; }
-		string GetCuk(void) const { return cuk; }
-		string GetCtlendpoints(void) const { return ctlendpoints; }
-		string GetCusomSeed(void) const { return custom_seed; }
+		const string& GetCuk(void) const { return cuk; }
+		const string& GetCtlendpoints(void) const { return ctlendpoints; }
+		const string& GetCusomSeed(void) const { return custom_seed; }
 		bool IsServerNode(void) const { return is_server; }
 		bool IsSlaveNode(void) const { return !is_server; }
 
@@ -2948,7 +2948,7 @@ static bool SendDumpCommandByAutoThreads(dumpnodereslist_t& nodes)
 
 	// create thread parameters
 	volatile bool	is_run	= false;
-	PTHPARAM		pthparam= new THPARAM[0 == nThreadCount ? 1 : nThreadCount];	// [NOTE] If no thread mode, we make one param.
+	PTHPARAM		pthparam= new THPARAM[(0 >= nThreadCount ? 1 : nThreadCount)];	// [NOTE] If no thread mode, we make one param.
 	int				pos		= 0;
 	for(dumpnodereslist_t::iterator iter = nodes.begin(); iter != nodes.end(); ++iter){
 		pthparam[pos].presults.push_back(&(*iter));									// set node structure "pointer"
@@ -6265,7 +6265,7 @@ static bool LoopCommand(ConsoleInput& InputIF, params_t& params, bool& is_exit)
 //
 // This command could not be specified in command line, this must be in script.
 //
-static bool LoopCmdCommand(params_t& params)
+static bool LoopCmdCommand(const params_t& params)
 {
 	PRN("ERROR: \"loopcmd\" must be specified in command file. This command could not be specified in command line.");
 	return true;

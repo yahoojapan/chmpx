@@ -52,7 +52,9 @@ url="https://chmpx.antpick.ax/"
 arch="x86_64"
 license="MIT"
 
-depends=""
+depends="
+	k2hash
+"
 depends_dev="
 	k2hash-dev
 "
@@ -66,7 +68,7 @@ makedepends="
 	musl-locales
 	procps
 	yaml-dev
-	openssl-dev
+	@ALP_DEPS_TLS_DEV_PKG@
 "
 
 install=""
@@ -107,9 +109,11 @@ package() {
 	make DESTDIR="$pkgdir" install
 
 	#
-	# Create /var/run/antpickax directory
+	# Install helper files
 	#
-	install -v -m 0777 -d "$pkgdir"/var/run/antpickax
+	install -Dm 0555 buildutils/chmpx-service-helper        "$pkgdir"/usr/libexec/chmpx-service-helper
+	install -Dm 0444 buildutils/chmpx-service-helper.conf   "$pkgdir"/etc/antpickax/chmpx-service-helper.conf
+	install -Dm 0444 buildutils/chmpx.ini.example           "$pkgdir"/etc/antpickax/chmpx.ini.example
 }
 
 # [NOTE]

@@ -58,12 +58,8 @@ License: @PKGLICENSE@
 @RPMPKG_GROUP@
 URL: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@
 Source0: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@/archive/%{gittag}/%{name}-%{version}.tar.gz
-Requires: k2hash%{?_isa} >= 1.0.93, libfullock%{?_isa} >= 1.0.59, nss-tools
-%if 0%{?rhel} == 6
-BuildRequires: git-core gcc-c++ make libtool k2hash-devel >= 1.0.93, libfullock-devel >= 1.0.59, libyaml-devel, nss-devel
-%else
-BuildRequires: systemd git-core gcc-c++ make libtool k2hash-devel >= 1.0.93, libfullock-devel >= 1.0.59, libyaml-devel, nss-devel
-%endif
+Requires: k2hash%{?_isa} >= @LIB_MINVER_LIBK2HASH@, libfullock%{?_isa} >= @LIB_MINVER_LIBFULLOCK@, libyaml, @RPM_DEPS_TLS_PKG@
+BuildRequires: systemd git-core gcc-c++ make libtool k2hash-devel >= @LIB_MINVER_LIBK2HASH@, libfullock-devel >= @LIB_MINVER_LIBFULLOCK@, libyaml-devel, @RPM_DEPS_TLS_DEV_PKG@
 
 %description
 @LONGDESC@
@@ -85,8 +81,6 @@ install -D -m 755 buildutils/chmpx-service-helper %{buildroot}/usr/libexec/chmpx
 install -D -m 644 buildutils/chmpx-service-helper.conf %{buildroot}/etc/antpickax/chmpx-service-helper.conf
 install -D -m 644 buildutils/chmpx.ini.example %{buildroot}/etc/antpickax/chmpx.ini.example
 %endif
-mkdir -p %{buildroot}/var/lib/antpickax
-mkdir -p %{buildroot}/var/run/antpickax
 
 %if %{make_check}
 %check
@@ -121,8 +115,6 @@ rm -rf %{buildroot}
 /usr/libexec/chmpx-service-helper
 /etc/antpickax/*
 %endif
-%dir %attr(0777,root,root) /var/lib/antpickax
-%dir %attr(0777,root,root) /var/run/antpickax
 
 %if 0%{?rhel} != 6
 %preun
@@ -134,7 +126,7 @@ rm -rf %{buildroot}
 #
 %package devel
 Summary: @SHORTDESC@ (development)
-Requires: %{name}%{?_isa} = %{version}-%{release}, k2hash-devel%{?_isa} >= 1.0.93, libfullock-devel%{?_isa} >= 1.0.59, libyaml-devel, nss-devel
+Requires: %{name}%{?_isa} = %{version}-%{release}, k2hash-devel%{?_isa} >= @LIB_MINVER_LIBK2HASH@, libfullock-devel%{?_isa} >= @LIB_MINVER_LIBFULLOCK@, libyaml-devel, @RPM_DEPS_TLS_DEV_PKG@
 
 %description devel
 Development package for building with @PACKAGE_NAME@ shared library.
