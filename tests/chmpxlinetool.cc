@@ -6904,6 +6904,14 @@ int main(int argc, char** argv)
 	// Initialize map
 	HostnameMap::Initialize();
 
+	// Initialize ChmNetDb
+	//
+	// [NOTE]
+	// We can initialize the ChmNetDb singleton by calling ChmNetDb::Get().
+	// Initialization allows to configure INET6(Ipv6) in advance.
+	//
+	ChmNetDb::Get();
+
 	//----------------------
 	// initialize nodes information
 	//----------------------

@@ -2302,10 +2302,13 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 		for(strlst_t::const_iterator svrnodeiter = expand_svrnodes.begin(); svrnodeiter != expand_svrnodes.end(); ++svrnodeiter){
 			strlst_t	nodehost_list;
 			nodehost_list.clear();
+			nodehost_list.push_back(*svrnodeiter);
+
 			if(!ChmNetDb::Get()->GetAllHostList(svrnodeiter->c_str(), nodehost_list, true)){
 				// if not found hostname/IP addresses for server node, add the original hostname
 				nodehost_list.push_back(*svrnodeiter);
 			}
+
 			// set first hostname
 			svrnode.name = nodehost_list.front();
 			chmcfginfo.servers.push_back(svrnode);
@@ -2316,7 +2319,7 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 				for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
 					for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
 						if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
-							MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());
+							MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());				// FOUND
 							ccvals.server_mode_by_comp	= true;
 							is_break_loop				= true;
 							break;
@@ -2325,6 +2328,12 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 					if(is_break_loop){
 						break;
 					}
+				}
+				// Set self server node name in configuration to localhostname cache.
+				if(!ChmNetDb::Get()->ReplaceFullLocalName(svrnode.name.c_str())){
+					ERR_CHMPRN("Failed to replace full local hostname(%s) in cache, but continue...", svrnode.name.c_str());
+				}else{
+					MSG_CHMPRN("Replaced full local hostname(%s) in cache.", svrnode.name.c_str());
 				}
 			}
 		}

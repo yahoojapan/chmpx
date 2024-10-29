@@ -470,7 +470,7 @@ class structure_lap
 		st_ptr_type GetAbsPtr(void) const { return pAbsPtr; }
 		st_ptr_type GetRelPtr(void) const { return CHM_REL(pShmBase, pAbsPtr, st_ptr_type); }
 
-		virtual void Reset(st_ptr_type ptr, const void* shmbase, bool is_abs = true);
+		void Reset(st_ptr_type ptr, const void* shmbase, bool is_abs = true);
 		virtual bool Initialize(void);
 		virtual bool Dump(std::stringstream& sstream, const char* spacer) const;
 		virtual bool Clear(void);
