@@ -53,6 +53,7 @@ arch="x86_64"
 license="MIT"
 
 depends="
+	procps
 	k2hash
 "
 depends_dev="
@@ -66,7 +67,6 @@ makedepends="
 	groff
 	util-linux-misc
 	musl-locales
-	procps
 	yaml-dev
 	@ALP_DEPS_TLS_DEV_PKG@
 "

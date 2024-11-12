@@ -334,6 +334,19 @@ const time_t	ChmNetDb::ALIVE_TIME;
 int				ChmNetDb::lockval = FLCK_NOSHARED_MUTEX_VAL_UNLOCKED;
 const size_t	ChmNetDb::PORT_NMATCH;
 
+// [NOTE]
+// If INET6 (IPv6) does not exist in the local host interface,
+// INET6(IPv6) name resolution will not be performed.
+//
+// When executing INET6 resolve on a HOST (Container) that does
+// not have IPv6 in its interface, it may be forced to wait
+// until a timeout occurs.
+// This occurs with ALPINE's INET6 and takes a very long time.
+// Therefore, we perform inspection from INET4 and also use a
+// flag to bypass the allocation of INET6.
+//
+bool			ChmNetDb::inet6 = true;		// default true
+
 //---------------------------------------------------------
 // Class methods
 //---------------------------------------------------------
@@ -392,7 +405,7 @@ bool ChmNetDb::GetLocalHostList(strlst_t& hostinfo, bool remove_localhost)
 	return true;
 }
 
-bool ChmNetDb::GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inetv6)
+bool ChmNetDb::GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inet6)
 {
 	if(!ppaddrinfo){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -400,18 +413,23 @@ bool ChmNetDb::GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_
 	}
 	*ppaddrinfo = NULL;
 
+	if(is_inet6 && !ChmNetDb::inet6){
+		// Not processing for INET6
+		return false;
+	}
+
 	struct addrinfo	hints;
 	int				result;
 	string			strPort = to_string(port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags		= AI_PASSIVE;
-	hints.ai_family		= is_inetv6 ? AF_INET6 : AF_INET;
+	hints.ai_family		= is_inet6 ? AF_INET6 : AF_INET;
 	hints.ai_socktype	= SOCK_STREAM;
 
 	// addrinfo
 	if(0 != (result = getaddrinfo(NULL, strPort.c_str(), &hints, ppaddrinfo)) || !(*ppaddrinfo)){
-		MSG_CHMPRN("Could not get %s addrinfo for %s, errno=%d.", (is_inetv6 ? "IN6ADDR_ANY_INIT" : "INADDR_ANY"), (is_inetv6 ? "AF_INET6" : "AF_INET"), result);
+		MSG_CHMPRN("Could not get %s addrinfo for %s, errno=%d.", (is_inet6 ? "IN6ADDR_ANY_INIT" : "INADDR_ANY"), (is_inet6 ? "AF_INET6" : "AF_INET"), result);
 		return false;
 	}
 	return true;
@@ -788,6 +806,7 @@ bool ChmNetDb::CheckHostnameInResolv(const char* hostname, bool is_default_domai
 		return false;
 	}
 	MSG_CHMPRN("Found hostname(%s) %s in resolv(DNS).", hostname, is_default_domain ? "with default domain" : "strictly");
+
 	return true;
 }
 
@@ -829,6 +848,7 @@ bool ChmNetDb::InitializeLocalHostInfo(void)
 	if(!InitializeLocalHostIpAddresses()){
 		WAN_CHMPRN("Obtaining the IP address of the local interfaces may have failed, but continue...");
 	}
+
 	if(!InitializeLocalHostnames()){
 		WAN_CHMPRN("Obtaining the local hostnames may have failed, but continue...");
 	}
@@ -839,6 +859,7 @@ bool ChmNetDb::InitializeLocalHostIpAddresses()
 {
 	struct ifaddrs*	ifaddr;
 	char			ipaddr[NI_MAXHOST];
+	bool			found_inet6 = false;
 
 	// get ip addresses on interface
 	memset(&ipaddr, 0, sizeof(ipaddr));
@@ -852,6 +873,11 @@ bool ChmNetDb::InitializeLocalHostIpAddresses()
 		if(NULL == tmp_ifaddr->ifa_addr){
 			continue;
 		}
+		if(AF_INET6 == tmp_ifaddr->ifa_addr->sa_family){
+			// found INET6(IPv6 interface)
+			found_inet6 = true;
+		}
+
 		if(AF_INET == tmp_ifaddr->ifa_addr->sa_family || AF_INET6 == tmp_ifaddr->ifa_addr->sa_family){
 			memset(ipaddr, 0, sizeof(ipaddr));
 			socklen_t	salen	= (AF_INET == tmp_ifaddr->ifa_addr->sa_family) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
@@ -892,6 +918,13 @@ bool ChmNetDb::InitializeLocalHostIpAddresses()
 	}
 	freeifaddrs(ifaddr);
 
+	// Check & set INET6 flag
+	if(found_inet6){
+		ChmNetDb::inet6 = true;
+	}else{
+		ChmNetDb::inet6 = false;
+	}
+
 	return true;
 }
 
@@ -919,6 +952,9 @@ bool ChmNetDb::InitializeLocalHostnames()
 		MSG_CHMPRN("Allowed hostname(%s) is full local hostname", buf.nodename);
 		fulllocalname = buf.nodename;
 
+		// add localnames
+		AddUniqueStringToList(fulllocalname, localnames, false);
+
 		// add cache without ip addresses
 		HostnammeAddCache(fulllocalname, string(""), true);
 	}else{
@@ -930,7 +966,7 @@ bool ChmNetDb::InitializeLocalHostnames()
 	// local hostname -> addrinfo
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags		= AI_CANONNAME;
-	hints.ai_family		= AF_UNSPEC;
+	hints.ai_family		= ChmNetDb::inet6 ? AF_UNSPEC : AF_INET;
 	hints.ai_socktype	= SOCK_STREAM;
 	if(0 != (result = getaddrinfo(buf.nodename, NULL, &hints, &res_info)) || !res_info){				// port is NULL
 		MSG_CHMPRN("Could not get addrinfo from %s, errno=%d.", buf.nodename, result);
@@ -955,7 +991,6 @@ bool ChmNetDb::InitializeLocalHostnames()
 				}else{
 					is_same_nodename = true;
 				}
-
 				if(is_same_nodename && fulllocalname.empty()){
 					MSG_CHMPRN("Found another local hostname : %s -> But not add to localnames array", hostname);
 				}else{
@@ -968,7 +1003,6 @@ bool ChmNetDb::InitializeLocalHostnames()
 					memset(&ipaddr, 0, sizeof(ipaddr));
 					if(0 == getnameinfo(tmpaddrinfo->ai_addr, tmpaddrinfo->ai_addrlen, ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST)){
 						HostnammeAddCache(string(hostname), string(ipaddr), true);
-
 						if(is_same_nodename && !fulllocalname.empty()){
 							HostnammeAddCache(fulllocalname, string(ipaddr), true);
 						}
@@ -1297,7 +1331,7 @@ bool ChmNetDb::GetHostAddressInfo(const char* target, CHMNDBCACHE& data)
 	// target -> addrinfo
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags		= AI_CANONNAME;
-	hints.ai_family		= AF_UNSPEC;
+	hints.ai_family		= ChmNetDb::inet6 ? AF_UNSPEC : AF_INET;
 	hints.ai_socktype	= SOCK_STREAM;
 	if(0 != getaddrinfo(target, NULL, &hints, &res_info) || !res_info){				// port is NULL
 		return false;
@@ -1424,7 +1458,7 @@ bool ChmNetDb::GetAddrInfoList(const char* target, short port, addrinfolist_t& i
 	struct addrinfo		hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags		= AI_CANONNAME;
-	hints.ai_family		= AF_UNSPEC;
+	hints.ai_family		= ChmNetDb::inet6 ? AF_UNSPEC : AF_INET;
 	hints.ai_socktype	= SOCK_STREAM;
 
 	// ip addresses
@@ -1482,6 +1516,34 @@ bool ChmNetDb::GetHostnameList(const char* target, strlst_t& hostnames, bool is_
 	}
 	AddUniqueStringListToList(data.hostnames, hostnames, true);
 	AddFullLocalHostname(hostnames);
+
+	return true;
+}
+
+bool ChmNetDb::ReplaceFullLocalName(const char* localneme)
+{
+	if(CHMEMPTYSTR(localneme)){
+		ERR_CHMPRN("Parameter is wrong.");
+		return false;
+	}
+	if(0 == strcmp(fulllocalname.c_str(), localneme)){
+		MSG_CHMPRN("Already set fulllocalname(%s).", localneme);
+		return true;
+	}
+
+	// overwrite fulllocalname
+	fulllocalname = localneme;
+
+	// erase same name in localnames list
+	for(strlst_t::const_iterator iter = localnames.begin(); localnames.end() != iter; ++iter){
+		if((*iter) == fulllocalname){
+			localnames.erase(iter);
+			break;
+		}
+	}
+
+	// add name to front of localnames list
+	localnames.push_front(fulllocalname);
 
 	return true;
 }

@@ -53,6 +53,7 @@ class ChmNetDb
 		static const time_t	ALIVE_TIME	= 60;	// default 60s
 		static int			lockval;			// like mutex
 		static const size_t	PORT_NMATCH	= 5;	// maximum 3 matches + 2(reserve)
+		static bool			inet6;				// inet6 is allowed
 
 		chmndbmap_t			cachemap;
 		time_t				timeout;			// 0 means no timeout
@@ -91,7 +92,7 @@ class ChmNetDb
 		static bool GetLocalHostname(std::string& hostname);
 		static bool GetLocalHostnameList(strlst_t& hostnames);
 		static bool GetLocalHostList(strlst_t& hostinfo, bool remove_localhost = false);
-		static bool GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inetv6);
+		static bool GetAnyAddrInfo(short port, struct addrinfo** ppaddrinfo, bool is_inet6);
 		static bool CvtAddrInfoToIpAddress(struct sockaddr_storage* info, socklen_t infolen, std::string& stripaddress);
 		static bool CvtSockToLocalPort(int sock, short& port);
 		static bool CvtSockToPeerPort(int sock, short& port);
@@ -109,6 +110,7 @@ class ChmNetDb
 		bool GetHostnameList(const char* target, strlst_t& hostnames, bool is_cvt_localhost);
 		bool GetIpAddressString(const char* target, std::string& ipaddress, bool is_cvt_localhost);
 		bool GetIpAddressStringList(const char* target, strlst_t& ipaddrs, bool is_cvt_localhost);
+		bool ReplaceFullLocalName(const char* localneme);
 		bool GetAllHostList(const char* target, strlst_t& expandlist, bool is_cvt_localhost);
 };
 
