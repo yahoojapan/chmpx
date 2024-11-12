@@ -1,3 +1,10 @@
+chmpx (1.0.106) unstable; urgency=low
+
+  * Improved IPv6 support and support for launch host domains - #139
+  * Changed supported OS and modified some codes - #138
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 12 Nov 2024 10:47:22 +0900
+
 chmpx (1.0.105) unstable; urgency=low
 
   * Changed support OS and Fixed about cppcheck, etc - #136
