@@ -5,8 +5,9 @@ CHMPX
 [![GitHub forks](https://img.shields.io/github/forks/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/network)
 [![GitHub stars](https://img.shields.io/github/stars/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/yahoojapan/chmpx.svg)](https://github.com/yahoojapan/chmpx/issues)
-[![debian packages](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 [![RPM packages](https://img.shields.io/badge/rpm-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
+[![debian packages](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
+[![ALPINE packages](https://img.shields.io/badge/apk-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 [![Docker image](https://img.shields.io/docker/pulls/antpickax/chmpx.svg)](https://hub.docker.com/r/antpickax/chmpx)
 [![Docker dev image](https://img.shields.io/docker/pulls/antpickax/chmpx-dev.svg)](https://hub.docker.com/r/antpickax/chmpx-dev)
 
@@ -49,6 +50,7 @@ As a result, it provides a high performance, a high scalability.
 ### Packages
   - [RPM packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
   - [Debian packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
+  - [ALPINE packages(packagecloud.io)](https://packagecloud.io/antpickax/stable)
 
 ### Docker images
   - [chmpx(Docker Hub)](https://hub.docker.com/r/antpickax/chmpx)

@@ -171,7 +171,9 @@ stop_process()
 			#
 			kill -HUP "${_ONE_PID}" > /dev/null 2>&1
 			sleep 1
-			if ! ps -p "${_ONE_PID}" >/dev/null 2>&1; then
+
+			# shellcheck disable=SC2009
+			if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_ONE_PID}$" || exit 1 && exit 0 ); then
 				break
 			fi
 
@@ -180,7 +182,9 @@ stop_process()
 			#
 			kill -KILL "${_ONE_PID}" > /dev/null 2>&1
 			sleep 1
-			if ! ps -p "${_ONE_PID}" >/dev/null 2>&1; then
+
+			# shellcheck disable=SC2009
+			if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_ONE_PID}$" || exit 1 && exit 0 ); then
 				break
 			fi
 			echo "[FAILED] kill ${_ONE_PID} process" >> "${STOP_PROC_LOGFILE}"
@@ -190,7 +194,7 @@ stop_process()
 
 		if [ "${_MAX_TRYCOUNT}" -le 0 ]; then
 			# shellcheck disable=SC2009
-			if ps -p "${_ONE_PID}" | grep -v PID | grep -q -i 'defunct'; then
+			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_ONE_PID}$" || exit 1 && exit 0 ); then
 				PRNWARN "Could not stop ${_ONE_PID} process, because it has defunct status. So assume we were able to stop it."
 			else
 				return 1
@@ -637,17 +641,24 @@ if [ "${IS_FAILURE_STOPPING_PROCS}" -ne 0 ]; then
 	sleep 2
 	IS_FAILURE_STOPPING_PROCS=0
 
-	if ps -p "${TESTSVRPID}" >/dev/null 2>&1; then
+	# shellcheck disable=SC2009
+	if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${TESTSVRPID}$" || exit 1 && exit 0 ); then
 		IS_FAILURE_STOPPING_PROCS=1
 	fi
-	if ps -p "${CHMPXSLVPID}" >/dev/null 2>&1; then
+
+	# shellcheck disable=SC2009
+	if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${CHMPXSLVPID}$" || exit 1 && exit 0 ); then
 		IS_FAILURE_STOPPING_PROCS=1
 	fi
-	if ps -p "${CHMPXSVRPID}" >/dev/null 2>&1; then
+
+	# shellcheck disable=SC2009
+	if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${CHMPXSVRPID}$" || exit 1 && exit 0 ); then
 		IS_FAILURE_STOPPING_PROCS=1
 	fi
+
 	for _ONE_PID in ${TESTCLIENTPIDS}; do
-		if ps -p "${_ONE_PID}" >/dev/null 2>&1; then
+		# shellcheck disable=SC2009
+		if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_ONE_PID}$" || exit 1 && exit 0 ); then
 			IS_FAILURE_STOPPING_PROCS=1
 		fi
 	done

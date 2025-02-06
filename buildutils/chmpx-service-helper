@@ -440,7 +440,7 @@ wait_process_up()
 				# Check process
 				#
 				# shellcheck disable=SC2009
-				if ps -p "${_WAITPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+				if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_WAITPROC_PID}$" || exit 1 && exit 0 ); then
 					#
 					# OK(single checking)
 					#
@@ -458,7 +458,7 @@ wait_process_up()
 					# Re-check process
 					#
 					# shellcheck disable=SC2009
-					if ps -p "${_WAITPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+					if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_WAITPROC_PID}$" || exit 1 && exit 0 ); then
 						#
 						# OK(double checking)
 						#
@@ -531,7 +531,7 @@ start_process()
 		if _STARTPROC_PID=$(cat "${_STARTPROC_PIDFILE}"); then
 
 			# shellcheck disable=SC2009
-			if ps -p "${_STARTPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_STARTPROC_PID}$" || exit 1 && exit 0 ); then
 				log_err "Could not start a new process because PID file(${_STARTPROC_PIDFILE}) exists and the process(${_STARTPROC_PID}) is running."
 				return 1
 			fi
@@ -572,6 +572,7 @@ start_process()
 			# shellcheck disable=SC2068
 			sudo -u "${_STARTPROC_OWNER}" $@ 2>&1 | sudo tee "${_STARTPROC_REDIRECTFILE}" >/dev/null 2>&1 &
 		fi
+		_TMP_PARENT_PROCESS_ID="$!"
 
 		# [NOTE]
 		# Detects the PID of sudo's child process because it is running a
@@ -579,8 +580,37 @@ start_process()
 		#
 		sleep 1
 
-		# shellcheck disable=SC2009
-		_STARTPROC_PROCESS_ID=$(ps --ppid $! | grep "${_STARTPROC_PROCNAME}" | grep -v sudo | awk '{print $1}')
+		#
+		# Try to find child process id
+		#
+		_STARTPROC_PROCESS_ID=""
+		while [ -z "${_STARTPROC_PROCESS_ID}" ]; do
+			#
+			# Get child process id and process name ( start "_TMP_PARENT_PROCESS_ID" as parent process id )
+			#
+			# shellcheck disable=SC2009
+			_TMP_CHILD_PROCESS_ID=$(ps -o pid,ppid,args ax | awk "\$2~/^${_TMP_PARENT_PROCESS_ID}/ { print \$1 }")
+			if [ -z "${_TMP_CHILD_PROCESS_ID}" ]; then
+				#
+				# Not found child process id
+				#
+				break
+			fi
+
+			# shellcheck disable=SC2009
+			_TMP_CHILD_PROCESS_PROC=$(ps -o pid,ppid,args ax | awk "\$2~/^${_TMP_PARENT_PROCESS_ID}/ { print \$3 }")
+			if ! ( echo "${_TMP_CHILD_PROCESS_PROC}" | grep -q -i 'sudo' || exit 1 && exit 0 ); then
+				#
+				# Found not "sudo" child process -> break
+				#
+				_STARTPROC_PROCESS_ID="${_TMP_CHILD_PROCESS_ID}"
+			else
+				#
+				# Found "sudo" child process -> continue to loop
+				#
+				_TMP_PARENT_PROCESS_ID="${_TMP_CHILD_PROCESS_ID}"
+			fi
+		done
 	else
 		if [ -n "${_STARTPROC_REDIRECTFILE}" ] && [ "${_STARTPROC_REDIRECTFILE}" = "NO" ]; then
 			# shellcheck disable=SC2068
@@ -608,7 +638,7 @@ start_process()
 	# Check process running
 	#
 	# shellcheck disable=SC2009
-	if ! ps -p "${_STARTPROC_PROCESS_ID}" | grep -v PID | grep -q -v -i 'defunct'; then
+	if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_STARTPROC_PROCESS_ID}$" || exit 1 && exit 0 ); then
 		log_err "Could not start a new process, it was launched but exited soon."
 		return 1
 	fi
@@ -675,7 +705,7 @@ stop_process()
 		# Check process
 		#
 		# shellcheck disable=SC2009
-		if ! ps -p "${_STOPPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+		if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_STOPPROC_PID}$" || exit 1 && exit 0 ); then
 			echo "Stopped PID(${_STOPPROC_PID}) process."
 			rm -f "${_STOPPROC_PID_FILE}"
 			return 0
@@ -693,7 +723,7 @@ stop_process()
 		# Check process
 		#
 		# shellcheck disable=SC2009
-		if ! ps -p "${_STOPPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+		if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_STOPPROC_PID}$" || exit 1 && exit 0 ); then
 			echo "Stopped PID(${_STOPPROC_PID}) process."
 			rm -f "${_STOPPROC_PID_FILE}"
 			return 0
@@ -712,7 +742,7 @@ stop_process()
 		# Check process
 		#
 		# shellcheck disable=SC2009
-		if ! ps -p "${_STOPPROC_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+		if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_STOPPROC_PID}$" || exit 1 && exit 0 ); then
 			echo "Stopped PID(${_STOPPROC_PID}) process."
 			rm -f "${_STOPPROC_PID_FILE}"
 			return 0
@@ -1112,7 +1142,7 @@ if [ "${SCRIPT_MODE}" = "STOP" ]; then
 	# Check old process
 	#
 	# shellcheck disable=SC2009
-	if ! ps -p "${OLD_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+	if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_PROCESS_PID}$" || exit 1 && exit 0 ); then
 		log_info "PID(${OLD_PROCESS_PID}) process is not exusted, then the process has stopped."
 		rm -f "${PIDDIR}/${SERVICE_PIDFILE}"
 		exit 0
@@ -1138,7 +1168,7 @@ if [ "${SCRIPT_MODE}" = "STOP" ]; then
 		# Check process running
 		#
 		# shellcheck disable=SC2009
-		if ! ps -p "${OLD_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+		if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_PROCESS_PID}$" || exit 1 && exit 0 ); then
 			#
 			# Stopped
 			#
@@ -1158,7 +1188,7 @@ if [ "${SCRIPT_MODE}" = "STOP" ]; then
 		sleep "${INTERVAL_SEC_FOR_LOOP}"
 
 		# shellcheck disable=SC2009
-		if ps -p "${OLD_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+		if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_PROCESS_PID}$" || exit 1 && exit 0 ); then
 			log_err "Could not stop PID(${OLD_PROCESS_PID}) process."
 			exit 1
 		fi
@@ -1176,8 +1206,9 @@ else
 	if [ -f "${PIDDIR}/${SERVICE_PIDFILE}" ]; then
 		OLD_PROCESS_PID=$(tr -d '\n' < "${PIDDIR}/${SERVICE_PIDFILE}")
 		if [ $$ -ne "${OLD_PROCESS_PID}" ]; then
+
 			# shellcheck disable=SC2009
-			if ps -p "${OLD_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_PROCESS_PID}$" || exit 1 && exit 0 ); then
 				log_err "Process PID(${OLD_PROCESS_PID}) has not stopped yet."
 				exit 1
 			fi
