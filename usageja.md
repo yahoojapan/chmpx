@@ -52,7 +52,7 @@ CHMPXをビルドした後で、動作確認をしてみます。
 **CHMPX** のパッケージは、Debianパッケージ、RPMパッケージの形式で公開しています。  
 お使いのOSによりインストール方法が異なりますので、以下の手順を確認してインストールしてください。  
 
-##### 最近のDebianベースLinuxの利用者は、以下の手順に従ってください。
+##### DebianベースLinuxの利用者は、以下の手順に従ってください。
 ```
 $ sudo apt-get update -y
 $ sudo apt-get install curl -y
@@ -64,7 +64,7 @@ $ sudo apt-get install chmpx
 $ sudo apt-get install chmpx-dev
 ```
 
-##### Fedoraの利用者は、以下の手順に従ってください。
+##### RPMベースのLinuxの場合は、以下の手順に従ってください。
 ```
 $ sudo dnf makecache
 $ sudo dnf install curl -y
@@ -76,16 +76,16 @@ $ sudo dnf install chmpx
 $ sudo dnf install chmpx-devel
 ```
 
-##### その他最近のRPMベースのLinuxの場合は、以下の手順に従ってください。
+##### ALPINEベースのLinuxの場合は、以下の手順に従ってください。
 ```
-$ sudo yum makecache
-$ sudo yum install curl -y
-$ curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.rpm.sh | sudo bash
-$ sudo yum install chmpx
+# apk update
+# apk add curl
+# curl -s https://packagecloud.io/install/repositories/antpickax/stable/script.alpine.sh | sh
+# apk add chmpx
 ```
 開発者向けパッケージをインストールする場合は、以下のパッケージをインストールしてください。
 ```
-$ sudo yum install chmpx-devel
+# apk add chmpx-dev
 ```
 
 ##### 上記以外のOS
