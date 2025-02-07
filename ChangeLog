@@ -1,3 +1,9 @@
+chmpx (1.0.108) unstable; urgency=low
+
+  * Fixed a bug in tests/test.sh - #144
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 07 Feb 2025 10:07:02 +0900
+
 chmpx (1.0.107) unstable; urgency=low
 
   * Changed support OSes and Fixed scripts, etc - #141
