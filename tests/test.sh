@@ -195,9 +195,9 @@ stop_process()
 		if [ "${_MAX_TRYCOUNT}" -le 0 ]; then
 			# shellcheck disable=SC2009
 			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${_ONE_PID}$" || exit 1 && exit 0 ); then
-				PRNWARN "Could not stop ${_ONE_PID} process, because it has defunct status. So assume we were able to stop it."
-			else
 				return 1
+			else
+				PRNWARN "Could not stop ${_ONE_PID} process, because it has maybe defunct status. So assume we were able to stop it."
 			fi
 		fi
 	done
