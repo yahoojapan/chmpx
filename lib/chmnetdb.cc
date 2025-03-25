@@ -1520,19 +1520,19 @@ bool ChmNetDb::GetHostnameList(const char* target, strlst_t& hostnames, bool is_
 	return true;
 }
 
-bool ChmNetDb::ReplaceFullLocalName(const char* localneme)
+bool ChmNetDb::ReplaceFullLocalName(const char* localname)
 {
-	if(CHMEMPTYSTR(localneme)){
+	if(CHMEMPTYSTR(localname)){
 		ERR_CHMPRN("Parameter is wrong.");
 		return false;
 	}
-	if(0 == strcmp(fulllocalname.c_str(), localneme)){
-		MSG_CHMPRN("Already set fulllocalname(%s).", localneme);
+	if(0 == strcmp(fulllocalname.c_str(), localname)){
+		MSG_CHMPRN("Already set fulllocalname(%s).", localname);
 		return true;
 	}
 
 	// overwrite fulllocalname
-	fulllocalname = localneme;
+	fulllocalname = localname;
 
 	// erase same name in localnames list
 	for(strlst_t::const_iterator iter = localnames.begin(); localnames.end() != iter; ++iter){
