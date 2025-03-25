@@ -281,7 +281,7 @@ class ChmIMData
 
 		// Others
 		CHMPXID_SEED_TYPE GetChmpxSeedType(void) const;
-		bool IsAllowHost(const char* hostname);
+		bool IsAllowHost(const char* hostname, std::string& normalizedname);
 		bool IsAllowHostStrictly(const char* hostname, short ctlport, const char* cuk, std::string& normalizedname, PCHMPXSSL pssl);
 };
 

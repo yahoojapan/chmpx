@@ -4277,13 +4277,18 @@ bool ChmEventSock::Accept(int sock)
 	// [NOTE]
 	// Check only hostname(IP address), then check strictly after accepting.
 	//
-	if(!pImData->IsAllowHost(strhostname.c_str())){
+	std::string	strNormalizeName;
+	if(!pImData->IsAllowHost(strhostname.c_str(), strNormalizeName)){
 		// Not allow accessing from slave.
-		ERR_CHMPRN("Denied %s(sock:%d) by not allowed.", strhostname.c_str(), newsock);
+		ERR_CHMPRN("Denied %s - %s(sock:%d) by not allowed.", strhostname.c_str(), strNormalizeName.c_str(), newsock);
 		if(!NotifyHup(newsock)){
 			ERR_CHMPRN("Failed to closing \"accepting socket\" for %s, but continue...", strhostname.c_str());
 		}
 		return false;
+	}
+	if(strhostname != strNormalizeName){
+		// overwrite
+		acceptingmap.set(newsock, strNormalizeName);
 	}
 
 	// Set nonblock
@@ -4404,9 +4409,10 @@ bool ChmEventSock::AcceptCtlport(int ctlsock)
 	// [NOTE]
 	// Check only hostname(IP address), then check strictly after accepting.
 	//
-	if(!pImData->IsAllowHost(strhostname.c_str())){
+	std::string	strNormalizeName;
+	if(!pImData->IsAllowHost(strhostname.c_str(), strNormalizeName)){
 		// Not allow accessing from slave.
-		ERR_CHMPRN("Denied %s(ctlsock:%d) by not allowed.", strhostname.c_str(), newctlsock);
+		ERR_CHMPRN("Denied %s - %s(ctlsock:%d) by not allowed.", strhostname.c_str(), strNormalizeName.c_str(), newctlsock);
 		if(!NotifyHup(newctlsock)){
 			ERR_CHMPRN("Failed to closing \"from control socket\" for chmpxid(0x%016" PRIx64 "), but continue...", CHM_INVALID_CHMPXID);
 		}

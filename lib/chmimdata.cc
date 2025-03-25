@@ -2874,7 +2874,7 @@ CHMPXID_SEED_TYPE ChmIMData::GetChmpxSeedType(void) const
 	return tmpchminfo.GetChmpxSeedType();
 }
 
-bool ChmIMData::IsAllowHost(const char* hostname)
+bool ChmIMData::IsAllowHost(const char* hostname, std::string& normalizedname)
 {
 	if(CHMEMPTYSTR(hostname)){
 		ERR_CHMPRN("Parameter is wrong.");
@@ -2901,9 +2901,16 @@ bool ChmIMData::IsAllowHost(const char* hostname)
 	}
 
 	// check name in configuration server/slave list.(from configuration)
-	if(pConfObj->CheckContainsNodeInfoList(hostname, NULL, NULL, true)){		// with update configuration
+	strlst_t	normnames;
+	if(pConfObj->CheckContainsNodeInfoList(hostname, NULL, &normnames, true)){		// with update configuration
 		// allowed
-		MSG_CHMPRN("Hostname(%s) is found in server/slave list from configuration.", hostname);
+		if(!normnames.empty()){
+			normalizedname = normnames.front();
+		}else{
+			normalizedname = hostname;
+		}
+		MSG_CHMPRN("Hostname(%s -> %s) is found in server/slave list from configuration.", hostname, normalizedname.c_str());
+
 		return true;
 	}
 	return false;

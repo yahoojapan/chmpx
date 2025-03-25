@@ -110,7 +110,7 @@ class ChmNetDb
 		bool GetHostnameList(const char* target, strlst_t& hostnames, bool is_cvt_localhost);
 		bool GetIpAddressString(const char* target, std::string& ipaddress, bool is_cvt_localhost);
 		bool GetIpAddressStringList(const char* target, strlst_t& ipaddrs, bool is_cvt_localhost);
-		bool ReplaceFullLocalName(const char* localneme);
+		bool ReplaceFullLocalName(const char* localname);
 		bool GetAllHostList(const char* target, strlst_t& expandlist, bool is_cvt_localhost);
 };
 

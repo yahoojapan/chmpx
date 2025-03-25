@@ -764,7 +764,7 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 					pnodeinfos->push_back(*iter);
 				}
 				if(pnormnames){
-					pnormnames->push_back(normalizedname);
+					pnormnames->push_front(normalizedname);
 				}
 				if(!pnodeinfos && !pnormnames){
 					// not need to wait for loop end, because not need to make info list.
@@ -780,7 +780,7 @@ bool CHMConf::RawCheckContainsNodeInfoList(const char* hostname, const short* pc
 						pnodeinfos->push_back(*iter);
 					}
 					if(pnormnames){
-						pnormnames->push_back(normalizedname);
+						pnormnames->push_front(normalizedname);
 					}
 					// if strict checking, break by found one node
 					fullock::flck_unlock_noshared_mutex(&CHMConf::lockval);	// UNLOCK
@@ -830,7 +830,7 @@ bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t
 				pnodeinfos->push_back(tmpinfo);
 			}
 			if(pnormnames){
-				pnormnames->push_back(normalizedname);
+				pnormnames->push_front(normalizedname);
 			}
 			if(!pnodeinfos && !pnormnames){
 				MSG_CHMPRN("Hostname(%s) is found in self-server without reverse peer to globalname(%s).", hostname, normalizedname.c_str());
@@ -848,7 +848,7 @@ bool CHMConf::CheckContainsNodeInfoList(const char* hostname, chmnode_cfginfos_t
 				pnodeinfos->push_back(tmpinfo);
 			}
 			if(pnormnames){
-				pnormnames->push_back(normalizedname);
+				pnormnames->push_front(normalizedname);
 			}
 			if(!pnodeinfos && !pnormnames){
 				MSG_CHMPRN("Hostname(%s) is found in self-slave without reverse peer to globalname(%s).", hostname, normalizedname.c_str());
@@ -2315,25 +2315,27 @@ bool CHMIniConf::LoadConfiguration(CHMCFGINFO& chmcfginfo) const
 
 			// whichever server mode or not?
 			if(!ccvals.server_mode_by_comp && chmcfginfo.self_ctlport == svrnode.ctlport && chmcfginfo.self_cuk == svrnode.cuk){
-				bool	is_break_loop = false;
+				bool	found_self_hostname = false;
 				for(strlst_t::const_iterator nodehostiter = nodehost_list.begin(); nodehost_list.end() != nodehostiter; ++nodehostiter){
 					for(strlst_t::const_iterator liter = localhost_list.begin(); localhost_list.end() != liter; ++liter){
 						if(0 == strcasecmp(nodehostiter->c_str(), liter->c_str())){
 							MSG_CHMPRN("Found self host name(%s) in server node list.", nodehostiter->c_str());				// FOUND
 							ccvals.server_mode_by_comp	= true;
-							is_break_loop				= true;
+							found_self_hostname			= true;
 							break;
 						}
 					}
-					if(is_break_loop){
+					if(found_self_hostname){
 						break;
 					}
 				}
-				// Set self server node name in configuration to localhostname cache.
-				if(!ChmNetDb::Get()->ReplaceFullLocalName(svrnode.name.c_str())){
-					ERR_CHMPRN("Failed to replace full local hostname(%s) in cache, but continue...", svrnode.name.c_str());
-				}else{
-					MSG_CHMPRN("Replaced full local hostname(%s) in cache.", svrnode.name.c_str());
+				if(found_self_hostname){
+					// Set self server node name in configuration to localhostname cache.
+					if(!ChmNetDb::Get()->ReplaceFullLocalName(svrnode.name.c_str())){
+						ERR_CHMPRN("Failed to replace full local hostname(%s) in cache, but continue...", svrnode.name.c_str());
+					}else{
+						MSG_CHMPRN("Replaced full local hostname(%s) in cache.", svrnode.name.c_str());
+					}
 				}
 			}
 		}

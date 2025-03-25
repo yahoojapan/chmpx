@@ -335,59 +335,68 @@ bool ExpandSimpleRegexHostname(const char* hostname, strlst_t& expand_lst, bool 
 // If the hostname matches in array, foundname is set as
 // matched hostname(FQDN or localhost or IP address).
 //
-bool IsInHostnameList(const char* target, strlst_t& hostname_list, string& foundname, bool is_cvt_localhost)
+bool IsInHostnameList(const char* target, const strlst_t& hostname_list, string& foundname, bool is_cvt_localhost)
 {
 	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is NULL.");
 		return false;
 	}
 
-	// get expanded all host(FQDN, hostnames, IP addresses) from target
-	strlst_t	expand_target_list;
-	if(!ChmNetDb::Get()->GetAllHostList(target, expand_target_list, is_cvt_localhost)){
+	// get expanded all target hostname(FQDN, hostnames, IP addresses) from target
+	strlst_t	target_hostname_list;
+	if(!ChmNetDb::Get()->GetAllHostList(target, target_hostname_list, is_cvt_localhost)){
 		MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", target, target);
-		expand_target_list.push_back(string(target));
+		target_hostname_list.push_back(string(target));
 	}
 
 	// get expaned all host from hostname_list
-	strlst_t	expand_hostname_list;
 	for(strlst_t::const_iterator hostname_list_iter = hostname_list.begin(); hostname_list_iter != hostname_list.end(); ++hostname_list_iter){
-		strlst_t	tmp_hostname_list;
-		// check simple regex
-		if(!ExpandSimpleRegexHostname(hostname_list_iter->c_str(), tmp_hostname_list, is_cvt_localhost, true, false)){
-			// hostname_list_iter->c_str() is not simple regex
-			tmp_hostname_list.push_back(*hostname_list_iter);
-		}
-		for(strlst_t::const_iterator tmp_hostname_list_iter = tmp_hostname_list.begin(); tmp_hostname_list_iter != tmp_hostname_list.end(); ++tmp_hostname_list_iter){
-			if(!ChmNetDb::Get()->GetAllHostList(tmp_hostname_list_iter->c_str(), expand_hostname_list, is_cvt_localhost)){
-				MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", tmp_hostname_list_iter->c_str(), tmp_hostname_list_iter->c_str());
-				expand_hostname_list.push_back(*tmp_hostname_list_iter);
-			}
-			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(tmp_hostname_list_iter->c_str())){
-				ChmNetDb::GetLocalHostList(expand_hostname_list, true);
-			}
-		}
-	}
+		std::string	base_hostname	= *hostname_list_iter;
+		bool		is_base_regex	= true;
+		strlst_t	expand_base_hostname_list;				// base hostname list(if regex, this list has multiple hostname)
+		strlst_t	all_base_hostname_list;					// final all hostname list
 
-	// compare
-	for(strlst_t::const_iterator expand_hostname_list_iter = expand_hostname_list.begin(); expand_hostname_list_iter != expand_hostname_list.end(); ++expand_hostname_list_iter){
-		// loop for all expand host
-		for(strlst_t::const_iterator expand_target_list_iter = expand_target_list.begin(); expand_target_list_iter != expand_target_list.end(); ++expand_target_list_iter){
-			// make host list for one expand host
-			strlst_t	one_target_list;
-			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(expand_target_list_iter->c_str())){
-				ChmNetDb::GetLocalHostList(one_target_list, true);
-			}else{
-				one_target_list.push_back(*expand_target_list_iter);
+		// expand simple regex
+		if(!ExpandSimpleRegexHostname(base_hostname.c_str(), expand_base_hostname_list, is_cvt_localhost, true, false)){
+			// base_hostname.c_str() is not simple regex
+			expand_base_hostname_list.push_back(base_hostname);
+			is_base_regex = false;
+		}
+		// make hostname list
+		for(strlst_t::const_iterator expand_base_hostname_list_iter = expand_base_hostname_list.begin(); expand_base_hostname_list_iter != expand_base_hostname_list.end(); ++expand_base_hostname_list_iter){
+			if(!ChmNetDb::Get()->GetAllHostList(expand_base_hostname_list_iter->c_str(), all_base_hostname_list, is_cvt_localhost)){
+				MSG_CHMPRN("could not get all host(hostname, IP address) list from %s, then use only hostname(%s)", expand_base_hostname_list_iter->c_str(), expand_base_hostname_list_iter->c_str());
+				all_base_hostname_list.push_back(*expand_base_hostname_list_iter);
 			}
-			// compare each host in expand host
-			for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
-				// cppcheck-suppress unmatchedSuppression
-				// cppcheck-suppress useStlAlgorithm
-				if((*expand_hostname_list_iter) == (*one_target_list_iter)){
-					// found!
-					foundname = *expand_hostname_list_iter;
-					return true;
+			if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(expand_base_hostname_list_iter->c_str())){
+				ChmNetDb::GetLocalHostList(all_base_hostname_list, true);
+			}
+		}
+
+		// compare( with each base hostname )
+		for(strlst_t::const_iterator all_base_hostname_list_iter = all_base_hostname_list.begin(); all_base_hostname_list_iter != all_base_hostname_list.end(); ++all_base_hostname_list_iter){
+			// loop for all expanded target host
+			for(strlst_t::const_iterator target_hostname_list_iter = target_hostname_list.begin(); target_hostname_list_iter != target_hostname_list.end(); ++target_hostname_list_iter){
+				// make target host list for one expanded target host
+				strlst_t	one_target_list;
+				if(!is_cvt_localhost && ChmNetDb::IsLocalhostKeyword(target_hostname_list_iter->c_str())){
+					ChmNetDb::GetLocalHostList(one_target_list, true);
+				}else{
+					one_target_list.push_back(*target_hostname_list_iter);
+				}
+				// compare one target host and one base host
+				for(strlst_t::const_iterator one_target_list_iter = one_target_list.begin(); one_target_list_iter != one_target_list.end(); ++one_target_list_iter){
+					// cppcheck-suppress unmatchedSuppression
+					// cppcheck-suppress useStlAlgorithm
+					if((*all_base_hostname_list_iter) == (*one_target_list_iter)){
+						// found
+						if(is_base_regex){
+							foundname = *all_base_hostname_list_iter;
+						}else{
+							foundname = base_hostname;
+						}
+						return true;
+					}
 				}
 			}
 		}
@@ -404,7 +413,7 @@ bool IsInHostnameList(const char* target, strlst_t& hostname_list, string& found
 // If the hostname matches in array, foundname is set as
 // matched hostname(FQDN or localhost or IP address).
 //
-bool IsMatchHostname(const char* target, strlst_t& regex_lst, string& foundname)
+bool IsMatchHostname(const char* target, const strlst_t& regex_lst, string& foundname)
 {
 	if(CHMEMPTYSTR(target)){
 		ERR_CHMPRN("Parameter is NULL.");
