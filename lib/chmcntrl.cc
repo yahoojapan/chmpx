@@ -644,6 +644,8 @@ bool ChmCntrl::Processing(PCOMPKT pComPkt, EVOBJTYPE call_ev_type)
 	}else if(COM_C2PX == pComPkt->head.type || COM_PX2C == pComPkt->head.type){
 		// Input from MQ, so processing do on MQ
 		//
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress constVariablePointer
 		const PPXCLT_ALL pCltAll = CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
 		if(IS_PXCLT_TYPE(pCltAll, CHMPX_CLT_JOIN_NOTIFY)){
 			// CHMPX_CLT_JOIN_NOTIFY type is processing by ChmEventSock.

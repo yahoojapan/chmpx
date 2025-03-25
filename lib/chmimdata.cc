@@ -383,6 +383,8 @@ void ChmIMData::FreeDupSelfChmpxInfo(PCHMPX ptr)
 	}
 }
 
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress constParameterPointer
 bool ChmIMData::IsSafeCHMINFO(const PCHMINFO pchminfo)
 {
 	if(!pchminfo){
