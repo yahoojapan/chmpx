@@ -20,6 +20,13 @@
  * REVISION:
  *
  */
+
+// [NOTE]
+// It would be possible to change it to a static method, but for compatibility
+// reasons, we will leave it as is.
+//
+// cppcheck-suppress-file functionStatic
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>

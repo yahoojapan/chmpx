@@ -1560,7 +1560,7 @@ void ChmNetDb::AddFullLocalHostname(strlst_t& hostnames)
 	bool	found = false;
 	for(strlst_t::iterator iter = hostnames.begin(); hostnames.end() != iter; ){
 		if((*iter) == fulllocalname){
-			iter	= hostnames.erase(iter);
+			hostnames.erase(iter);
 			found	= true;
 			break;
 		}
