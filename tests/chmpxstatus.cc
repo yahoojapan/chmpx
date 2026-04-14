@@ -256,6 +256,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		}
 
 		string	socks;
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress constVariablePointer
 		for(PCHMSOCKLIST psocklist = pInfo->pchminfo->chmpx_man.chmpx_self->chmpx.socklist; psocklist; psocklist = psocklist->next){
 			char	szBuff[32];
 			sprintf(szBuff, "%d", psocklist->sock);
@@ -303,6 +305,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		}
 
 		string	socks;
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress constVariablePointer
 		for(PCHMSOCKLIST psocklist = pchmpxlist->chmpx.socklist; psocklist; psocklist = psocklist->next){
 			char	szBuff[32];
 			sprintf(szBuff, "%d", psocklist->sock);
@@ -351,6 +355,8 @@ static bool PrintAllInfo(ChmCntrl* pchmobj)
 		}
 
 		string	socks;
+		// cppcheck-suppress unmatchedSuppression
+		// cppcheck-suppress constVariablePointer
 		for(PCHMSOCKLIST psocklist = pchmpxlist->chmpx.socklist; psocklist; psocklist = psocklist->next){
 			char	szBuff[32];
 			sprintf(szBuff, "%d", psocklist->sock);
@@ -487,6 +493,8 @@ static bool PrintSelfInfo(ChmCntrl* pchmobj)
 	}
 
 	string	socks;
+	// cppcheck-suppress unmatchedSuppression
+	// cppcheck-suppress constVariablePointer
 	for(PCHMSOCKLIST psocklist = pInfo->socklist; psocklist; psocklist = psocklist->next){
 		char	szBuff[32];
 		sprintf(szBuff, "%d", psocklist->sock);

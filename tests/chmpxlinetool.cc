@@ -1507,8 +1507,6 @@ bool ConsoleInput::GetCommand(void)
 						}else{
 							history_pos++;
 							input = history[history_pos];
-							input_pos = input.length();
-
 							for(input_pos = 0UL; input_pos < input.length(); input_pos++){
 								putchar(input[input_pos]);
 							}
