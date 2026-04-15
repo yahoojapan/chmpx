@@ -1,3 +1,9 @@
+chmpx (1.0.112) unstable; urgency=low
+
+  * Common build_helper.sh script was updated for fedora:44 - #153
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Wed, 15 Apr 2026 18:16:48 +0900
+
 chmpx (1.0.111) unstable; urgency=low
 
   * Changed support OS and Fixed some code - #151
