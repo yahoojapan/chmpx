@@ -53,10 +53,10 @@ class ChmBinData
 
 		bool Set(unsigned char* bydata, size_t bylength, bool is_duplicate = false);
 		bool Set(PCHMBIN pchmbin, bool is_duplicate = false);
-		bool Overwrite(unsigned char* bydata, size_t bylength, off_t offset);
-		bool Overwrite(PCHMBIN pchmbin, off_t offset);
-		bool Append(unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, static_cast<off_t>(length)); }
-		bool Append(PCHMBIN pchmbin) { return Overwrite(pchmbin, static_cast<off_t>(length)); }
+		bool Overwrite(const unsigned char* bydata, size_t bylength, off_t offset);
+		bool Overwrite(const CHMBIN* pchmbin, off_t offset);
+		bool Append(const unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, static_cast<off_t>(length)); }
+		bool Append(const CHMBIN* pchmbin) { return Overwrite(pchmbin, static_cast<off_t>(length)); }
 
 		bool Load(unsigned char* bydata, bool is_cvt_ntoh = true, bool is_duplicate = false);
 		bool Put(unsigned char* bydata, bool is_cvt_hton = true) const;
@@ -94,23 +94,23 @@ class ChmKVPair
 		bool Set(unsigned char* bydata, size_t bylength, bool is_key, bool is_duplicate = false);
 		bool Set(const ChmBinData& Data, bool is_key, bool is_duplicate = false);
 		bool Set(PCHMKVP pkvp, bool is_duplicate = false);
-		bool Overwrite(unsigned char* bydata, size_t bylength, bool is_key, off_t offset);
+		bool Overwrite(const unsigned char* bydata, size_t bylength, bool is_key, off_t offset);
 		bool Overwrite(const ChmBinData& Data, bool is_key, off_t offset);
-		bool Append(unsigned char* bydata, size_t bylength, bool is_key) { return Overwrite(bydata, bylength, is_key, static_cast<off_t>(is_key ? Key.length : Value.length)); }
+		bool Append(const unsigned char* bydata, size_t bylength, bool is_key) { return Overwrite(bydata, bylength, is_key, static_cast<off_t>(is_key ? Key.length : Value.length)); }
 		bool Append(const ChmBinData& Data, bool is_key) { return Overwrite(Data, is_key, static_cast<off_t>(is_key ? Key.length : Value.length)); }
 
 		bool SetKey(unsigned char* bydata, size_t bylength, bool is_duplicate = false) { return Set(bydata, bylength, true, is_duplicate); }
 		bool SetKey(const ChmBinData& Data, bool is_duplicate = false) { return Set(Data, true, is_duplicate); }
-		bool OverwriteKey(unsigned char* bydata, size_t bylength, off_t offset) { return Overwrite(bydata, bylength, true, offset); }
+		bool OverwriteKey(const unsigned char* bydata, size_t bylength, off_t offset) { return Overwrite(bydata, bylength, true, offset); }
 		bool OverwriteKey(const ChmBinData& Data, bool is_key, off_t offset) { return Overwrite(Data, true, offset); }
-		bool AppendKey(unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, true, static_cast<off_t>(Key.length)); }
+		bool AppendKey(const unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, true, static_cast<off_t>(Key.length)); }
 		bool AppendKey(const ChmBinData& Data) { return Overwrite(Data, true, static_cast<off_t>(Key.length)); }
 
 		bool SetValue(unsigned char* bydata, size_t bylength, bool is_duplicate = false) { return Set(bydata, bylength, false, is_duplicate); }
 		bool SetValue(const ChmBinData& Data, bool is_duplicate = false) { return Set(Data, false, is_duplicate); }
-		bool OverwriteValue(unsigned char* bydata, size_t bylength, off_t offset) { return Overwrite(bydata, bylength, false, offset); }
+		bool OverwriteValue(const unsigned char* bydata, size_t bylength, off_t offset) { return Overwrite(bydata, bylength, false, offset); }
 		bool OverwriteValue(const ChmBinData& Data, bool is_key, off_t offset) { return Overwrite(Data, false, offset); }
-		bool AppendValue(unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, false, static_cast<off_t>(Value.length)); }
+		bool AppendValue(const unsigned char* bydata, size_t bylength) { return Overwrite(bydata, bylength, false, static_cast<off_t>(Value.length)); }
 		bool AppendValue(const ChmBinData& Data) { return Overwrite(Data, false, static_cast<off_t>(Value.length)); }
 
 		bool Load(unsigned char* bydata, bool is_cvt_ntoh = true, bool is_duplicate = false);

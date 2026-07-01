@@ -125,7 +125,7 @@ bool CHMDbgControl::LoadDbgCntlEnvName(void)
 
 bool CHMDbgControl::LoadDbgCntlEnvFile(void)
 {
-	char*	pEnvVal;
+	const char*	pEnvVal;
 	if(NULL == (pEnvVal = getenv(CHMDbgControl::DBGENVFILE))){
 		MSG_CHMPRN("%s ENV is not set.", CHMDbgControl::DBGENVFILE);
 		return true;

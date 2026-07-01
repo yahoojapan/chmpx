@@ -6333,8 +6333,8 @@ chmpxpos_t chmpxman_lap<T>::GetNextServerPos(chmpxpos_t startpos, chmpxpos_t now
 	if(CHM_INVALID_CHMPXLISTPOS == startpos && CHM_INVALID_CHMPXLISTPOS != nowpos){
 		startpos = reinterpret_cast<chmpxpos_t>(basic_type::pAbsPtr->chmpx_servers);
 	}
-	PCHMPXLIST	pStartPos	= reinterpret_cast<PCHMPXLIST>(startpos);
-	PCHMPXLIST	pNowPos		= reinterpret_cast<PCHMPXLIST>(nowpos);
+	const CHMPXLIST*	pStartPos	= reinterpret_cast<PCHMPXLIST>(startpos);
+	PCHMPXLIST			pNowPos		= reinterpret_cast<PCHMPXLIST>(nowpos);
 
 	// normalize
 	chmpxlistlap	svrchmpxlist;

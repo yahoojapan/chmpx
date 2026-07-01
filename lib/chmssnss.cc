@@ -759,7 +759,7 @@ bool ChmSecureSock::LoadCACerts(chmpk11list_t& pk11objlist)
 			//
 			// AND WE NEED TO CHECK FILE EXTENSION OR FORMAT BEFORE CALLING PK11 FUNCTION.
 			//
-			PRDirEntry*	entry;
+			const PRDirEntry*	entry;
 			while(NULL != (entry = PR_ReadDir(dir, PR_SKIP_BOTH))){
 				if(0 == strcmp(entry->name, ".") || 0 == strcmp(entry->name, "..")){
 					continue;
@@ -1095,15 +1095,14 @@ bool ChmSecureSock::SetBlockingMode(PRFileDesc* SSSession, bool is_blocking)
 	return true;
 }
 
-// cppcheck-suppress constParameter
-bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
+bool ChmSecureSock::CheckResultSSL(int sock, ConstChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !sslsession || !IS_SAFE_CHKRESULTSSL_TYPE(type)){
 		ERR_CHMPRN("Parameters are wrong.");
 		is_retry = false;
 		return false;
 	}
-	//ChmSSSessionEnt*	session = reinterpret_cast<ChmSSSessionEnt*>(sslsession);		// not used
+	//const ChmSSSessionEnt*	session = reinterpret_cast<const ChmSSSessionEnt*>(sslsession);		// not used
 
 	// Now not use these value
 	/*
@@ -1145,11 +1144,13 @@ bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long actio
 // The processing content of this Callback function is almost the same as
 // SSL_AuthCertificate. However, this bypasses verification of hostname.
 //
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress constParameterCallback
 SECStatus ChmSecureSock::AuthCertificateCallback(void* arg, PRFileDesc* fd, PRBool checksig, PRBool isServer)
 {
 	CERTCertificate*	certPeer		= NULL;
 	SECStatus			resStatus		= SECSuccess;
-	bool*				is_verify_peer	= reinterpret_cast<bool*>(arg);
+	const bool*			is_verify_peer	= reinterpret_cast<const bool*>(arg);
 
 	if(!is_verify_peer || !(*is_verify_peer)){
 		// If not verify mode, thus return here.

@@ -76,7 +76,7 @@ class ChmSecureSock
 		static bool SetSslMinVersion(chmss_ver_t ssver);
 		static bool SetExtValue(const char* key, const char* value);
 
-		static bool CheckResultSSL(int sock, ChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
+		static bool CheckResultSSL(int sock, ConstChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static ChmSSSession AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static ChmSSSession ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);
 		static bool ShutdownSSL(int sock, ChmSSSession sslsession, int con_retrycnt = CHMEVENTSOCK_RETRY_DEFAULT, suseconds_t con_waittime = CHMEVENTSOCK_TIMEOUT_DEFAULT);

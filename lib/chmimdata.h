@@ -152,8 +152,8 @@ class ChmIMData
 		bool GetChmpxSvr(chmpxid_t chmpxid, PCHMPXSVR chmpxsvr) const;
 		bool GetChmpxSvrs(PCHMPXSVR* ppchmpxsvrs, long& count) const;
 		bool CompareChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count);
-		bool MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove = true, bool is_init_process = false, int eqfd = CHM_INVALID_HANDLE);
-		bool MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, int eqfd);
+		bool MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove = true, bool is_init_process = false, int argeqfd = CHM_INVALID_HANDLE);
+		bool MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, int argeqfd);
 
 		bool GetGroup(std::string& group) const;
 		bool IsRandomDeliver(void) const;

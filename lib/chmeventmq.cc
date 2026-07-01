@@ -514,7 +514,7 @@ bool ChmEventMq::Clean(void)
 //
 bool ChmEventMq::UpdateInternalData(void)
 {
-	ChmIMData*	pImData;
+	const ChmIMData*	pImData;
 	if(!pChmCntrl || NULL == (pImData = pChmCntrl->GetImDataObj())){
 		ERR_CHMPRN("Object is not pre-initialized.");
 		return false;
@@ -768,8 +768,8 @@ bool ChmEventMq::MakeMqPath(msgid_t msgid, string& path)
 		ERR_CHMPRN("Invalid MSGID.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
-	string		group;
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	string				group;
 	if(!pImData->GetGroup(group)){
 		ERR_CHMPRN("Could not get Group name.");
 		return false;
@@ -888,9 +888,8 @@ bool ChmEventMq::FreeReserveMsgIds(void)
 		ERR_CHMPRN("This process is not a process joining slave chmpx.");
 		return false;
 	}
-	ChmIMData*	pImData			= pChmCntrl->GetImDataObj();
-
-	long		mqcnt_per_attach= pImData->GetMQPerAttach();
+	const ChmIMData*	pImData			= pChmCntrl->GetImDataObj();
+	long				mqcnt_per_attach= pImData->GetMQPerAttach();
 	if(mqcnt_per_attach <= 0){
 		mqcnt_per_attach = 1L;		// why?
 	}
@@ -1267,8 +1266,8 @@ bool ChmEventMq::Processing(PCOMPKT pComPkt)
 		// cppcheck-suppress redundantAssignment
 		SendComPkt.offset = static_cast<off_t>(sizeof(COMPKT));
 
-		unsigned char*	pbody	= reinterpret_cast<unsigned char*>(pComPkt) + pComPkt->offset;
-		size_t			blength	= pComPkt->length - sizeof(COMPKT);
+		const unsigned char*	pbody	= reinterpret_cast<const unsigned char*>(pComPkt) + pComPkt->offset;
+		size_t					blength	= pComPkt->length - sizeof(COMPKT);
 
 		// for trace
 		struct timespec	start_time;
@@ -2052,7 +2051,7 @@ bool ChmEventMq::PxCltSendMergeGetLastTime(struct timespec& lastts)
 	return true;
 }
 
-bool ChmEventMq::PxCltReceiveMergeGetLastTime(PCOMHEAD pComHead, PPXCLT_ALL pCltAll)
+bool ChmEventMq::PxCltReceiveMergeGetLastTime(PCOMHEAD pComHead, const PXCLT_ALL* pCltAll)
 {
 	if(!pComHead || !pCltAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -2690,7 +2689,7 @@ bool ChmEventMq::PxCltSendAbortUpdateData(void)
 	return true;
 }
 
-bool ChmEventMq::PxCltReceiveAbortUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll)
+bool ChmEventMq::PxCltReceiveAbortUpdateData(PCOMHEAD pComHead, const PXCLT_ALL* pCltAll)
 {
 	if(!pComHead || !pCltAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -2820,7 +2819,7 @@ bool ChmEventMq::PxCltReceiveCloseNotify(PCOMHEAD pComHead, PPXCLT_ALL pCltAll)
 	}
 
 	// if msgid in cache, so close and remove it from cache.
-	msgid_t*	pmsgids = CHM_ABS(pCloseNotify, pCloseNotify->pmsgids, msgid_t*);
+	const msgid_t*	pmsgids = CHM_ABS(pCloseNotify, pCloseNotify->pmsgids, msgid_t*);
 	for(long cnt = 0; cnt < pCloseNotify->count; cnt++){
 		if(!CloseDestMQ(pmsgids[cnt])){
 			ERR_CHMPRN("Failed to close and remove cache for msgid(0x%016" PRIx64 ").", pmsgids[cnt]);

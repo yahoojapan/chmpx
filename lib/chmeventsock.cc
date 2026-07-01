@@ -216,7 +216,7 @@ static inline void DUMPCOM_COMPKT_TYPE(const char* action, PCOMPKT pComPkt)
 
 	if(chm_debug_mode >= CHMDBG_DUMP){
 		if(COM_PX2PX == pComPkt->head.type){
-			PPXCOM_ALL	pComAll = CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
+			const PXCOM_ALL*	pComAll = CVT_COM_ALL_PTR_PXCOMPKT(pComPkt);
 			MSG_CHMPRN("%s COMPKT type(%s) : PXCOM_ALL type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE(pComPkt->head.type), STRPXCOMTYPE(pComAll->val_head.type));
 		}else if(COM_C2C == pComPkt->head.type){ \
 			MSG_CHMPRN("%s COMPKT type(%s) : COM_C2C type(%s).", (CHMEMPTYSTR(action) ? "" : action), STRCOMTYPE(pComPkt->head.type), STRCOMC2CTYPE(pComPkt->head.c2ctype));
@@ -1564,7 +1564,7 @@ bool ChmEventSock::MergeWorkerFunc(void* common_param, chmthparam_t wp_param)
 	merge_param.startts.tv_nsec	= lastts.tv_nsec;
 
 	// hash values
-	ChmIMData*	pImData			= pThis->pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData	= pThis->pChmCntrl->GetImDataObj();
 	chmhash_t	tmp_hashval		= static_cast<chmhash_t>(-1);
 	chmhash_t	tmp_max_hashval	= static_cast<chmhash_t>(-1);
 	merge_param.chmpxid			= pImData->GetSelfChmpxId();
@@ -1755,8 +1755,8 @@ bool ChmEventSock::AcceptMapCallback(const sock_pending_map_t::iterator& iter, v
 		return true;										// do not stop loop.
 	}
 	// get socket and im object
-	int				sock	= iter->first;
-	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	int					sock	= iter->first;
+	const ChmIMData*	pImData	= pSockObj->pChmCntrl->GetImDataObj();
 	if(pImData && CHM_INVALID_SOCK != sock){
 		// check server/slave socket
 		chmpxid_t	chmpxid	= pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
@@ -1784,8 +1784,8 @@ bool ChmEventSock::ControlSockMapCallback(const sock_ids_map_t::iterator& iter, 
 		return true;										// do not stop loop.
 	}
 	// get socket and im object
-	int				sock	= iter->first;
-	ChmIMData*		pImData	= pSockObj->pChmCntrl->GetImDataObj();
+	int					sock	= iter->first;
+	const ChmIMData*	pImData	= pSockObj->pChmCntrl->GetImDataObj();
 	if(pImData && CHM_INVALID_SOCK != sock){
 		// check server/slave socket
 		chmpxid_t	chmpxid	= pImData->GetChmpxIdBySock(sock, CLOSETG_SERVERS);
@@ -1824,9 +1824,11 @@ bool ChmEventSock::SslSockMapCallback(const sock_ssl_map_t::iterator& iter, void
 	return true;
 }
 
+// cppcheck-suppress unmatchedSuppression
+// cppcheck-suppress constParameterCallback
 bool ChmEventSock::SendLockMapCallback(const sendlockmap_t::iterator& iter, void* psockobj)
 {
-	ChmEventSock*	pSockObj = reinterpret_cast<ChmEventSock*>(psockobj);
+	const ChmEventSock*	pSockObj = reinterpret_cast<const ChmEventSock*>(psockobj);
 	if(!pSockObj){
 		ERR_CHMPRN("Parameter is wrong.");
 		return true;										// do not stop loop.
@@ -1860,8 +1862,8 @@ ChmEventSock::ChmEventSock(int eventqfd, ChmCntrl* pcntrl, bool is_ssl) :
 
 	// SSL
 	if(is_ssl){
-		ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-		CHMPXSSL	ssldata;
+		const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+		CHMPXSSL			ssldata;
 		if(!pImData->GetSelfSsl(ssldata)){
 			ERR_CHMPRN("Failed to get SSL structure from self chmpx, but continue...");
 		}else{
@@ -1947,7 +1949,7 @@ bool ChmEventSock::Clean(void)
 //
 bool ChmEventSock::UpdateInternalData(void)
 {
-	ChmIMData*	pImData;
+	const ChmIMData*	pImData;
 	if(!pChmCntrl || NULL == (pImData = pChmCntrl->GetImDataObj())){
 		ERR_CHMPRN("Object is not pre-initialized.");
 		return false;
@@ -2051,9 +2053,9 @@ bool ChmEventSock::GetEventQueueFds(event_fds_t& fds)
 	}
 	fds.clear();
 
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-	int			sock	= CHM_INVALID_SOCK;
-	int			ctlsock	= CHM_INVALID_SOCK;
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	int					sock	= CHM_INVALID_SOCK;
+	int					ctlsock	= CHM_INVALID_SOCK;
 	if(!pImData->GetSelfSocks(sock, ctlsock)){
 		ERR_CHMPRN("Could not get self sock and ctlsock.");
 		return false;
@@ -2268,9 +2270,9 @@ bool ChmEventSock::IsEventQueueFd(int fd)
 		return false;
 	}
 
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-	int			sock	= CHM_INVALID_SOCK;
-	int			ctlsock	= CHM_INVALID_SOCK;
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	int					sock	= CHM_INVALID_SOCK;
+	int					ctlsock	= CHM_INVALID_SOCK;
 	if(!pImData->GetSelfSocks(sock, ctlsock)){
 		ERR_CHMPRN("Could not get self sock and ctlsock, but continue...");
 	}else{
@@ -2309,9 +2311,9 @@ bool ChmEventSock::IsSafeParamsForSSL(void)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
 
-	CHMPXSSL	ssldata;
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	CHMPXSSL			ssldata;
 	if(!pImData->GetSelfSsl(ssldata)){
 		ERR_CHMPRN("Failed to get SSL structure from self chmpx.");
 		return false;
@@ -2463,8 +2465,8 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
-	bool		is_server	= pImData->IsServerChmpxId(chmpxid);
+	const ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
+	bool				is_server	= pImData->IsServerChmpxId(chmpxid);
 
 	if(!is_server && !is_check_slave){
 		WAN_CHMPRN("Could not find chmpxid(0x%016" PRIx64 ") sock in slave list.", chmpxid);
@@ -2551,9 +2553,7 @@ bool ChmEventSock::GetLockedSendSock(chmpxid_t chmpxid, int& sock, bool is_check
 						}
 						if(TryLockSendSock(*iter)){										// try to lock socket
 							// get locked sock status.
-							// cppcheck-suppress unmatchedSuppression
-							// cppcheck-suppress constVariablePointer
-							const PCHMSSSTAT	pssstat = sendlockmap.get(*iter);
+							const CHMSSSTAT*	pssstat = sendlockmap.get(*iter);
 							if(pssstat && (pssstat->last_time + sock_pool_timeout) < nowtime){
 								// timeouted socket.
 								sendlockmap.erase(*iter);								// remove socket from send lock map(with unlock it)
@@ -3377,7 +3377,7 @@ bool ChmEventSock::ServerDownNotifyHup(chmpxid_t chmpxid)
 bool ChmEventSock::ServerSockNotifyHup(int fd, bool& is_close, chmpxid_t& chmpxid)
 {
 	// get sock to chmpxid
-	ChmIMData*	pImData;
+	const ChmIMData*	pImData;
 	if(!pChmCntrl || NULL == (pImData = pChmCntrl->GetImDataObj()) || CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdBySock(fd, CLOSETG_SERVERS))){
 		MSG_CHMPRN("checked sock(%d) and it is not server sock(not found server sock list).", fd);
 		chmpxid	= CHM_INVALID_CHMPXID;
@@ -3992,9 +3992,9 @@ bool ChmEventSock::CloseRechainRing(chmpxid_t nowchmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
 
-	chmpxpos_t	selfpos	= pImData->GetSelfServerPos();
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	chmpxpos_t			selfpos	= pImData->GetSelfServerPos();
 	if(CHM_INVALID_CHMPXLISTPOS == selfpos){
 		ERR_CHMPRN("Not found self chmpx data in list.");
 		return false;
@@ -4066,8 +4066,8 @@ bool ChmEventSock::CheckRechainRing(chmpxid_t newchmpxid, bool& is_rechain)
 	}
 	is_rechain = false;
 
-	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
-	chmpxid_t	nowchmpxid	= pImData->GetNextRingChmpxId();
+	const	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
+	chmpxid_t			nowchmpxid	= pImData->GetNextRingChmpxId();
 	if(nowchmpxid == newchmpxid){
 		socklist_t	nowsocklist;
 		if(pImData->GetServerSock(nowchmpxid, nowsocklist) && !nowsocklist.empty()){
@@ -4134,8 +4134,8 @@ chmpxid_t ChmEventSock::GetNextRingChmpxId(void)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-	chmpxid_t	chmpxid	= 0L;
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	chmpxid_t			chmpxid	= 0L;
 
 	if(CHM_INVALID_CHMPXID != (chmpxid = pImData->GetNextRingChmpxId())){
 		//MSG_CHMPRN("Not need to connect rechain RING.");
@@ -4192,8 +4192,8 @@ bool ChmEventSock::IsSafeDeptAndNextChmpxId(chmpxid_t dept_chmpxid, chmpxid_t ne
 		return true;
 	}
 
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-	chmpxpos_t	selfpos = pImData->GetSelfServerPos();
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	chmpxpos_t			selfpos = pImData->GetSelfServerPos();
 	if(CHM_INVALID_CHMPXLISTPOS == selfpos){
 		ERR_CHMPRN("Not found self chmpx data in list.");
 		return false;
@@ -4518,7 +4518,7 @@ bool ChmEventSock::InitialAllServerStatus(void)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Connect to ONE of servers.
 	string		name;
@@ -4697,7 +4697,6 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				if(!pImData->UpdateSelfLastStatusTime()){
 					ERR_CHMPRN("Could not update own updating status time, but continue...");
 				}
-				chmpxsts_t	status = pImData->GetSelfStatus();
 
 				// If change self status after processing, so need to update status to all servers.
 				chmpxid_t	to_chmpxid = GetNextRingChmpxId();
@@ -4725,6 +4724,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 				// Check changed self status and do start merging.
 				// 
 				if(IsAutoMerge()){
+					chmpxsts_t	status = pImData->GetSelfStatus();
 					if(!IS_CHMPXSTS_NOTHING(status)){
 						// start merge automatically
 						if(!RequestMergeStart()){
@@ -5313,7 +5313,7 @@ bool ChmEventSock::Processing(PCOMPKT pComPkt)
 			return false;
 		}
 		// following datas
-		PPXCLT_ALL	pPxCltCom	= CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
+		const PXCLT_ALL*	pPxCltCom	= CVT_CLT_ALL_PTR_PXCOMPKT(pComPkt);
 
 		if(CHMPX_CLT_JOIN_NOTIFY == pPxCltCom->val_head.type){
 			if(!PxCltReceiveJoinNotify(&(pComPkt->head), pPxCltCom)){
@@ -5343,7 +5343,7 @@ bool ChmEventSock::Processing(int sock, const char* pCommand)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	strlst_t	cmdarray;
 	if(!str_paeser(pCommand, cmdarray) || cmdarray.empty()){
@@ -5949,11 +5949,11 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 		return true;
 	}
 
-	// get now status
-	chmpxsts_t	status = pImData->GetSelfStatus();
-
 	// check pending service in operation 
 	if(startup_servicein){
+		// get now status
+		chmpxsts_t	status = pImData->GetSelfStatus();
+
 		// SERVICE IN operation is pending.
 		if(IS_CHMPXSTS_SRVOUT(status) && IS_CHMPXSTS_UP(status) && IS_CHMPXSTS_NOACT(status) && IS_CHMPXSTS_NOTHING(status)){
 			if(IS_CHMPXSTS_SUSPEND(status)){
@@ -6053,7 +6053,7 @@ bool ChmEventSock::CheckAllStatusForMergeComplete(void) const
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// get all server status
 	PCHMPXSVR	pchmpxsvrs	= NULL;
@@ -6200,8 +6200,8 @@ bool ChmEventSock::MergeStart(void)
 		}
 
 		// get chmpxids(targets) which have same basehash or replica basehash.
-		ChmIMData*	pImData = pChmCntrl->GetImDataObj();
-		chmhash_t	basehash;
+		const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+		chmhash_t			basehash;
 		if(!pImData->GetSelfBaseHash(basehash)){
 			// there is no server, so set status "DONE" here.
 			if(!MergeDone()){
@@ -7069,11 +7069,11 @@ bool ChmEventSock::SendCtlPort(chmpxid_t chmpxid, const unsigned char* pbydata, 
 		ERR_CHMPRN("Parameters are wrong.");
 		return false;
 	}
-	ChmIMData*		pImData = pChmCntrl->GetImDataObj();
 
-	string			hostname;
-	short			ctlport	= CHM_INVALID_PORT;
-	hostport_list_t	ctlendpoints;
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	string				hostname;
+	short				ctlport	= CHM_INVALID_PORT;
+	hostport_list_t		ctlendpoints;
 	if(!pImData->GetServerBase(chmpxid, &hostname, NULL, &ctlport, NULL, &ctlendpoints)){
 		ERR_CHMPRN("Could not find server by chmpxid(0x%016" PRIx64 ").", chmpxid);
 		return false;
@@ -7166,8 +7166,8 @@ bool ChmEventSock::CtlComServiceOut(const char* hostname, short ctlport, const c
 		return false;
 	}
 
-	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
-	chmpxid_t	chmpxid;
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	chmpxid_t			chmpxid;
 	if(CHM_INVALID_CHMPXID == (chmpxid = pImData->GetChmpxIdByToServerName(hostname, ctlport, cuk, ctlendpoints, custom_seed))){
 		ERR_CHMPRN("Could not find a server as %s:%d.", hostname, ctlport);
 		strResponse = CTL_RES_ERROR_NOT_FOUND_SVR;
@@ -7213,7 +7213,7 @@ bool ChmEventSock::CtlComSelfStatus(string& strResponse)
 		strResponse = CTL_RES_INT_ERROR;
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// get all information for self chmpx
 	long		maxmqcnt	= pImData->GetMaxMQCount();
@@ -7320,7 +7320,7 @@ bool ChmEventSock::CtlComAllServerStatus(string& strResponse)
 		strResponse = CTL_RES_INT_ERROR;
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// get information for all servers
 	PCHMPXSVR	pchmpxsvrs	= NULL;
@@ -7450,8 +7450,8 @@ bool ChmEventSock::CtlComAllTraceView(string& strResponse, logtype_t dirmask, lo
 		strResponse = CTL_RES_ERROR;
 		return false;
 	}
-	ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
-	long		trcount	= pImData->GetTraceCount();
+	const ChmIMData*	pImData	= pChmCntrl->GetImDataObj();
+	long				trcount	= pImData->GetTraceCount();
 
 	if(!IS_SAFE_CHMLOG_MASK(dirmask) || !IS_SAFE_CHMLOG_MASK(devmask)){
 		ERR_CHMPRN("dirmask(0x%016" PRIx64 ") or devmask(0x%016" PRIx64 ") are wrong.", dirmask, devmask);
@@ -7525,7 +7525,7 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -7589,7 +7589,7 @@ bool ChmEventSock::PxComSendStatusReq(int sock, chmpxid_t chmpxid, bool need_soc
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+bool ChmEventSock::PxComReceiveStatusReq(PCOMHEAD pComHead, const PXCOM_ALL* pComAll, PCOMPKT* ppResComPkt)
 {
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -7790,7 +7790,7 @@ bool ChmEventSock::PxComSendConinitReq(int sock, chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// datas
 	chmpxid_t		selfchmpxid = pImData->GetSelfChmpxId();
@@ -7879,7 +7879,7 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
 
@@ -7915,9 +7915,7 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 			// old version
 			comver = pComHead->version;
 
-			// cppcheck-suppress unmatchedSuppression
-			// cppcheck-suppress constVariablePointer
-			const PPXCOM_CONINIT_REQ	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
+			const PXCOM_CONINIT_REQ*	pConinitReq	= CVT_COMPTR_CONINIT_REQ(pComAll);
 
 			name.clear();
 			from_chmpxid= pConinitReq->chmpxid;
@@ -7953,7 +7951,7 @@ bool ChmEventSock::PxComSendConinitRes(int sock, chmpxid_t chmpxid, comver_t com
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -8011,7 +8009,7 @@ bool ChmEventSock::PxComReceiveConinitRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
 
@@ -8051,7 +8049,7 @@ bool ChmEventSock::PxComSendJoinRing(chmpxid_t chmpxid, PCHMPXSVR pserver)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -8306,7 +8304,7 @@ bool ChmEventSock::PxComSendStatusUpdate(chmpxid_t chmpxid, PCHMPXSVR pchmpxsvrs
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*		pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// make data
 	PCOMPKT	pComPkt;
@@ -8549,7 +8547,7 @@ bool ChmEventSock::PxComSendStatusConfirm(chmpxid_t chmpxid, PCHMPXSVR pchmpxsvr
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*		pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// make data
 	PCOMPKT	pComPkt;
@@ -8838,7 +8836,7 @@ bool ChmEventSock::PxComSendStatusChange(chmpxid_t chmpxid, PCHMPXSVR pserver, b
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -8908,7 +8906,7 @@ bool ChmEventSock::PxComSendSlavesStatusChange(PCHMPXSVR pserver)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// get all slave chmpxid.
 	chmpxid_t		selfchmpxid = pImData->GetSelfChmpxId();
@@ -9236,7 +9234,7 @@ bool ChmEventSock::PxComSendMergeStart(chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9382,7 +9380,7 @@ bool ChmEventSock::PxComSendMergeAbort(chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9421,7 +9419,7 @@ bool ChmEventSock::PxComReceiveMergeAbort(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 	PPXCOM_MERGE_ABORT	pMergeAbort	= CVT_COMPTR_MERGE_ABORT(pComAll);
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
@@ -9497,7 +9495,7 @@ bool ChmEventSock::PxComSendMergeComplete(chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9694,7 +9692,7 @@ bool ChmEventSock::PxComSendMergeSuspend(chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9818,7 +9816,7 @@ bool ChmEventSock::PxComSendMergeNoSuspend(chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9940,7 +9938,7 @@ bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -9975,7 +9973,7 @@ bool ChmEventSock::PxComSendMergeSuspendGet(int sock, chmpxid_t chmpxid)
 	return true;
 }
 
-bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, const PPXCOM_ALL pComAll, PCOMPKT* ppResComPkt)
+bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, const PXCOM_ALL* pComAll, PCOMPKT* ppResComPkt)
 {
 	if(!pComHead || !pComAll || !ppResComPkt){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -9985,7 +9983,7 @@ bool ChmEventSock::PxComReceiveMergeSuspendGet(PCOMHEAD pComHead, const PPXCOM_A
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*					pImData			= pChmCntrl->GetImDataObj();
+	const ChmIMData*			pImData			= pChmCntrl->GetImDataObj();
 //	PPXCOM_MERGE_SUSPEND_GET	pMergeSuspendGet= CVT_COMPTR_MERGE_SUSPEND_GET(pComAll);
 	*ppResComPkt								= NULL;
 
@@ -10059,7 +10057,7 @@ bool ChmEventSock::PxComSendServerDown(chmpxid_t chmpxid, chmpxid_t downchmpxid)
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -10208,7 +10206,7 @@ bool ChmEventSock::PxComReceiveServerDown(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 	return true;
 }
 
-bool ChmEventSock::PxCltReceiveJoinNotify(const PCOMHEAD pComHead, const PPXCLT_ALL pComAll)
+bool ChmEventSock::PxCltReceiveJoinNotify(const PCOMHEAD pComHead, const PXCLT_ALL* pComAll)
 {
 	if(!pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10305,7 +10303,7 @@ bool ChmEventSock::PxComSendReqUpdateData(chmpxid_t chmpxid, const PPXCOMMON_MER
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	while(!fullock::flck_trylock_noshared_mutex(&mergeidmap_lockval));	// LOCK
 
@@ -10360,7 +10358,7 @@ bool ChmEventSock::PxComReceiveReqUpdateData(PCOMHEAD pComHead, PPXCOM_ALL pComA
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*				pImData			= pChmCntrl->GetImDataObj();
+	const ChmIMData*		pImData			= pChmCntrl->GetImDataObj();
 	PPXCOM_REQ_UPDATEDATA	pReqUpdateData	= CVT_COMPTR_REQ_UPDATEDATA(pComAll);
 	chmpxid_t				selfchmpxid		= pImData->GetSelfChmpxId();
 	*ppResComPkt							= NULL;
@@ -10500,7 +10498,7 @@ bool ChmEventSock::PxComSendResUpdateData(chmpxid_t chmpxid, size_t length, cons
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -10570,7 +10568,7 @@ bool ChmEventSock::PxComSendResultUpdateData(chmpxid_t chmpxid, reqidmapflag_t r
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -10654,7 +10652,7 @@ bool ChmEventSock::PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_so
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*	pImData = pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData = pChmCntrl->GetImDataObj();
 
 	// Make packet
 	PCOMPKT	pComPkt;
@@ -10703,7 +10701,7 @@ bool ChmEventSock::PxComSendVersionReq(int sock, chmpxid_t chmpxid, bool need_so
 // Therefore, instead of processing in the reception main loop, CHMPX_COM_VERSION_RES is
 // returned directly in this method.
 //
-bool ChmEventSock::PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, const PPXCOM_ALL pComAll)
+bool ChmEventSock::PxComReceiveVersionReq(int sock, PCOMHEAD pComHead, const PXCOM_ALL* pComAll)
 {
 	if(CHM_INVALID_SOCK == sock || !pComHead || !pComAll){
 		ERR_CHMPRN("Parameter are wrong.");
@@ -10772,7 +10770,7 @@ bool ChmEventSock::PxComReceiveVersionRes(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 		ERR_CHMPRN("Object is not initialized.");
 		return false;
 	}
-	ChmIMData*			pImData		= pChmCntrl->GetImDataObj();
+	const ChmIMData*	pImData		= pChmCntrl->GetImDataObj();
 	PPXCOM_VERSION_RES	pVersionRes	= CVT_COMPTR_VERSION_RES(pComAll);
 	chmpxid_t			selfchmpxid	= pImData->GetSelfChmpxId();
 	*ppResComPkt					= NULL;
