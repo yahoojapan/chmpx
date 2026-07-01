@@ -116,7 +116,7 @@ bool ChmBinData::Set(PCHMBIN pchmbin, bool is_duplicate)
 //
 // After calling this method, byptr is always allocated.
 //
-bool ChmBinData::Overwrite(unsigned char* bydata, size_t bylength, off_t offset)
+bool ChmBinData::Overwrite(const unsigned char* bydata, size_t bylength, off_t offset)
 {
 	if(!bydata || 0 == bylength){
 		MSG_CHMPRN("Parameter is wrong, so nothing copy.");
@@ -164,7 +164,7 @@ bool ChmBinData::Overwrite(unsigned char* bydata, size_t bylength, off_t offset)
 	return true;
 }
 
-bool ChmBinData::Overwrite(PCHMBIN pchmbin, off_t offset)
+bool ChmBinData::Overwrite(const CHMBIN* pchmbin, off_t offset)
 {
 	if(!pchmbin){
 		return false;
@@ -344,7 +344,7 @@ bool ChmKVPair::Set(PCHMKVP pkvp, bool is_duplicate)
 	return true;
 }
 
-bool ChmKVPair::Overwrite(unsigned char* bydata, size_t bylength, bool is_key, off_t offset)
+bool ChmKVPair::Overwrite(const unsigned char* bydata, size_t bylength, bool is_key, off_t offset)
 {
 	if(!bydata || 0L == bylength){
 		return true;

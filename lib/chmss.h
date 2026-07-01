@@ -44,6 +44,7 @@ class ChmSecureSock;
 // Typedefs for ChmSecureSock class
 //---------------------------------------------------------
 typedef	void*								ChmSSSession;
+typedef	const void*							ConstChmSSSession;
 
 //---------------------------------------------------------
 // Common symbols/macros for ChmSecureSock::CheckResultSSL

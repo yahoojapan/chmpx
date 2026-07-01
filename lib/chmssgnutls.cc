@@ -407,8 +407,8 @@ bool ChmSecureSock::LoadCACerts(gnutls_certificate_credentials_t& cert_cred)
 			// get detail error for each failed cert.
 			// Then we open CA directory and load each certs by manually here.
 			//
-			DIR*			pdir;
-			struct dirent*	dent;
+			DIR*					pdir;
+			const struct dirent*	dent;
 			if(NULL == (pdir = opendir(ChmSecureSock::GetCAPath().c_str()))){
 				ERR_CHMPRN("Could not open directory(%s) for CA certs by errno(%d).", ChmSecureSock::GetCAPath().c_str(), errno);
 				return false;
@@ -448,14 +448,14 @@ bool ChmSecureSock::LoadCACerts(gnutls_certificate_credentials_t& cert_cred)
 	return true;
 }
 
-bool ChmSecureSock::CheckResultSSL(int sock, ChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
+bool ChmSecureSock::CheckResultSSL(int sock, ConstChmSSSession sslsession, long action_result, int type, bool& is_retry, bool& is_close, int retrycnt, suseconds_t waittime)
 {
 	if(CHM_INVALID_SOCK == sock || !sslsession || !IS_SAFE_CHKRESULTSSL_TYPE(type)){
 		ERR_CHMPRN("Parameters are wrong.");
 		is_retry = false;
 		return false;
 	}
-	ChmSSSessionEnt*	ssl = reinterpret_cast<ChmSSSessionEnt*>(sslsession);
+	const ChmSSSessionEnt*	ssl = reinterpret_cast<const ChmSSSessionEnt*>(sslsession);
 
 	if(CHMEVENTSOCK_RETRY_DEFAULT == retrycnt){
 		// cppcheck-suppress uselessAssignmentPtrArg

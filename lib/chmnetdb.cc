@@ -815,7 +815,7 @@ bool ChmNetDb::CheckHostnameInResolv(const char* hostname, bool is_default_domai
 //---------------------------------------------------------
 ChmNetDb::ChmNetDb() : timeout(ChmNetDb::ALIVE_TIME), fulllocalname(""), is_init_regobj(false)
 {
-	static ChmNetDb*	pnetdb = NULL;		// for checking initializing
+	static const ChmNetDb*	pnetdb = NULL;	// for checking initializing
 	if(!pnetdb){
 		pnetdb = this;
 		InitializeLocalHostInfo();			// initializing

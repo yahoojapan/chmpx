@@ -1208,7 +1208,7 @@ bool ChmIMData::CompareChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count)
 	return true;
 }
 
-bool ChmIMData::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove, bool is_init_process, int eqfd)
+bool ChmIMData::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove, bool is_init_process, int argeqfd)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1217,10 +1217,10 @@ bool ChmIMData::MergeChmpxSvrs(PCHMPXSVR pchmpxsvrs, long count, bool is_remove,
 	ChmLock	AutoLock(CHMLT_IMDATA, CHMLT_WRITE);			// Lock
 
 	chminfolap	tmpchminfo(&pChmShm->info, pChmShm);
-	return tmpchminfo.MergeChmpxSvrs(pchmpxsvrs, count, is_remove, is_init_process, eqfd);
+	return tmpchminfo.MergeChmpxSvrs(pchmpxsvrs, count, is_remove, is_init_process, argeqfd);
 }
 
-bool ChmIMData::MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, int eqfd)
+bool ChmIMData::MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, int argeqfd)
 {
 	if(!IsAttachedShm()){
 		ERR_CHMPRN("There is no attached ChmShm.");
@@ -1249,9 +1249,9 @@ bool ChmIMData::MergeChmpxSvrsForStatusUpdate(PCHMPXSVR pchmpxsvrs, long count, 
 	//
 	// Lock in following method.
 	//
-	if(!MergeChmpxSvrs(pchmpxsvrs, count, false, false, eqfd)){
+	if(!MergeChmpxSvrs(pchmpxsvrs, count, false, false, argeqfd)){
 		ERR_CHMPRN("Failed to merge chmpx server information, try to recover...");
-		if(!MergeChmpxSvrs(pbasechmpxsvrs, basecount, false, false, eqfd)){
+		if(!MergeChmpxSvrs(pbasechmpxsvrs, basecount, false, false, argeqfd)){
 			ERR_CHMPRN("Failed to recover merging chmpx server information, no more do nothing...");
 		}
 		CHM_Free(pbasechmpxsvrs);

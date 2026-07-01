@@ -168,7 +168,7 @@ class ChmEventMq : public ChmEventBase
 		bool FreeMsgIds(msgid_t msgid, mqd_t mqfd);
 		mqd_t OpenDestMQ(msgid_t msgid);
 
-		bool PxCltReceiveMergeGetLastTime(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
+		bool PxCltReceiveMergeGetLastTime(PCOMHEAD pComHead, const PXCLT_ALL* pCltAll);
 		bool PxCltSendMergeResponseLastTime(const struct timespec& lastts);
 		bool PxCltReceiveMergeResponseLastTime(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
 		bool PxCltReceiveRequestUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
@@ -177,7 +177,7 @@ class ChmEventMq : public ChmEventBase
 		bool PxCltReceiveSetUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
 		bool PxCltSendResultUpdateData(chmpxid_t chmpxid, bool result);
 		bool PxCltReceiveResultUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
-		bool PxCltReceiveAbortUpdateData(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
+		bool PxCltReceiveAbortUpdateData(PCOMHEAD pComHead, const PXCLT_ALL* pCltAll);
 		bool PxCltSendCloseNotify(msgidlist_t& msgids);
 		bool PxCltReceiveCloseNotify(PCOMHEAD pComHead, PPXCLT_ALL pCltAll);
 
