@@ -5971,7 +5971,9 @@ bool ChmEventSock::ContinuousAutoMerge(void)
 			startup_servicein = false;
 
 			// re-get status
+			// cppcheck-suppress unmatchedSuppression
 			// cppcheck-suppress unreadVariable
+			// cppcheck-suppress redundantAssignment
 			status = pImData->GetSelfStatus();
 		}else{
 			// Not [SERVICE OUT] [UP] [NOACT] [NOTHING] status

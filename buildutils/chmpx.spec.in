@@ -47,6 +47,8 @@
 %global run_autogen echo "skip autogen.sh"
 %endif
 
+%global major_version %{lua: print(string.match("@VERSION@", "^%d+"))}
+
 #
 # main package
 #
@@ -75,12 +77,10 @@ BuildRequires: systemd git-core gcc-c++ make libtool k2hash-devel >= @LIB_MINVER
 %install
 %make_install
 find %{buildroot} -name '*.la' -exec rm -f {} ';'
-%if 0%{?rhel} != 6
 install -D -m 644 buildutils/chmpx.service %{buildroot}/lib/systemd/system/chmpx.service
 install -D -m 755 buildutils/chmpx-service-helper %{buildroot}/usr/libexec/chmpx-service-helper
 install -D -m 644 buildutils/chmpx-service-helper.conf %{buildroot}/etc/antpickax/chmpx-service-helper.conf
 install -D -m 644 buildutils/chmpx.ini.example %{buildroot}/etc/antpickax/chmpx.ini.example
-%endif
 
 %if %{make_check}
 %check
@@ -94,32 +94,20 @@ install -D -m 644 buildutils/chmpx.ini.example %{buildroot}/etc/antpickax/chmpx.
 %postun -p /sbin/ldconfig
 %endif
 
-%if 0%{?rhel} == 6
-%clean
-rm -rf %{buildroot}
-%endif
-
 %files
-%if 0%{?rhel} == 6
-%doc COPYING
-%defattr(-,root,root)
-%else
+
 %license COPYING
-%endif
+
 %doc README AUTHORS ChangeLog
-%{_libdir}/*.so.1*
+%{_libdir}/*.so.%{major_version}*
 %{_mandir}/man1/*
 %{_bindir}/*
-%if 0%{?rhel} != 6
 /lib/systemd/system/chmpx.service
 /usr/libexec/chmpx-service-helper
 /etc/antpickax/*
-%endif
 
-%if 0%{?rhel} != 6
 %preun
 %systemd_preun @PACKAGE_NAME@.service
-%endif
 
 #
 # devel package
@@ -133,9 +121,7 @@ Development package for building with @PACKAGE_NAME@ shared library.
 This package has header files and symbols for it.
 
 %files devel
-%if 0%{?rhel} == 6
-%defattr(-,root,root)
-%endif
+
 %doc README AUTHORS ChangeLog
 %{_includedir}/*
 %{_libdir}/*.so
