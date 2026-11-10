@@ -829,7 +829,12 @@ bool ChmEventSock::RawReceive(int sock, ChmSSSession ssl, bool& is_closed, PCOMP
 			ERR_CHMPRN("The packet length(%zu) in received COMPKT from sock(%d) is too short, should be %zu byte.", ComPkt.length, sock, sizeof(COMPKT));
 			return false;
 		}
+
 		totallength = ComPkt.length;
+		if(MAX_RECEIVE_LENGTH_SOCKET < totallength){
+			ERR_CHMPRN("The packet length(%zu) is too largel(over %zu MB).", totallength, static_cast<size_t>(MAX_RECEIVE_LENGTH_SOCKET / 1024 / 1024));
+			return false;
+		}
 	}
 	DUMPCOM_COMPKT("Sock::RawReceive", &ComPkt);
 
@@ -7902,11 +7907,11 @@ bool ChmEventSock::PxComReceiveConinitReq(PCOMHEAD pComHead, PPXCOM_ALL pComAll,
 
 			PPXCOM_N2_CONINIT_REQ	pConinitReq	= CVT_COMPTR_N2_CONINIT_REQ(pComAll);
 
-			name		= pConinitReq->name;
+			name		= std::string(pConinitReq->name, strnlen(pConinitReq->name, NI_MAXHOST - 1));
 			from_chmpxid= pConinitReq->chmpxid;
 			ctlport		= pConinitReq->ctlport;
-			cuk			= pConinitReq->cuk;
-			custom_seed	= pConinitReq->custom_seed;
+			cuk			= std::string(pConinitReq->cuk, strnlen(pConinitReq->cuk, CUK_MAX - 1));
+			custom_seed	= std::string(pConinitReq->custom_seed, strnlen(pConinitReq->custom_seed, CUSTOM_ID_SEED_MAX - 1));
 
 			rev_hostport_pairs(endpoints,		pConinitReq->endpoints,		EXTERNAL_EP_MAX);
 			rev_hostport_pairs(ctlendpoints,	pConinitReq->ctlendpoints,	EXTERNAL_EP_MAX);

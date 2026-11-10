@@ -33,6 +33,7 @@
 #define	MAX_K2HASH_MQ_KEY_LENGTH	128						// (uint64_t(32) + '-' + uint64_t(32) + '-' + uint64_t(32) + suffix(5) + null) + some bytes.
 #define	MQ_PRIORITY_NOTICE			10						// COM_PX2C, COM_C2PX
 #define	MQ_PRIORITY_MSG				10						// COM_C2C
+#define	MAX_RECEIVE_LENGTH_SOCKET	(1024 * 1024 * 256)		// 256MB
 
 // 
 // The two higher bits in serial number is for the ACK on MQ.

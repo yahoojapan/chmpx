@@ -1186,10 +1186,14 @@ SECStatus ChmSecureSock::AuthCertificateCallback(void* arg, PRFileDesc* fd, PRBo
 	}
 
 	// [NOTE]
-	// We do not check hostname in certification, but this is not a
-	// good method for strict verification.
-	// If you need it, you can call SSL_SetURL function before authenticating,
-	// and call SSL_RevealURL function here, and check hostname.
+	// CHMPX is designed to retrieve destination information(hostname/IP address)
+	// from the configuration, with the verification of these details handled by
+	// separate logic.
+	// CHMPX is intended for operation within an isolated, trusted private network.
+	// Therefore, scenarios such as path hijacking by another node under the same
+	// CA(ex. insider threats) are outside its scope.
+	// Validating the legitimate CA chain and controlling nodes at the application
+	// layer are considered sufficient.
 	//
 
 	CERT_DestroyCertificate(certPeer);

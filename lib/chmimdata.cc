@@ -677,7 +677,7 @@ bool ChmIMData::InitializeShmEx(const CHMCFGINFO& chmcfg, const CHMNODE_CFGINFO*
 
 	// make new file
 	int	fd;
-	if(CHM_INVALID_HANDLE == (fd = open(shmpath.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH))){
+	if(CHM_INVALID_HANDLE == (fd = open(shmpath.c_str(), O_RDWR | O_CREAT | O_NOFOLLOW, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH))){
 		ERR_CHMPRN("Could not create file(%s), errno = %d", shmpath.c_str(), errno);
 		return false;
 	}

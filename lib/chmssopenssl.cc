@@ -491,6 +491,7 @@ ChmSSCtx ChmSecureSock::MakeSSLContext(const char* server_cert, const char* serv
 	}
 
 	// Set cert
+	int	verify_mode = SSL_VERIFY_NONE;
 	if(!CHMEMPTYSTR(server_cert) && !CHMEMPTYSTR(server_prikey)){
 		// Set server cert
 		if(1 != SSL_CTX_use_certificate_chain_file(ctx, server_cert)){
@@ -527,6 +528,11 @@ ChmSSCtx ChmSecureSock::MakeSSLContext(const char* server_cert, const char* serv
 			}
 		}
 
+		// verify peer mode
+	    if(verify_peer){
+			verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT | SSL_VERIFY_CLIENT_ONCE;
+		}
+
 	}else if(!CHMEMPTYSTR(slave_cert) && !CHMEMPTYSTR(slave_prikey)){
 		// Set slave cert
 		if(1 != SSL_CTX_use_certificate_chain_file(ctx, slave_cert)){
@@ -550,12 +556,22 @@ ChmSSCtx ChmSecureSock::MakeSSLContext(const char* server_cert, const char* serv
 			return NULL;
 		}
 
-		// slave SSL context does not need verify flag.
-		verify_peer = false;
+		// verify peer mode
+	    if(verify_peer){
+			verify_mode = SSL_VERIFY_PEER;
+		}
 	}
 
-	// Make verify peer mode
-	int	verify_mode = verify_peer ? (SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT | SSL_VERIFY_CLIENT_ONCE) : SSL_VERIFY_NONE;
+	// [NOTE]
+	// CHMPX is designed to retrieve destination information(hostname/IP address)
+	// from the configuration, with the verification of these details handled by
+	// separate logic.
+	// CHMPX is intended for operation within an isolated, trusted private network.
+	// Therefore, scenarios such as path hijacking by another node under the same
+	// CA(ex. insider threats) are outside its scope.
+	// Validating the legitimate CA chain and controlling nodes at the application
+	// layer are considered sufficient.
+	//
 
 	// Set callback
 	SSL_CTX_set_verify(ctx, verify_mode, ChmSecureSock::VerifyCallBackSSL);									// Set verify callback
