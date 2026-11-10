@@ -309,7 +309,7 @@ inline bool rev_hostport_pairs(hostport_list_t& dst, PCHMPXHP_RAWPAIR psrc, size
 	for(size_t cnt = 0; cnt < srccnt; ++cnt){
 		if(!CHMEMPTYSTR(psrc[cnt].name)){
 			HOSTPORTPAIR	tmp;
-			tmp.host = psrc[cnt].name;
+			tmp.host = std::string(psrc[cnt].name, strnlen(psrc[cnt].name, NI_MAXHOST - 1));
 			tmp.port = psrc[cnt].port;
 			dst.push_back(tmp);
 		}
@@ -1873,8 +1873,10 @@ bool chmpx_lap<T>::MergeChmpxSvr(PCHMPXSVR chmpxsvr, CHMPXID_SEED_TYPE type, boo
 	}
 
 	// others(always overwrite)
-	strncpy(basic_type::pAbsPtr->cuk,			chmpxsvr->cuk,			CUK_MAX);
-	strncpy(basic_type::pAbsPtr->custom_seed,	chmpxsvr->custom_seed,	CUSTOM_ID_SEED_MAX);
+	memset(basic_type::pAbsPtr->cuk,			0,						CUK_MAX);
+	strncpy(basic_type::pAbsPtr->cuk,			chmpxsvr->cuk,			CUK_MAX - 1);
+	memset(basic_type::pAbsPtr->custom_seed,	0,						CUSTOM_ID_SEED_MAX);
+	strncpy(basic_type::pAbsPtr->custom_seed,	chmpxsvr->custom_seed,	CUSTOM_ID_SEED_MAX - 1);
 	copy_hostport_pairs(basic_type::pAbsPtr->forward_peers, chmpxsvr->forward_peers, FORWARD_PEER_MAX);
 	copy_hostport_pairs(basic_type::pAbsPtr->reverse_peers, chmpxsvr->reverse_peers, REVERSE_PEER_MAX);
 

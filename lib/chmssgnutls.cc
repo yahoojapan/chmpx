@@ -590,13 +590,8 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 
 	// Load server cert
 	if(ctx->strServerPKey.empty()){
-		if(0 > (resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strServerCert.c_str(), GNUTLS_X509_FMT_PEM))){
-			ERR_CHMPRN("Failed to load server cert(cert file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strServerCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
-			gnutls_certificate_free_credentials(cert_cred);
-			return NULL;
-		}
-		if(0 == resgnutls){
-			ERR_CHMPRN("No server cert is loaded from cert file(%s).", ctx->strServerCert.c_str());
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strServerCert.c_str(), ctx->strServerCert.c_str(), GNUTLS_X509_FMT_PEM))){
+			ERR_CHMPRN("Failed to load server cert/key from single file(%s)" CHM_GNUTLS_ERR_PRN_FORM, ctx->strServerCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 			gnutls_certificate_free_credentials(cert_cred);
 			return NULL;
 		}
@@ -637,6 +632,7 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 	// set verify peer
 	if(ChmSecureSock::is_verify_peer){
 		gnutls_certificate_server_set_request(session, GNUTLS_CERT_REQUIRE);						// not GNUTLS_CERT_REQUEST
+		gnutls_certificate_send_x509_rdn_sequence(session, 1);
 	}else{
 		gnutls_certificate_server_set_request(session, GNUTLS_CERT_IGNORE);
 	}
@@ -664,6 +660,28 @@ ChmSSSession ChmSecureSock::AcceptSSL(ChmSSCtx ctx, int sock, int con_retrycnt, 
 		gnutls_deinit(session);
 		gnutls_certificate_free_credentials(cert_cred);
 		return NULL;
+	}
+
+	// Verify peer
+	if(ChmSecureSock::is_verify_peer){
+		unsigned int status = 0;
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_verify_peers3(session, NULL, &status))){
+			ERR_CHMPRN("Failed to verify peer certificate"  CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+			gnutls_deinit(session);
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+		if(status != 0){
+			// Certificate is invalid (expired, untrusted CA, tampered with, etc)
+			gnutls_datum_t	out;
+			gnutls_certificate_verification_status_print(status, GNUTLS_CRT_X509, &out, 0);
+			ERR_CHMPRN("Peer certificate verification failed: %s", out.data);
+			gnutls_free(out.data);
+
+			gnutls_deinit(session);
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
 	}
 
 	// print information for session
@@ -706,13 +724,8 @@ ChmSSSession ChmSecureSock::ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt,
 	// Load slave cert
 	if(ChmSecureSock::is_verify_peer && !ctx->strSlaveCert.empty()){
 		if(ctx->strSlavePKey.empty()){
-			if(0 > (resgnutls = gnutls_certificate_set_x509_crl_file(cert_cred, ctx->strSlaveCert.c_str(), GNUTLS_X509_FMT_PEM))){
-				ERR_CHMPRN("Failed to load slave cert(cert file=%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strSlaveCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
-				gnutls_certificate_free_credentials(cert_cred);
-				return NULL;
-			}
-			if(0 == resgnutls){
-				ERR_CHMPRN("No slave cert is loaded from cert file(%s).", ctx->strSlaveCert.c_str());
+			if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_set_x509_key_file(cert_cred, ctx->strSlaveCert.c_str(), ctx->strSlaveCert.c_str(), GNUTLS_X509_FMT_PEM))){
+				ERR_CHMPRN("Failed to load slave cert/key from single file(%s) allocate credential" CHM_GNUTLS_ERR_PRN_FORM, ctx->strSlaveCert.c_str(), CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
 				gnutls_certificate_free_credentials(cert_cred);
 				return NULL;
 			}
@@ -779,6 +792,54 @@ ChmSSSession ChmSecureSock::ConnectSSL(ChmSSCtx ctx, int sock, int con_retrycnt,
 		gnutls_deinit(session);
 		gnutls_certificate_free_credentials(cert_cred);
 		return NULL;
+	}
+
+	// Verify peer
+	if(ChmSecureSock::is_verify_peer){
+		// [NOTE]
+		// CHMPX is designed to retrieve destination information(hostname/IP address)
+		// from the configuration, with the verification of these details handled by
+		// separate logic.
+		// CHMPX is intended for operation within an isolated, trusted private network.
+		// Therefore, scenarios such as path hijacking by another node under the same
+		// CA(ex. insider threats) are outside its scope.
+		// Validating the legitimate CA chain and controlling nodes at the application
+		// layer are considered sufficient.
+		//
+
+		// Verification of certificate presentation
+		unsigned int			cert_list_size	= 0;
+		const gnutls_datum_t*	pCertList		= gnutls_certificate_get_peers(session, &cert_list_size);
+		if(NULL == pCertList || 0 == cert_list_size){
+			ERR_CHMPRN("No peer certificate found in session");
+			gnutls_deinit(session);
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+
+		// [NOTE]
+		// CHMPX only checks the CA certificate, it does not perform hostname verification.
+		// Verification based on hostname or IP address can be performed if required,
+		// depending on the configuration.
+		//
+		unsigned int status = 0;
+		if(GNUTLS_E_SUCCESS != (resgnutls = gnutls_certificate_verify_peers3(session, NULL, &status))){
+			ERR_CHMPRN("Failed to verify peer certificate"  CHM_GNUTLS_ERR_PRN_FORM, CHM_GNUTLS_ERR_PRN_ARGS(resgnutls));
+			gnutls_deinit(session);
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
+		if(status != 0){
+			// Certificate is invalid (expired, untrusted CA, tampered with, etc)
+			gnutls_datum_t	out;
+			gnutls_certificate_verification_status_print(status, GNUTLS_CRT_X509, &out, 0);
+			ERR_CHMPRN("Peer certificate verification failed: %s", out.data);
+			gnutls_free(out.data);
+
+			gnutls_deinit(session);
+			gnutls_certificate_free_credentials(cert_cred);
+			return NULL;
+		}
 	}
 
 	// print information for session
