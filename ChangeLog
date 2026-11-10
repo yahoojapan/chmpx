@@ -1,3 +1,10 @@
+chmpx (1.0.114) unstable; urgency=low
+
+  * Strengthened variable checks and fixed bugs - #158
+  * Changed support OSes and fixed files - #157
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Tue, 10 Nov 2026 17:31:16 +0900
+
 chmpx (1.0.113) unstable; urgency=low
 
   * Supports Alpine 3.24, manual trigger for GHA, and fix codes - #155
